@@ -402,6 +402,57 @@ function renderGroupTable() {
   }
 }
 
+/** 예선 전체 대진(팀 조합)과 각 경기의 기록 여부 */
+function groupFixtures() {
+  const list = [];
+  for (let i = 0; i < TOURNAMENT_TEAMS.length; i++) {
+    for (let j = i + 1; j < TOURNAMENT_TEAMS.length; j++) {
+      const a = TOURNAMENT_TEAMS[i].id;
+      const b = TOURNAMENT_TEAMS[j].id;
+      const match = tMatches.find(m => m.stage === 'group'
+        && ((m.teamA === a && m.teamB === b) || (m.teamA === b && m.teamB === a)));
+      list.push({ a, b, match: match || null });
+    }
+  }
+  return list;
+}
+
+function renderGroupFixtures() {
+  const box = document.getElementById('groupFixtures');
+  const note = document.getElementById('fixtureNote');
+  if (!box || !note) return;
+
+  const list = groupFixtures();
+  const done = list.filter(f => f.match).length;
+
+  note.textContent = currentAdmin
+    ? `${list.length}경기 중 ${done}경기 완료 · 이긴 팀을 누르면 바로 기록되고 위 순위표에 반영됩니다.`
+    : `${list.length}경기 중 ${done}경기 완료 · 결과 등록은 관리자만 할 수 있습니다.`;
+
+  box.innerHTML = list.map(f => {
+    if (f.match) {
+      const loser = f.match.winner === f.match.teamA ? f.match.teamB : f.match.teamA;
+      return `<div class="fx done">
+        <span class="fx-pair">
+          <b class="win-txt">${esc(teamLabel(f.match.winner))}</b>
+          <span class="fx-vs">승</span>
+          <span class="loss-txt">${esc(teamLabel(loser))}</span>
+        </span>
+        ${currentAdmin ? `<button class="btn-mini btn-reject" data-tdel="${f.match.id}">삭제</button>` : ''}
+      </div>`;
+    }
+    return `<div class="fx">
+      <span class="fx-pair">${esc(teamLabel(f.a))}<span class="fx-vs">vs</span>${esc(teamLabel(f.b))}</span>
+      ${currentAdmin
+        ? `<span class="fx-actions">
+             <button class="btn-mini btn-approve" data-fx="${f.a}:${f.b}:${f.a}">${esc(teamLabel(f.a))} 승</button>
+             <button class="btn-mini btn-approve" data-fx="${f.a}:${f.b}:${f.b}">${esc(teamLabel(f.b))} 승</button>
+           </span>`
+        : '<span class="fx-todo">미진행</span>'}
+    </div>`;
+  }).join('');
+}
+
 function renderTournamentForm() {
   const form = document.getElementById('tForm');
   const hint = document.getElementById('tFormHint');
@@ -465,6 +516,7 @@ function renderTournamentLog() {
 function renderTournament() {
   renderTeamCards();
   renderGroupTable();
+  renderGroupFixtures();
   renderTournamentForm();
   renderTournamentLog();
 }
@@ -481,6 +533,16 @@ async function recordTournamentMatch() {
   try {
     await apiPost('/api/tournament', { action: 'record', stage, teamA, teamB, winner, note });
     document.getElementById('tNote').value = '';
+    await loadTournament();
+    renderTournament();
+    showToast(`${teamLabel(winner)} 승리로 기록했습니다.`);
+  } catch (e) { showToast(e.message); }
+}
+
+/** 예선 대진에서 이긴 팀 버튼을 눌러 바로 기록 */
+async function recordFixture(a, b, winner) {
+  try {
+    await apiPost('/api/tournament', { action: 'record', stage: 'group', teamA: a, teamB: b, winner });
     await loadTournament();
     renderTournament();
     showToast(`${teamLabel(winner)} 승리로 기록했습니다.`);
@@ -510,6 +572,16 @@ function initTournamentEvents() {
   if (log) log.addEventListener('click', e => {
     const id = e.target.dataset && e.target.dataset.tdel;
     if (id) deleteTournamentMatch(id);
+  });
+
+  const fx = document.getElementById('groupFixtures');
+  if (fx) fx.addEventListener('click', e => {
+    const d = e.target.dataset || {};
+    if (d.tdel) return deleteTournamentMatch(d.tdel);
+    if (d.fx) {
+      const [a, b, winner] = d.fx.split(':');
+      recordFixture(a, b, winner);
+    }
   });
 }
 
