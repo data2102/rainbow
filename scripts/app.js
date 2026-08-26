@@ -6,6 +6,23 @@ let players = [];
 let matches = [];
 let requests = [];
 let admins = [];
+let tMatches = [];          // 대회 경기 기록
+
+/* 대회 참가 팀. api/tournament.js 의 TEAMS 와 id 가 일치해야 합니다. */
+const TOURNAMENT_TEAMS = [
+  { id: 'A', label: 'A팀', members: ['레나', '네오', '블루베리', '키스'] },
+  { id: 'B', label: 'B팀', members: ['현정', '구짭', '범상', '짱가'] },
+  { id: 'C', label: 'C팀', members: ['멘탈', '메가', '소소', '보리'] },
+  { id: 'D', label: 'D팀', members: ['진원', '람보', '플라스', '수까락'] },
+  { id: 'E', label: 'E팀', members: ['벨리', '까를', '티얼', '조커'] },
+];
+const MERCENARIES = ['렌보짱', '럭키', '호신', '실장'];
+const ADVANCING = 4;        // 예선 통과 팀 수
+
+function teamLabel(id) {
+  const t = TOURNAMENT_TEAMS.find(t => t.id === id);
+  return t ? t.label : id;
+}
 let currentAdmin = null;
 let authToken = null;       // 메모리에만 보관 (새로고침 시 재로그인)
 
@@ -49,6 +66,13 @@ async function loadState() {
   players = d.players || [];
   matches = d.matches || [];
   requests = d.requests || [];
+}
+
+async function loadTournament() {
+  try {
+    const d = await apiGet('/api/tournament');
+    tMatches = d.matches || [];
+  } catch { tMatches = []; }
 }
 
 async function loadAdmins() {
@@ -267,6 +291,202 @@ function renderAll() {
   renderHistory();
   renderPending();
   renderAdminList();
+  renderTournament();
+}
+
+/* ---------- 대회 (TOURNAMENT) ---------- */
+
+/** 예선 순위: 승 많은 순 → 패 적은 순 → 팀 순 */
+function groupStandings() {
+  const rows = TOURNAMENT_TEAMS.map(t => ({ ...t, played: 0, wins: 0, losses: 0 }));
+  const byId = Object.fromEntries(rows.map(r => [r.id, r]));
+
+  for (const m of tMatches) {
+    if (m.stage !== 'group') continue;
+    const a = byId[m.teamA];
+    const b = byId[m.teamB];
+    if (!a || !b) continue;
+    a.played++; b.played++;
+    if (m.winner === m.teamA) { a.wins++; b.losses++; }
+    else                      { b.wins++; a.losses++; }
+  }
+
+  rows.sort((x, y) => y.wins - x.wins || x.losses - y.losses || x.id.localeCompare(y.id));
+
+  // 전적이 같으면 같은 순위를 준다. 순위를 임의로 갈라놓으면
+  // 아직 정해지지 않은 순서가 정해진 것처럼 보이기 때문이다.
+  let rank = 0;
+  rows.forEach((r, i) => {
+    const prev = rows[i - 1];
+    if (prev && prev.wins === r.wins && prev.losses === r.losses) r.rank = prev.rank;
+    else r.rank = ++rank;
+    if (prev && prev.rank === r.rank) { prev.tied = true; r.tied = true; }
+    rank = Math.max(rank, i + 1);
+  });
+  return rows;
+}
+
+function renderTeamCards() {
+  const el = document.getElementById('teamCards');
+  if (!el) return;
+  const teams = TOURNAMENT_TEAMS.map(t => `
+    <div class="team-card">
+      <div class="tc-name">${esc(t.label)}</div>
+      <div class="tc-roster">${t.members.map(esc).join(' · ')}</div>
+    </div>`).join('');
+  el.innerHTML = teams + `
+    <div class="team-card is-merc">
+      <div class="tc-name">용병</div>
+      <div class="tc-roster">${MERCENARIES.map(esc).join(' · ')}<br><em>그 외 상황 봐서</em></div>
+    </div>`;
+}
+
+function renderGroupTable() {
+  const tbody = document.querySelector('#groupTable tbody');
+  if (!tbody) return;
+  const rows = groupStandings();
+  const anyPlayed = rows.some(r => r.played > 0);
+
+  tbody.innerHTML = rows.map(r => {
+    const rate = r.played ? Math.round((r.wins / r.played) * 1000) / 10 : 0;
+    // 자기 순위까지의 팀 수가 진출 정원을 넘지 않아야 진출 확정이다.
+    // 정원 경계에서 동률이면 그 팀들은 아직 확정이 아니라 '경합' 상태다.
+    const upTo = rows.filter(o => o.rank <= r.rank).length;
+    const settled = anyPlayed && upTo <= ADVANCING;
+    const contesting = anyPlayed && !settled && r.rank <= ADVANCING;
+    const tag = settled ? '<span class="adv-tag">본선</span>'
+              : contesting ? '<span class="vie-tag">경합</span>' : '';
+    return `<tr class="${settled ? 'is-adv' : ''}">
+      <td class="rank-cell ${anyPlayed ? medalClass(r.rank) : ''}">${anyPlayed ? r.rank : '-'}${r.tied && anyPlayed ? '<span class="tie-tag">동률</span>' : ''}</td>
+      <td><b>${esc(r.label)}</b> ${tag}</td>
+      <td>${r.played}</td>
+      <td class="win-txt">${r.wins}</td>
+      <td class="loss-txt">${r.losses}</td>
+      <td>${rate}%</td>
+    </tr>`;
+  }).join('');
+
+  const note = document.getElementById('groupNote');
+  if (note) {
+    const played = tMatches.filter(m => m.stage === 'group').length;
+    const hasTie = anyPlayed && rows.some(r =>
+      r.rank <= ADVANCING && rows.filter(o => o.rank <= r.rank).length > ADVANCING);
+    note.innerHTML = anyPlayed
+      ? `예선 ${played}경기 반영 · 상위 ${ADVANCING}팀이 본선에 진출합니다.`
+        + (hasTie ? ' <b style="color:var(--amber);">마지막 진출 자리를 두고 동률이 있습니다 — 경합 팀 중 진출 팀은 따로 정하세요.</b>' : '')
+      : '아직 기록된 예선 경기가 없습니다. 경기를 기록하면 순위가 자동으로 계산됩니다.';
+  }
+}
+
+function renderTournamentForm() {
+  const form = document.getElementById('tForm');
+  const hint = document.getElementById('tFormHint');
+  if (!form || !hint) return;
+
+  form.style.display = currentAdmin ? 'block' : 'none';
+  hint.style.display = currentAdmin ? 'none' : 'block';
+  if (!currentAdmin) return;
+
+  // 팀 선택지는 한 번만 채운다
+  const selA = document.getElementById('tTeamA');
+  if (selA && !selA.options.length) {
+    const opts = TOURNAMENT_TEAMS.map(t => `<option value="${t.id}">${esc(t.label)}</option>`).join('');
+    selA.innerHTML = opts;
+    document.getElementById('tTeamB').innerHTML = opts;
+    document.getElementById('tTeamB').selectedIndex = 1;
+  }
+  syncWinnerOptions();
+}
+
+/** 승리 팀 선택지를 현재 고른 두 팀으로 맞춘다 */
+function syncWinnerOptions() {
+  const a = document.getElementById('tTeamA');
+  const b = document.getElementById('tTeamB');
+  const w = document.getElementById('tWinner');
+  if (!a || !b || !w) return;
+  const prev = w.value;
+  w.innerHTML = [a.value, b.value]
+    .filter((v, i, arr) => arr.indexOf(v) === i)
+    .map(id => `<option value="${id}">${esc(teamLabel(id))} 승리</option>`)
+    .join('');
+  if ([a.value, b.value].includes(prev)) w.value = prev;
+}
+
+function renderTournamentLog() {
+  const el = document.getElementById('tMatchLog');
+  if (!el) return;
+  if (!tMatches.length) {
+    el.innerHTML = '<div class="log-empty">아직 기록된 대회 경기가 없습니다.</div>';
+    return;
+  }
+
+  el.innerHTML = [...tMatches].reverse().map(m => {
+    const loser = m.winner === m.teamA ? m.teamB : m.teamA;
+    return `<div class="tlog">
+      <div class="tlog-top">
+        <span class="stage-tag ${m.stage}">${m.stage === 'group' ? '예선' : '본선'}</span>
+        <span class="tlog-teams">
+          <b class="win-txt">${esc(teamLabel(m.winner))}</b>
+          <span class="tlog-vs">승</span>
+          <span class="loss-txt">${esc(teamLabel(loser))}</span>
+        </span>
+        ${m.note ? `<span class="tlog-note">${esc(m.note)}</span>` : ''}
+        ${currentAdmin ? `<button class="btn-mini btn-reject" data-tdel="${m.id}">삭제</button>` : ''}
+      </div>
+      <div class="tlog-meta">등록자 : ${esc(m.recordedBy || '-')} · ${formatDateTime(m.ts)}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderTournament() {
+  renderTeamCards();
+  renderGroupTable();
+  renderTournamentForm();
+  renderTournamentLog();
+}
+
+async function recordTournamentMatch() {
+  const stage = document.getElementById('tStage').value;
+  const teamA = document.getElementById('tTeamA').value;
+  const teamB = document.getElementById('tTeamB').value;
+  const winner = document.getElementById('tWinner').value;
+  const note = document.getElementById('tNote').value.trim();
+
+  if (teamA === teamB) return showToast('서로 다른 두 팀을 선택해주세요.');
+
+  try {
+    await apiPost('/api/tournament', { action: 'record', stage, teamA, teamB, winner, note });
+    document.getElementById('tNote').value = '';
+    await loadTournament();
+    renderTournament();
+    showToast(`${teamLabel(winner)} 승리로 기록했습니다.`);
+  } catch (e) { showToast(e.message); }
+}
+
+async function deleteTournamentMatch(id) {
+  if (!confirm('이 대회 경기 기록을 삭제할까요? 예선 순위에서도 함께 빠집니다.')) return;
+  try {
+    await apiPost('/api/tournament', { action: 'delete', id: Number(id) });
+    await loadTournament();
+    renderTournament();
+    showToast('기록을 삭제했습니다.');
+  } catch (e) { showToast(e.message); }
+}
+
+function initTournamentEvents() {
+  const a = document.getElementById('tTeamA');
+  const b = document.getElementById('tTeamB');
+  if (a) a.addEventListener('change', syncWinnerOptions);
+  if (b) b.addEventListener('change', syncWinnerOptions);
+
+  const btn = document.getElementById('tRecordBtn');
+  if (btn) btn.addEventListener('click', recordTournamentMatch);
+
+  const log = document.getElementById('tMatchLog');
+  if (log) log.addEventListener('click', e => {
+    const id = e.target.dataset && e.target.dataset.tdel;
+    if (id) deleteTournamentMatch(id);
+  });
 }
 
 /* ---------- 토스트 / 모달 ---------- */
@@ -595,6 +815,7 @@ function initAdminEvents() {
 
 async function refreshAll() {
   await loadState();
+  await loadTournament();
   await loadAdmins();
   renderAll();
 }
@@ -608,6 +829,7 @@ async function boot() {
   initTabs();
   initStandingEvents();
   initAdminEvents();
+  initTournamentEvents();
   renderAuthBar();
   try {
     await refreshAll();

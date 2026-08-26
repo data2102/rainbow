@@ -328,6 +328,48 @@
   .final-vs span{color:var(--amber);margin:0 10px;}
   .final-note{font-size:12.5px;color:var(--text-dim);margin-top:7px;font-weight:600;}
 
+  /* 예선 순위표 */
+  #groupTable tr.is-adv td{background:rgba(143,224,92,0.045);}
+  .tie-tag{
+    display:block;font-family:'Share Tech Mono',monospace;font-size:10px;
+    color:var(--amber);letter-spacing:.04em;font-weight:700;
+  }
+  .adv-tag,.vie-tag{
+    font-family:'Oswald',sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em;
+    padding:1px 5px;margin-left:2px;vertical-align:middle;
+  }
+  .adv-tag{color:var(--bg);background:var(--win);}
+  .vie-tag{color:var(--amber);border:1px solid var(--amber-dim);}
+
+  /* 대회 경기 기록 폼 */
+  .t-form-grid{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px;
+  }
+  .t-note-cell{grid-column:1/-1;}
+  .t-lab{
+    display:block;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--text-dim);margin-bottom:4px;font-weight:700;
+  }
+  .t-form-grid select,.t-form-grid input{
+    width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);
+    font-family:'Share Tech Mono',monospace;padding:9px 10px;font-size:14px;font-weight:700;
+  }
+  .t-form-grid select:focus,.t-form-grid input:focus{outline:none;border-color:var(--amber-dim);}
+
+  /* 대회 경기 기록 목록 */
+  .tlog{border-bottom:1px solid rgba(44,52,31,0.6);padding:10px 0;}
+  .tlog:last-child{border-bottom:none;}
+  .tlog-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .stage-tag{
+    font-family:'Oswald',sans-serif;font-size:11.5px;font-weight:700;letter-spacing:.08em;
+    padding:2px 7px;border:1px solid var(--border);color:var(--text-dim);flex:none;
+  }
+  .stage-tag.final{color:var(--amber);border-color:var(--amber-dim);}
+  .tlog-teams{font-size:15px;font-weight:800;}
+  .tlog-vs{color:var(--text-dim);margin:0 5px;font-size:13px;}
+  .tlog-note{font-size:12.5px;color:var(--text-dim);font-weight:600;}
+  .tlog-meta{font-size:12px;color:var(--text-dim);margin-top:3px;font-weight:600;}
+
   /* 좁은 화면에서는 가로 스크롤 없이 세 칸이 다 들어오도록 줄인다 */
   @media (max-width:560px){
     .bracket{min-width:0;gap:7px;}
@@ -495,14 +537,7 @@
       <div class="tsec">
         <div class="tsec-h">■ 조편성</div>
         <div class="tsec-sub">5개 팀 · 팀당 4명</div>
-        <div class="team-cards">
-          <div class="team-card"><div class="tc-name">A팀</div><div class="tc-roster">레나 · 네오 · 블루베리 · 키스</div></div>
-          <div class="team-card"><div class="tc-name">B팀</div><div class="tc-roster">현정 · 구짭 · 범상 · 짱가</div></div>
-          <div class="team-card"><div class="tc-name">C팀</div><div class="tc-roster">멘탈 · 메가 · 소소 · 보리</div></div>
-          <div class="team-card"><div class="tc-name">D팀</div><div class="tc-roster">진원 · 람보 · 플라스 · 수까락</div></div>
-          <div class="team-card"><div class="tc-name">E팀</div><div class="tc-roster">벨리 · 까를 · 티얼 · 조커</div></div>
-          <div class="team-card is-merc"><div class="tc-name">용병</div><div class="tc-roster">렌보짱 · 럭키 · 호신 · 실장<br><em>그 외 상황 봐서</em></div></div>
-        </div>
+        <div class="team-cards" id="teamCards"></div>
       </div>
 
       <div class="tsec">
@@ -513,6 +548,17 @@
           <li><b>1위부터 4위까지</b>만 본선에 진출합니다.</li>
           <li>5위 팀은 여기서 탈락합니다.</li>
         </ul>
+
+        <div class="tsec-h" style="font-size:13px;color:var(--win);margin-top:18px;">예선 순위</div>
+        <div class="table-wrap">
+          <table id="groupTable">
+            <thead>
+              <tr><th>순위</th><th>팀</th><th>경기</th><th>승</th><th>패</th><th>승률</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="foot-note" id="groupNote" style="margin-top:8px;"></div>
       </div>
 
       <div class="tsec">
@@ -585,6 +631,44 @@
           <div class="final-vs">무패팀 <span>VS</span> 생존팀</div>
           <div class="final-note">승자조를 무패로 통과한 팀과, 패자조를 뚫고 살아남은 팀의 대결</div>
         </div>
+      </div>
+
+      <div class="tsec">
+        <div class="tsec-h">■ 대회 경기 기록</div>
+        <div class="tsec-sub">예선 순위는 여기 기록된 결과로 자동 계산됩니다</div>
+
+        <div id="tFormHint" class="log-empty">관리자 로그인 후 경기를 기록할 수 있습니다.</div>
+
+        <div id="tForm" style="display:none;">
+          <div class="t-form-grid">
+            <div>
+              <label class="t-lab">구분</label>
+              <select id="tStage">
+                <option value="group">예선</option>
+                <option value="final">본선</option>
+              </select>
+            </div>
+            <div>
+              <label class="t-lab">팀 1</label>
+              <select id="tTeamA"></select>
+            </div>
+            <div>
+              <label class="t-lab">팀 2</label>
+              <select id="tTeamB"></select>
+            </div>
+            <div>
+              <label class="t-lab">결과</label>
+              <select id="tWinner"></select>
+            </div>
+            <div class="t-note-cell">
+              <label class="t-lab">메모 (선택)</label>
+              <input type="text" id="tNote" maxlength="60" placeholder="예: 승자조 1차전">
+            </div>
+          </div>
+          <button class="btn" id="tRecordBtn">대회 경기 기록</button>
+        </div>
+
+        <div id="tMatchLog" style="margin-top:14px;"></div>
       </div>
 
       <div class="tsec">
