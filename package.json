@@ -8,7 +8,9 @@
     "start": "node server.js",
     "dev": "node server.js",
     "db:setup": "node scripts/setup.mjs",
-    "db:seed": "node scripts/seed.mjs"
+    "db:seed": "node scripts/seed.mjs",
+    "admin": "node scripts/admin.mjs",
+    "admin:reset": "node scripts/admin.mjs reset"
   },
   "dependencies": {
     "express": "^4.22.2",

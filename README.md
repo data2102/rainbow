@@ -23,7 +23,8 @@
 │   ├── app.js              프론트엔드 로직 (API 호출)
 │   ├── build_index.py      원본 + app.js → public/index.html 생성
 │   ├── setup.mjs           테이블 생성
-│   └── seed.mjs            시드 JSON → DB 적재
+│   ├── seed.mjs            시드 JSON → DB 적재
+│   └── admin.mjs           관리자 목록 조회 · 비밀번호 재발급
 ├── api/
 │   ├── _lib.js             DB연결·비밀번호해시·세션·점수규칙
 │   ├── state.js            GET  공개 랭킹/기록 조회
@@ -149,6 +150,34 @@ nginx 리버스 프록시 + Let's Encrypt(certbot)로 HTTPS를 붙이면 됩니�
 
 ---
 
+## 관리자 비밀번호를 잊었을 때
+
+비밀번호는 scrypt 해시로만 저장되어 되돌려볼 수 없습니다. 대신 재발급합니다.
+
+```bash
+export DATABASE_URL="postgresql://..."     # Windows: $env:DATABASE_URL="..."
+
+npm run admin                    # 관리자 목록과 각자의 상태 보기
+npm run admin:reset ADMIN_TeaRs  # 해당 계정만 임시 비밀번호 재발급
+```
+
+```
+✅ ADMIN_TeaRs 의 비밀번호를 재발급했습니다.
+
+   임시 비밀번호   R6-xxxxxxxx
+```
+
+- **선수 명단과 경기 기록은 전혀 건드리지 않습니다.** 해당 계정의 비밀번호만 바뀝니다.
+- 그 계정으로 열려 있던 **기존 로그인 세션은 모두 종료**됩니다.
+- 재발급된 계정은 첫 로그인 시 **비밀번호 변경 창이 강제로** 뜹니다.
+- 실행 기록은 `audit_log` 테이블에 `reset_password_cli` 로 남습니다.
+
+> `npm run db:seed` 를 다시 돌리는 것으로도 비밀번호가 재발급되지만,
+> **경기 기록이 시드 시점으로 되돌아가므로 운영 중에는 절대 쓰지 마세요.**
+> 운영 중에는 위 `admin:reset` 을 쓰면 됩니다.
+
+---
+
 ## 운영 메모
 
 - **점수 규칙** (`api/_lib.js`의 `winGain`): 승 +3 / 패 −1 / 3연승 +1 / 5연승 +2. 규칙을 바꾸려면 이 함수만 수정.
@@ -169,3 +198,5 @@ nginx 리버스 프록시 + Let's Encrypt(certbot)로 HTTPS를 붙이면 됩니�
 - 가입/삭제 신청 → 승인 → 명단 반영
 - 내보내기 → 초기화 → 가져오기 왕복 복구 (총점 일치)
 - 브라우저에서 4개 탭 렌더링 및 관리자 로그인 플로우 (콘솔 에러 없음)
+- 비밀번호 재발급 후 옛 비밀번호 거부 · 새 비밀번호 로그인 · 기존 세션 무효화 ·
+  선수/경기 데이터 및 다른 관리자 계정 무변화
