@@ -1,0 +1,20 @@
+{
+  "name": "r6rank",
+  "version": "1.0.0",
+  "description": "LADDER ZONE - Rainbow Six clan ladder (r6rank.co.kr)",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "db:setup": "node scripts/setup.mjs",
+    "db:seed": "node scripts/seed.mjs"
+  },
+  "dependencies": {
+    "express": "^4.22.2",
+    "pg": "^8.23.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

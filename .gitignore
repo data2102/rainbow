@@ -1,0 +1,8 @@
+node_modules/
+.env
+.vercel
+*.log
+
+# 내보내기/백업 JSON에는 평문 비밀번호가 들어있을 수 있으므로 저장소에 올리지 않습니다.
+ladder_backup*.json
+*.backup.json

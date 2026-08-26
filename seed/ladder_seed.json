@@ -1,0 +1,894 @@
+{
+  "players": [
+    {
+      "handle": "SNC_LeNa",
+      "clan": "SNC",
+      "name": "LeNa",
+      "point": 26,
+      "wins": 7,
+      "losses": 4,
+      "streak": 1,
+      "lastResult": "W",
+      "lastMatch": "2026-08-26T00:13:37.898Z"
+    },
+    {
+      "handle": "SNC_Gjplayer",
+      "clan": "SNC",
+      "name": "Gjplayer",
+      "point": 39,
+      "wins": 14,
+      "losses": 6,
+      "streak": 14,
+      "lastResult": "W",
+      "lastMatch": "2026-08-25T23:58:08.110Z"
+    },
+    {
+      "handle": "SNC_NEo",
+      "clan": "SNC",
+      "name": "NEo",
+      "point": -10,
+      "wins": 0,
+      "losses": 10,
+      "streak": -10,
+      "lastResult": "L",
+      "lastMatch": "2026-08-25T23:57:47.067Z"
+    },
+    {
+      "handle": "SNC_BlueBerry",
+      "clan": "SNC",
+      "name": "BlueBerry",
+      "point": 0,
+      "wins": 0,
+      "losses": 0,
+      "streak": 0,
+      "lastResult": null,
+      "lastMatch": null
+    },
+    {
+      "handle": "SNC_SungJin",
+      "clan": "SNC",
+      "name": "SungJin",
+      "point": 0,
+      "wins": 0,
+      "losses": 0,
+      "streak": 0,
+      "lastResult": null,
+      "lastMatch": null
+    },
+    {
+      "handle": "oK_hyunjung",
+      "clan": "oK",
+      "name": "hyunjung",
+      "point": 30,
+      "wins": 9,
+      "losses": 0,
+      "streak": 9,
+      "lastResult": "W",
+      "lastMatch": "2026-08-25T23:58:08.110Z"
+    },
+    {
+      "handle": "oK_Carlos",
+      "clan": "oK",
+      "name": "Carlos",
+      "point": 30,
+      "wins": 9,
+      "losses": 0,
+      "streak": 9,
+      "lastResult": "W",
+      "lastMatch": "2026-08-25T23:58:08.110Z"
+    },
+    {
+      "handle": "oK_mEntAl",
+      "clan": "oK",
+      "name": "mEntAl",
+      "point": 24,
+      "wins": 7,
+      "losses": 0,
+      "streak": 7,
+      "lastResult": "W",
+      "lastMatch": "2026-08-25T23:58:08.110Z"
+    },
+    {
+      "handle": "oK_AngLee",
+      "clan": "oK",
+      "name": "AngLee",
+      "point": -8,
+      "wins": 0,
+      "losses": 8,
+      "streak": -8,
+      "lastResult": "L",
+      "lastMatch": "2026-08-26T00:03:23.220Z"
+    },
+    {
+      "handle": "oK_LuCkY",
+      "clan": "oK",
+      "name": "LuCkY",
+      "point": 3,
+      "wins": 1,
+      "losses": 0,
+      "streak": 1,
+      "lastResult": "W",
+      "lastMatch": "2026-08-25T23:58:08.110Z"
+    },
+    {
+      "handle": "LOTUS_TeaRs",
+      "clan": "LOTUS",
+      "name": "TeaRs",
+      "point": -11,
+      "wins": 0,
+      "losses": 11,
+      "streak": -11,
+      "lastResult": "L",
+      "lastMatch": "2026-08-26T00:01:40.604Z"
+    },
+    {
+      "handle": "LOTUS_MEGA",
+      "clan": "LOTUS",
+      "name": "MEGA",
+      "point": -10,
+      "wins": 0,
+      "losses": 10,
+      "streak": -10,
+      "lastResult": "L",
+      "lastMatch": "2026-08-26T00:01:40.604Z"
+    },
+    {
+      "handle": "LOTUS_JINWON2",
+      "clan": "LOTUS",
+      "name": "JINWON2",
+      "point": -9,
+      "wins": 0,
+      "losses": 9,
+      "streak": -9,
+      "lastResult": "L",
+      "lastMatch": "2026-08-26T00:01:40.604Z"
+    },
+    {
+      "handle": "NE_Valley",
+      "clan": "NE",
+      "name": "Valley",
+      "point": 6,
+      "wins": 2,
+      "losses": 0,
+      "streak": 2,
+      "lastResult": "W",
+      "lastMatch": "2026-08-26T00:01:26.831Z"
+    },
+    {
+      "handle": "Rambo702",
+      "clan": "-",
+      "name": "Rambo702",
+      "point": 10,
+      "wins": 3,
+      "losses": 0,
+      "streak": 3,
+      "lastResult": "W",
+      "lastMatch": "2026-08-26T00:01:26.831Z"
+    },
+    {
+      "handle": "PSN_SangDaL2",
+      "clan": "PSN",
+      "name": "SangDaL2",
+      "point": 24,
+      "wins": 7,
+      "losses": 0,
+      "streak": 7,
+      "lastResult": "W",
+      "lastMatch": "2026-08-26T00:01:26.832Z"
+    },
+    {
+      "handle": "PSN_JOKER",
+      "clan": "PSN",
+      "name": "JOKER",
+      "point": 10,
+      "wins": 3,
+      "losses": 0,
+      "streak": 3,
+      "lastResult": "W",
+      "lastMatch": "2026-08-26T00:03:23.220Z"
+    },
+    {
+      "handle": "PSN_SkyLacK",
+      "clan": "PSN",
+      "name": "SkyLacK",
+      "point": 6,
+      "wins": 2,
+      "losses": 0,
+      "streak": 2,
+      "lastResult": "W",
+      "lastMatch": "2026-08-26T00:01:40.604Z"
+    },
+    {
+      "handle": "soso",
+      "clan": "-",
+      "name": "soso",
+      "point": 0,
+      "wins": 0,
+      "losses": 0,
+      "streak": 0,
+      "lastResult": null,
+      "lastMatch": null
+    },
+    {
+      "handle": "GURKA_PANG",
+      "clan": "GURKA",
+      "name": "PANG",
+      "point": -13,
+      "wins": 0,
+      "losses": 13,
+      "streak": -13,
+      "lastResult": "L",
+      "lastMatch": "2026-08-26T00:13:37.898Z"
+    },
+    {
+      "handle": "KIMPO_BORY",
+      "clan": "KIMPO",
+      "name": "BORY",
+      "point": 10,
+      "wins": 3,
+      "losses": 0,
+      "streak": 3,
+      "lastResult": "W",
+      "lastMatch": "2026-08-26T00:01:40.604Z"
+    },
+    {
+      "handle": "JjicKShoT",
+      "clan": "-",
+      "name": "JjicKShoT",
+      "point": 0,
+      "wins": 0,
+      "losses": 0,
+      "streak": 0,
+      "lastResult": null,
+      "lastMatch": null
+    },
+    {
+      "handle": "KisS",
+      "clan": "-",
+      "name": "KisS",
+      "point": 3,
+      "wins": 1,
+      "losses": 0,
+      "streak": 1,
+      "lastResult": "W",
+      "lastMatch": "2026-08-25T04:55:10.679Z"
+    },
+    {
+      "handle": "PAC_Plus",
+      "clan": "PAC",
+      "name": "Plus",
+      "point": 6,
+      "wins": 2,
+      "losses": 0,
+      "streak": 2,
+      "lastResult": "W",
+      "lastMatch": "2026-08-26T00:01:40.604Z"
+    },
+    {
+      "handle": "RID_HoSiN",
+      "clan": "RID",
+      "name": "HoSiN",
+      "point": 0,
+      "wins": 0,
+      "losses": 0,
+      "streak": 0,
+      "lastResult": null,
+      "lastMatch": null
+    },
+    {
+      "handle": "Surva chobo",
+      "clan": "-",
+      "name": "Surva chobo",
+      "point": 0,
+      "wins": 0,
+      "losses": 0,
+      "streak": 0,
+      "lastResult": null,
+      "lastMatch": null
+    },
+    {
+      "handle": "xOx_Cream",
+      "clan": "xOx",
+      "name": "Cream",
+      "point": 0,
+      "wins": 0,
+      "losses": 0,
+      "streak": 0,
+      "lastResult": null,
+      "lastMatch": null
+    },
+    {
+      "handle": "2MaNstorY_PsiloveU",
+      "clan": "2MaNstorY",
+      "name": "PsiloveU",
+      "point": 3,
+      "wins": 1,
+      "losses": 0,
+      "streak": 1,
+      "lastResult": "W",
+      "lastMatch": "2026-08-25T23:49:21.917Z"
+    },
+    {
+      "handle": "2MaNstorY_zZangGa",
+      "clan": "2MaNstorY",
+      "name": "zZangGa",
+      "point": 3,
+      "wins": 1,
+      "losses": 0,
+      "streak": 1,
+      "lastResult": "W",
+      "lastMatch": "2026-08-25T23:49:21.917Z"
+    }
+  ],
+  "matches": [
+    {
+      "winner": "SNC_LeNa",
+      "loser": "SNC_Gjplayer",
+      "pointsAwarded": 3,
+      "ts": 1787626362721
+    },
+    {
+      "winner": "SNC_LeNa",
+      "loser": "SNC_Gjplayer",
+      "pointsAwarded": 3,
+      "ts": 1787626364876
+    },
+    {
+      "winner": "SNC_LeNa",
+      "loser": "SNC_Gjplayer",
+      "pointsAwarded": 7,
+      "ts": 1787626366397
+    },
+    {
+      "winner": "SNC_LeNa",
+      "loser": "SNC_Gjplayer",
+      "pointsAwarded": 3,
+      "ts": 1787626367106
+    },
+    {
+      "winner": "SNC_LeNa",
+      "loser": "SNC_Gjplayer",
+      "pointsAwarded": 8,
+      "ts": 1787626368218
+    },
+    {
+      "winner": "SNC_LeNa",
+      "loser": "SNC_Gjplayer",
+      "pointsAwarded": 3,
+      "ts": 1787626371083
+    },
+    {
+      "winner": "SNC_Gjplayer",
+      "loser": "SNC_LeNa",
+      "pointsAwarded": 3,
+      "ts": 1787626373025
+    },
+    {
+      "winner": "SNC_Gjplayer",
+      "loser": "SNC_LeNa",
+      "pointsAwarded": 3,
+      "ts": 1787626374133
+    },
+    {
+      "winner": "SNC_Gjplayer",
+      "loser": "SNC_LeNa",
+      "pointsAwarded": 7,
+      "ts": 1787626374862
+    },
+    {
+      "winner": "SNC_Gjplayer",
+      "loser": "SNC_NEo",
+      "pointsAwarded": 4,
+      "ts": 1787626734037
+    },
+    {
+      "winner": "SNC_Gjplayer",
+      "loser": "SNC_NEo",
+      "pointsAwarded": 3,
+      "ts": 1787626735653
+    },
+    {
+      "winner": "SNC_Gjplayer",
+      "loser": "SNC_LeNa",
+      "pointsAwarded": 5,
+      "ts": 1787626737082
+    },
+    {
+      "winner": "SNC_Gjplayer",
+      "loser": "SNC_LeNa",
+      "pointsAwarded": 3,
+      "ts": 1787626737790
+    },
+    {
+      "winner": "SNC_Gjplayer",
+      "loser": "SNC_NEo",
+      "pointsAwarded": 3,
+      "ts": 1787626743801
+    },
+    {
+      "winner": "SNC_Gjplayer",
+      "loser": "SNC_NEo",
+      "pointsAwarded": 3,
+      "ts": 1787626750991
+    },
+    {
+      "winner": "SNC_Gjplayer",
+      "loser": "SNC_NEo",
+      "pointsAwarded": 3,
+      "ts": 1787626758248
+    },
+    {
+      "winner": "SNC_Gjplayer",
+      "loser": "SNC_NEo",
+      "pointsAwarded": 3,
+      "ts": 1787626767381
+    },
+    {
+      "winner": "oK_hyunjung",
+      "loser": "GURKA_PANG",
+      "pointsAwarded": 3,
+      "ts": 1787626810333
+    },
+    {
+      "winner": "oK_Carlos",
+      "loser": "GURKA_PANG",
+      "pointsAwarded": 3,
+      "ts": 1787626822177
+    },
+    {
+      "winner": "Rambo702",
+      "loser": "GURKA_PANG",
+      "pointsAwarded": 3,
+      "ts": 1787632815786
+    },
+    {
+      "winner": "PSN_SangDaL2",
+      "loser": "GURKA_PANG",
+      "pointsAwarded": 3,
+      "ts": 1787632835270
+    },
+    {
+      "winner": "PSN_SangDaL2",
+      "loser": "GURKA_PANG",
+      "pointsAwarded": 3,
+      "ts": 1787632838307
+    },
+    {
+      "winner": "PSN_SangDaL2",
+      "loser": "GURKA_PANG",
+      "pointsAwarded": 4,
+      "ts": 1787632848097
+    },
+    {
+      "winners": [
+        {
+          "handle": "oK_hyunjung",
+          "gained": 3
+        },
+        {
+          "handle": "oK_Carlos",
+          "gained": 3
+        },
+        {
+          "handle": "NE_Valley",
+          "gained": 3
+        },
+        {
+          "handle": "Rambo702",
+          "gained": 3
+        },
+        {
+          "handle": "PSN_SangDaL2",
+          "gained": 3
+        },
+        {
+          "handle": "PSN_JOKER",
+          "gained": 3
+        },
+        {
+          "handle": "KIMPO_BORY",
+          "gained": 3
+        }
+      ],
+      "losers": [
+        "SNC_NEo",
+        "oK_AngLee",
+        "LOTUS_TeaRs",
+        "LOTUS_MEGA",
+        "LOTUS_JINWON2",
+        "GURKA_PANG"
+      ],
+      "ts": 1787633092910
+    },
+    {
+      "winners": [
+        {
+          "handle": "oK_hyunjung",
+          "gained": 4
+        },
+        {
+          "handle": "oK_Carlos",
+          "gained": 4
+        },
+        {
+          "handle": "oK_mEntAl",
+          "gained": 3
+        }
+      ],
+      "losers": [
+        "oK_AngLee",
+        "LOTUS_TeaRs",
+        "LOTUS_MEGA"
+      ],
+      "ts": 1787633683257
+    },
+    {
+      "winners": [
+        {
+          "handle": "oK_hyunjung",
+          "gained": 3
+        },
+        {
+          "handle": "oK_Carlos",
+          "gained": 3
+        },
+        {
+          "handle": "oK_mEntAl",
+          "gained": 3
+        }
+      ],
+      "losers": [
+        "oK_AngLee",
+        "LOTUS_TeaRs",
+        "LOTUS_MEGA"
+      ],
+      "ts": 1787633688221
+    },
+    {
+      "winners": [
+        {
+          "handle": "oK_hyunjung",
+          "gained": 5
+        },
+        {
+          "handle": "oK_Carlos",
+          "gained": 5
+        },
+        {
+          "handle": "oK_mEntAl",
+          "gained": 4
+        }
+      ],
+      "losers": [
+        "oK_AngLee",
+        "LOTUS_TeaRs",
+        "LOTUS_MEGA",
+        "LOTUS_JINWON2"
+      ],
+      "ts": 1787633693196
+    },
+    {
+      "winners": [
+        {
+          "handle": "oK_hyunjung",
+          "gained": 3
+        },
+        {
+          "handle": "oK_Carlos",
+          "gained": 3
+        },
+        {
+          "handle": "oK_mEntAl",
+          "gained": 3
+        }
+      ],
+      "losers": [
+        "oK_AngLee",
+        "LOTUS_TeaRs",
+        "LOTUS_MEGA",
+        "LOTUS_JINWON2",
+        "GURKA_PANG"
+      ],
+      "ts": 1787633697730
+    },
+    {
+      "winners": [
+        {
+          "handle": "oK_hyunjung",
+          "gained": 3
+        },
+        {
+          "handle": "oK_Carlos",
+          "gained": 3
+        },
+        {
+          "handle": "oK_mEntAl",
+          "gained": 5
+        }
+      ],
+      "losers": [
+        "oK_AngLee",
+        "LOTUS_TeaRs",
+        "LOTUS_MEGA",
+        "LOTUS_JINWON2",
+        "GURKA_PANG"
+      ],
+      "ts": 1787633701664
+    },
+    {
+      "winners": [
+        {
+          "handle": "oK_hyunjung",
+          "gained": 3
+        },
+        {
+          "handle": "oK_Carlos",
+          "gained": 3
+        },
+        {
+          "handle": "oK_mEntAl",
+          "gained": 3
+        },
+        {
+          "handle": "KIMPO_BORY",
+          "gained": 3
+        },
+        {
+          "handle": "KisS",
+          "gained": 3
+        },
+        {
+          "handle": "PAC_Plus",
+          "gained": 3
+        }
+      ],
+      "losers": [
+        "oK_AngLee",
+        "LOTUS_TeaRs",
+        "LOTUS_MEGA",
+        "LOTUS_JINWON2",
+        "GURKA_PANG"
+      ],
+      "ts": 1787633710679
+    },
+    {
+      "winners": [
+        {
+          "handle": "PSN_SangDaL2",
+          "gained": 5
+        }
+      ],
+      "losers": [
+        "GURKA_PANG"
+      ],
+      "ts": 1787701736168
+    },
+    {
+      "winners": [
+        {
+          "handle": "PSN_SangDaL2",
+          "gained": 3
+        }
+      ],
+      "losers": [
+        "LOTUS_TeaRs"
+      ],
+      "ts": 1787701752159
+    },
+    {
+      "winners": [
+        {
+          "handle": "2MaNstorY_PsiloveU",
+          "gained": 3
+        },
+        {
+          "handle": "2MaNstorY_zZangGa",
+          "gained": 3
+        }
+      ],
+      "losers": [
+        "LOTUS_JINWON2"
+      ],
+      "ts": 1787701761917
+    },
+    {
+      "winners": [
+        {
+          "handle": "SNC_Gjplayer",
+          "gained": 3
+        }
+      ],
+      "losers": [
+        "SNC_NEo"
+      ],
+      "ts": 1787702004357,
+      "recordedBy": "비로그인 사용자"
+    },
+    {
+      "winners": [
+        {
+          "handle": "SNC_Gjplayer",
+          "gained": 3
+        }
+      ],
+      "losers": [
+        "SNC_NEo"
+      ],
+      "ts": 1787702018808,
+      "recordedBy": "비로그인 사용자"
+    },
+    {
+      "winners": [
+        {
+          "handle": "SNC_Gjplayer",
+          "gained": 3
+        }
+      ],
+      "losers": [
+        "SNC_NEo"
+      ],
+      "ts": 1787702267067,
+      "recordedBy": "비로그인 사용자"
+    },
+    {
+      "winners": [
+        {
+          "handle": "SNC_Gjplayer",
+          "gained": 3
+        },
+        {
+          "handle": "oK_hyunjung",
+          "gained": 3
+        },
+        {
+          "handle": "oK_Carlos",
+          "gained": 3
+        },
+        {
+          "handle": "oK_mEntAl",
+          "gained": 3
+        },
+        {
+          "handle": "oK_LuCkY",
+          "gained": 3
+        }
+      ],
+      "losers": [
+        "LOTUS_TeaRs",
+        "LOTUS_MEGA",
+        "LOTUS_JINWON2",
+        "GURKA_PANG"
+      ],
+      "ts": 1787702288110,
+      "recordedBy": "비로그인 사용자"
+    },
+    {
+      "winners": [
+        {
+          "handle": "NE_Valley",
+          "gained": 3
+        },
+        {
+          "handle": "Rambo702",
+          "gained": 4
+        },
+        {
+          "handle": "PSN_SangDaL2",
+          "gained": 3
+        },
+        {
+          "handle": "PSN_JOKER",
+          "gained": 3
+        },
+        {
+          "handle": "PSN_SkyLacK",
+          "gained": 3
+        }
+      ],
+      "losers": [
+        "LOTUS_TeaRs",
+        "LOTUS_MEGA",
+        "LOTUS_JINWON2"
+      ],
+      "ts": 1787702486832,
+      "recordedBy": "LOTUS_TeaRs"
+    },
+    {
+      "winners": [
+        {
+          "handle": "PSN_SkyLacK",
+          "gained": 3
+        },
+        {
+          "handle": "KIMPO_BORY",
+          "gained": 4
+        },
+        {
+          "handle": "PAC_Plus",
+          "gained": 3
+        }
+      ],
+      "losers": [
+        "LOTUS_TeaRs",
+        "LOTUS_MEGA",
+        "LOTUS_JINWON2"
+      ],
+      "ts": 1787702500604,
+      "recordedBy": "LOTUS_TeaRs"
+    },
+    {
+      "winners": [
+        {
+          "handle": "PSN_JOKER",
+          "gained": 4
+        }
+      ],
+      "losers": [
+        "oK_AngLee"
+      ],
+      "ts": 1787702603220,
+      "recordedBy": "LOTUS_TeaRs"
+    },
+    {
+      "winners": [
+        {
+          "handle": "SNC_LeNa",
+          "gained": 3
+        }
+      ],
+      "losers": [
+        "GURKA_PANG"
+      ],
+      "ts": 1787703217898,
+      "recordedBy": "LOTUS_TeaRs"
+    }
+  ],
+  "requests": [
+    {
+      "id": "req_1787719163715_m9aqps",
+      "type": "add",
+      "newId": "LOTUS_MONG",
+      "newClan": "LOTUS",
+      "requestedAt": 1787719163715
+    }
+  ],
+  "admins": [
+    {
+      "id": "ADMIN_TeaRs",
+      "mustChangePassword": true
+    },
+    {
+      "id": "ADMIN_LeNa",
+      "mustChangePassword": true
+    },
+    {
+      "id": "ADMIN_Gjplayer",
+      "mustChangePassword": true
+    },
+    {
+      "id": "ADMIN_Valley",
+      "mustChangePassword": true
+    },
+    {
+      "id": "ADMIN_hyungjung",
+      "mustChangePassword": true
+    },
+    {
+      "id": "ADMIN_Carlos",
+      "mustChangePassword": true
+    },
+    {
+      "id": "ADMIN_Rambo702",
+      "mustChangePassword": true
+    },
+    {
+      "id": "ADMIN_SiLJanG",
+      "mustChangePassword": true
+    },
+    {
+      "id": "ADMIN_soso",
+      "mustChangePassword": true
+    }
+  ],
+  "exportedAt": 1787719713040
+}
