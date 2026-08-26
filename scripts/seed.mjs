@@ -3,14 +3,13 @@
  *   node scripts/seed.mjs ./seed/ladder_seed.json
  *
  * - 구버전 1:1 경기기록은 자동으로 팀전 형식으로 변환합니다.
- * - 관리자 비밀번호가 파일에 없으면 임시 비밀번호를 발급해 화면에 출력합니다.
+ * - 관리자 비밀번호가 파일에 없으면 임시 비밀번호로 설정합니다.
  *   (저장소에 올라가는 시드 파일에는 비밀번호를 넣지 않습니다.)
  * - 파일에 평문 비밀번호가 있으면 scrypt 해시로 변환해 저장합니다.
  * - 이미 존재하는 데이터는 덮어씁니다(선수/경기/요청 전체 교체).
  */
 import fs from 'node:fs';
-import { randomBytes } from 'node:crypto';
-import { getPool, tx, hashPw, normalizeMatch, parseHandle } from '../api/_lib.js';
+import { getPool, tx, hashPw, normalizeMatch, parseHandle, TEMP_PASSWORD } from '../api/_lib.js';
 
 const file = process.argv[2] || './seed/ladder_seed.json';
 if (!fs.existsSync(file)) {
@@ -24,11 +23,6 @@ const players = data.players || [];
 const matches = (data.matches || []).map(normalizeMatch);
 const admins = data.admins || [];
 const requests = data.requests || [];
-
-/** 사람이 옮겨적을 수 있는 임시 비밀번호 */
-function tempPw() {
-  return 'R6-' + randomBytes(6).toString('base64url');
-}
 
 const issued = [];
 
@@ -67,7 +61,7 @@ await tx(async (c) => {
   for (const a of admins) {
     if (!a.id) continue;
     const generated = !a.password;
-    const pw = a.password || tempPw();
+    const pw = a.password || TEMP_PASSWORD;
     if (generated) issued.push([a.id, pw]);
     await c.query(
       `INSERT INTO admins (id, pw_hash, must_change) VALUES ($1,$2,TRUE)

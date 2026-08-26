@@ -326,6 +326,21 @@
   .final-vs span{color:var(--amber);margin:0 10px;}
   .final-note{font-size:12.5px;color:var(--text-dim);margin-top:7px;font-weight:600;}
 
+  /* 회원 관리 */
+  .member-list{
+    max-height:340px;overflow-y:auto;border:1px solid var(--border);background:var(--bg);
+    padding:4px;margin-top:10px;
+  }
+  .member-row{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:8px 10px;border-bottom:1px solid rgba(44,52,31,0.5);
+  }
+  .member-row:last-child{border-bottom:none;}
+  .member-row:hover{background:rgba(255,176,32,0.05);}
+  .member-id{font-size:14px;font-weight:700;}
+  .member-meta{font-size:11.5px;color:var(--text-dim);font-weight:600;margin-top:1px;}
+  .member-row .btn-mini{flex:none;padding:5px 10px;font-size:11px;}
+
   /* 전체 기록 표 */
   .history-table th{cursor:default;}
   .history-table th:hover{color:#f4f6e8;}
@@ -553,11 +568,21 @@
       </div>
 
       <div class="panel hud-corner">
+        <h2>회원 관리</h2>
+        <div class="foot-note" style="margin-top:0;margin-bottom:10px;">
+          명단에서 회원을 바로 삭제합니다. 삭제해도 지난 경기 기록은 HISTORY에 그대로 남습니다.
+        </div>
+        <input type="text" id="memberSearch" placeholder="아이디 또는 클랜으로 검색...">
+        <div class="member-list" id="memberList"></div>
+        <div class="foot-note" id="memberCount"></div>
+      </div>
+
+      <div class="panel hud-corner">
         <h2>어드민 계정 관리</h2>
         <div id="adminList"></div>
         <label>신규 어드민 ID 추가</label>
         <input type="text" id="newAdminId" placeholder="예: ADMIN_NewName">
-        <button class="btn" id="addAdminBtn">어드민 추가 (임시 비밀번호 자동 발급)</button>
+        <button class="btn" id="addAdminBtn">어드민 추가 (초기 비밀번호 1234)</button>
       </div>
 
       <div class="panel hud-corner">
@@ -1075,6 +1100,41 @@ function renderAdminList() {
   });
 }
 
+function renderMemberList() {
+  const box = document.getElementById('memberList');
+  const count = document.getElementById('memberCount');
+  const search = document.getElementById('memberSearch');
+  if (!box || !count) return;
+
+  const q = search ? search.value.trim().toLowerCase() : '';
+  const list = q
+    ? players.filter(p => p.handle.toLowerCase().includes(q) || (p.clan || '').toLowerCase().includes(q))
+    : players;
+
+  box.innerHTML = list.map(p => `
+    <div class="member-row">
+      <div>
+        <div class="member-id">${esc(p.handle)} <span class="clan-tag">${esc(p.clan)}</span></div>
+        <div class="member-meta">${p.point}점 · ${p.wins}승 ${p.losses}패</div>
+      </div>
+      <button class="btn-mini btn-reject" data-member="${esc(p.handle)}">삭제</button>
+    </div>`).join('')
+    || `<div class="log-empty">${q ? '검색 결과 없음' : '등록된 회원이 없습니다.'}</div>`;
+
+  count.textContent = q
+    ? `${players.length}명 중 ${list.length}명 표시`
+    : `등록된 회원 ${players.length}명`;
+}
+
+async function removeMember(handle) {
+  if (!confirm(`'${handle}' 회원을 명단에서 삭제할까요?\n\n랭킹에서 즉시 사라집니다. 지난 경기 기록은 HISTORY에 그대로 남습니다.`)) return;
+  try {
+    await apiPost('/api/player', { action: 'remove', handle });
+    await refreshAll();
+    showToast(`${handle} 회원을 삭제했습니다.`);
+  } catch (e) { showToast(e.message); }
+}
+
 function renderAll() {
   renderStanding();
   renderTop5();
@@ -1083,6 +1143,7 @@ function renderAll() {
   renderHistory();
   renderPending();
   renderAdminList();
+  renderMemberList();
   renderTournament();
 }
 
@@ -1646,6 +1707,15 @@ function initStandingEvents() {
 }
 
 function initAdminEvents() {
+  const memberSearch = document.getElementById('memberSearch');
+  if (memberSearch) memberSearch.addEventListener('input', renderMemberList);
+
+  const memberList = document.getElementById('memberList');
+  if (memberList) memberList.addEventListener('click', e => {
+    const handle = e.target.dataset && e.target.dataset.member;
+    if (handle) removeMember(handle);
+  });
+
   document.getElementById('adminLockedLoginBtn').addEventListener('click', showAdminLoginModal);
   document.getElementById('addAdminBtn').addEventListener('click', addAdmin);
   document.getElementById('historyRefreshBtn').addEventListener('click', async () => {

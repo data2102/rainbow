@@ -47,10 +47,6 @@ head = head.replace('  <nav class="tabs">', '  <div id="connBanner"></div>\n\n  
 
 # 초기 비밀번호 안내 문구 수정
 head = head.replace(
-    '<button class="btn" id="addAdminBtn">어드민 추가 (초기 비밀번호 1234)</button>',
-    '<button class="btn" id="addAdminBtn">어드민 추가 (임시 비밀번호 자동 발급)</button>'
-)
-head = head.replace(
     '<div class="foot-note">이 랭킹 데이터는 이 페이지를 이용하는 모든 사용자에게 공유됩니다. '
     '다른 계정/사이트로 옮길 때는 내보내기로 백업한 JSON을 새 사본에서 가져오기 하세요.</div>',
     '<div class="foot-note">모든 데이터는 서버 DB에 저장됩니다. 정기적으로 내보내기(JSON)로 '

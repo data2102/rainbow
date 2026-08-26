@@ -40,6 +40,13 @@ export async function tx(fn) {
 
 /* ---------- 비밀번호 ---------- */
 
+/**
+ * 새 계정과 재발급에 쓰는 임시 비밀번호.
+ * 모바일에서 받아치기 쉽도록 짧게 두었다. 이 값으로 로그인하면
+ * 비밀번호 변경 창이 강제로 뜨고, 8자 이상으로 바꿔야 이용할 수 있다.
+ */
+export const TEMP_PASSWORD = '1234';
+
 export function hashPw(pw) {
   const salt = randomBytes(16).toString('hex');
   return `scrypt$${salt}$${scryptSync(pw, salt, 64).toString('hex')}`;

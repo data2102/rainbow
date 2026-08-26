@@ -30,6 +30,9 @@ CREATE TABLE IF NOT EXISTS admins (
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- 대소문자만 다른 관리자 ID 를 막는다. 로그인은 대소문자를 가리지 않기 때문이다.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_admins_lower_id ON admins (lower(id));
+
 CREATE TABLE IF NOT EXISTS requests (
   id           TEXT PRIMARY KEY,
   type         TEXT NOT NULL CHECK (type IN ('add','remove')),

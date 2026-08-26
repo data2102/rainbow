@@ -318,6 +318,21 @@
   .final-vs span{color:var(--amber);margin:0 10px;}
   .final-note{font-size:12.5px;color:var(--text-dim);margin-top:7px;font-weight:600;}
 
+  /* 회원 관리 */
+  .member-list{
+    max-height:340px;overflow-y:auto;border:1px solid var(--border);background:var(--bg);
+    padding:4px;margin-top:10px;
+  }
+  .member-row{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:8px 10px;border-bottom:1px solid rgba(44,52,31,0.5);
+  }
+  .member-row:last-child{border-bottom:none;}
+  .member-row:hover{background:rgba(255,176,32,0.05);}
+  .member-id{font-size:14px;font-weight:700;}
+  .member-meta{font-size:11.5px;color:var(--text-dim);font-weight:600;margin-top:1px;}
+  .member-row .btn-mini{flex:none;padding:5px 10px;font-size:11px;}
+
   /* 전체 기록 표 */
   .history-table th{cursor:default;}
   .history-table th:hover{color:#f4f6e8;}
@@ -540,6 +555,16 @@
       <div class="panel hud-corner">
         <h2>가입 · 삭제 승인 대기</h2>
         <div id="pendingList"><div class="log-empty">대기 중인 요청이 없습니다.</div></div>
+      </div>
+
+      <div class="panel hud-corner">
+        <h2>회원 관리</h2>
+        <div class="foot-note" style="margin-top:0;margin-bottom:10px;">
+          명단에서 회원을 바로 삭제합니다. 삭제해도 지난 경기 기록은 HISTORY에 그대로 남습니다.
+        </div>
+        <input type="text" id="memberSearch" placeholder="아이디 또는 클랜으로 검색...">
+        <div class="member-list" id="memberList"></div>
+        <div class="foot-note" id="memberCount"></div>
       </div>
 
       <div class="panel hud-corner">

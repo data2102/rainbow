@@ -10,7 +10,9 @@
     "db:setup": "node scripts/setup.mjs",
     "db:seed": "node scripts/seed.mjs",
     "admin": "node scripts/admin.mjs",
-    "admin:reset": "node scripts/admin.mjs reset"
+    "admin:reset": "node scripts/admin.mjs reset",
+    "admin:rename": "node scripts/admin.mjs rename",
+    "admin:reset-all": "node scripts/admin.mjs reset-all"
   },
   "dependencies": {
     "express": "^4.22.2",

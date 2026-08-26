@@ -307,6 +307,41 @@ function renderAdminList() {
   });
 }
 
+function renderMemberList() {
+  const box = document.getElementById('memberList');
+  const count = document.getElementById('memberCount');
+  const search = document.getElementById('memberSearch');
+  if (!box || !count) return;
+
+  const q = search ? search.value.trim().toLowerCase() : '';
+  const list = q
+    ? players.filter(p => p.handle.toLowerCase().includes(q) || (p.clan || '').toLowerCase().includes(q))
+    : players;
+
+  box.innerHTML = list.map(p => `
+    <div class="member-row">
+      <div>
+        <div class="member-id">${esc(p.handle)} <span class="clan-tag">${esc(p.clan)}</span></div>
+        <div class="member-meta">${p.point}점 · ${p.wins}승 ${p.losses}패</div>
+      </div>
+      <button class="btn-mini btn-reject" data-member="${esc(p.handle)}">삭제</button>
+    </div>`).join('')
+    || `<div class="log-empty">${q ? '검색 결과 없음' : '등록된 회원이 없습니다.'}</div>`;
+
+  count.textContent = q
+    ? `${players.length}명 중 ${list.length}명 표시`
+    : `등록된 회원 ${players.length}명`;
+}
+
+async function removeMember(handle) {
+  if (!confirm(`'${handle}' 회원을 명단에서 삭제할까요?\n\n랭킹에서 즉시 사라집니다. 지난 경기 기록은 HISTORY에 그대로 남습니다.`)) return;
+  try {
+    await apiPost('/api/player', { action: 'remove', handle });
+    await refreshAll();
+    showToast(`${handle} 회원을 삭제했습니다.`);
+  } catch (e) { showToast(e.message); }
+}
+
 function renderAll() {
   renderStanding();
   renderTop5();
@@ -315,6 +350,7 @@ function renderAll() {
   renderHistory();
   renderPending();
   renderAdminList();
+  renderMemberList();
   renderTournament();
 }
 
@@ -878,6 +914,15 @@ function initStandingEvents() {
 }
 
 function initAdminEvents() {
+  const memberSearch = document.getElementById('memberSearch');
+  if (memberSearch) memberSearch.addEventListener('input', renderMemberList);
+
+  const memberList = document.getElementById('memberList');
+  if (memberList) memberList.addEventListener('click', e => {
+    const handle = e.target.dataset && e.target.dataset.member;
+    if (handle) removeMember(handle);
+  });
+
   document.getElementById('adminLockedLoginBtn').addEventListener('click', showAdminLoginModal);
   document.getElementById('addAdminBtn').addEventListener('click', addAdmin);
   document.getElementById('historyRefreshBtn').addEventListener('click', async () => {

@@ -24,13 +24,15 @@
 │   ├── build_index.py      원본 + app.js → public/index.html 생성
 │   ├── setup.mjs           테이블 생성
 │   ├── seed.mjs            시드 JSON → DB 적재
-│   └── admin.mjs           관리자 목록 조회 · 비밀번호 재발급
+│   └── admin.mjs           관리자 목록 조회 · 비밀번호 재설정 · ID 변경
 ├── api/
 │   ├── _lib.js             DB연결·비밀번호해시·세션·점수규칙
 │   ├── state.js            GET  공개 랭킹/기록 조회
 │   ├── admin.js            POST 로그인·비번변경·관리자관리
 │   ├── match.js            POST 경기 기록 (관리자)
 │   ├── request.js          POST 가입·삭제 신청 / 승인·거절
+│   ├── player.js           POST 회원 즉시 삭제 (관리자)
+│   ├── tournament.js       GET/POST 대회 경기 기록
 │   └── data.js             GET/POST 내보내기·가져오기·초기화 (관리자)
 ├── db/schema.sql           테이블 정의
 ├── seed/ladder_seed.json   기존 데이터 (선수 29명 / 경기 41건) — 비밀번호 미포함
@@ -157,20 +159,34 @@ nginx 리버스 프록시 + Let's Encrypt(certbot)로 HTTPS를 붙이면 됩니�
 ```bash
 export DATABASE_URL="postgresql://..."     # Windows: $env:DATABASE_URL="..."
 
-npm run admin                    # 관리자 목록과 각자의 상태 보기
-npm run admin:reset ADMIN_TeaRs  # 해당 계정만 임시 비밀번호 재발급
+npm run admin                                  # 관리자 목록과 각자의 상태 보기
+npm run admin:reset ADMIN_TeaRs                # 해당 계정만 임시 비밀번호로 되돌리기
+npm run admin:reset-all                        # 전원 임시 비밀번호로 되돌리기
+npm run admin:rename ADMIN_Old ADMIN_New       # ID 변경 (비밀번호 유지)
 ```
 
-```
-✅ ADMIN_TeaRs 의 비밀번호를 재발급했습니다.
+임시 비밀번호는 `1234` 입니다 (`api/_lib.js` 의 `TEMP_PASSWORD`).
+모바일에서 입력하기 쉽도록 짧게 두었고, 이 값으로 로그인하면 **비밀번호 변경 창이
+강제로 뜨며 8자 이상으로 바꿔야** 이용할 수 있습니다.
 
-   임시 비밀번호   R6-xxxxxxxx
-```
+> ⚠️ 임시 비밀번호가 알려진 값이므로, 아직 변경하지 않은 계정은 누구나 로그인할 수
+> 있습니다. 계정을 만들거나 되돌린 뒤에는 본인이 바로 변경하게 하세요.
 
 - **선수 명단과 경기 기록은 전혀 건드리지 않습니다.** 해당 계정의 비밀번호만 바뀝니다.
 - 그 계정으로 열려 있던 **기존 로그인 세션은 모두 종료**됩니다.
 - 재발급된 계정은 첫 로그인 시 **비밀번호 변경 창이 강제로** 뜹니다.
 - 실행 기록은 `audit_log` 테이블에 `reset_password_cli` 로 남습니다.
+
+**관리자 ID 는 대소문자를 가리지 않습니다.** `admin_tears` 로 입력해도 `ADMIN_TeaRs`
+로 로그인됩니다. 대신 대소문자만 다른 ID 는 새로 만들 수 없습니다.
+
+## 회원 삭제
+
+ADMIN 탭의 **회원 관리**에서 명단의 회원을 바로 삭제할 수 있습니다.
+'회원 삭제 요청 → 승인' 절차를 거치지 않는 즉시 삭제입니다.
+
+지난 경기 기록(`matches`)은 지우지 않습니다. 기록까지 사라지면 다른 선수들의
+전적과 어긋나기 때문에, HISTORY 탭에는 그대로 남습니다.
 
 > `npm run db:seed` 를 다시 돌리는 것으로도 비밀번호가 재발급되지만,
 > **경기 기록이 시드 시점으로 되돌아가므로 운영 중에는 절대 쓰지 마세요.**

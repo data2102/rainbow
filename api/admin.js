@@ -1,6 +1,6 @@
 import {
   q, body, methodGuard, hashPw, verifyPw, isLegacyHash,
-  createSession, currentAdmin, requireAdmin, audit,
+  createSession, currentAdmin, requireAdmin, audit, TEMP_PASSWORD,
 } from './_lib.js';
 
 export default async function handler(req, res) {
@@ -25,7 +25,8 @@ export default async function handler(req, res) {
 
 async function login(req, res) {
   const { id, password } = body(req);
-  const rows = await q(`SELECT * FROM admins WHERE id = $1`, [id]);
+  // ID 는 대소문자를 가리지 않는다. 세션과 기록에는 DB 에 저장된 원래 표기를 쓴다.
+  const rows = await q(`SELECT * FROM admins WHERE lower(id) = lower($1)`, [String(id || '').trim()]);
   const a = rows[0];
   if (!a || !verifyPw(password, a.pw_hash)) {
     return res.status(401).json({ error: 'ID 또는 비밀번호가 일치하지 않습니다.' });
@@ -73,13 +74,20 @@ async function add(req, res) {
   const me = await requireAdmin(req, res);
   if (!me) return;
   const { id, password } = body(req);
-  if (!id) return res.status(400).json({ error: 'ID를 입력해주세요.' });
-  const exists = await q(`SELECT 1 FROM admins WHERE id = $1`, [id]);
-  if (exists.length) return res.status(400).json({ error: '이미 존재하는 관리자 ID입니다.' });
-  const initial = password && password.length >= 8 ? password : null;
-  const temp = initial || Math.random().toString(36).slice(2, 10) + '!R6';
-  await q(`INSERT INTO admins (id, pw_hash, must_change) VALUES ($1, $2, TRUE)`, [id, hashPw(temp)]);
-  await audit(me, 'add_admin', { id });
+  const newId = String(id || '').trim();
+  if (!newId) return res.status(400).json({ error: 'ID를 입력해주세요.' });
+  // 대소문자만 다른 ID 를 허용하면 로그인 시 어느 계정인지 가릴 수 없게 된다.
+  const exists = await q(`SELECT id FROM admins WHERE lower(id) = lower($1)`, [newId]);
+  if (exists.length) {
+    return res.status(400).json({
+      error: exists[0].id === newId
+        ? '이미 존재하는 관리자 ID입니다.'
+        : `대소문자만 다른 관리자 ID가 이미 있습니다: ${exists[0].id}`,
+    });
+  }
+  const temp = password && password.length >= 8 ? password : TEMP_PASSWORD;
+  await q(`INSERT INTO admins (id, pw_hash, must_change) VALUES ($1, $2, TRUE)`, [newId, hashPw(temp)]);
+  await audit(me, 'add_admin', { id: newId });
   res.status(200).json({ ok: true, tempPassword: temp });
 }
 
@@ -89,7 +97,8 @@ async function remove(req, res) {
   const { id } = body(req);
   const cnt = await q(`SELECT count(*)::int AS c FROM admins`);
   if (cnt[0].c <= 1) return res.status(400).json({ error: '최소 1명 이상의 관리자가 있어야 합니다.' });
-  await q(`DELETE FROM admins WHERE id = $1`, [id]);
-  await audit(me, 'remove_admin', { id });
+  const gone = await q(`DELETE FROM admins WHERE lower(id) = lower($1) RETURNING id`, [String(id || '').trim()]);
+  if (!gone.length) return res.status(404).json({ error: '이미 삭제된 관리자입니다.' });
+  await audit(me, 'remove_admin', { id: gone[0].id });
   res.status(200).json({ ok: true });
 }

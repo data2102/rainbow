@@ -12,6 +12,7 @@ import match from './api/match.js';
 import request from './api/request.js';
 import data from './api/data.js';
 import tournament from './api/tournament.js';
+import player from './api/player.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -32,6 +33,7 @@ app.all('/api/match', wrap(match));
 app.all('/api/request', wrap(request));
 app.all('/api/data', wrap(data));
 app.all('/api/tournament', wrap(tournament));
+app.all('/api/player', wrap(player));
 
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: '5m' }));
 app.get('*', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
