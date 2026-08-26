@@ -2,7 +2,21 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<title>GO ACE // RAINBOW SIX LADDER</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RAINBOWSIX RANK</title>
+<meta name="description" content="레인보우 식스 클랜 래더 · 시즌 랭킹과 전체 경기 기록을 실시간으로 공개합니다.">
+<link rel="canonical" href="https://r6rank.co.kr/">
+
+<!-- 카카오톡·디스코드 등에서 링크를 공유할 때 표시되는 정보 -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="RAINBOWSIX RANK">
+<meta property="og:title" content="RAINBOWSIX RANK">
+<meta property="og:description" content="레인보우 식스 클랜 래더 · 시즌 랭킹과 전체 경기 기록을 실시간으로 공개합니다.">
+<meta property="og:url" content="https://r6rank.co.kr/">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="RAINBOWSIX RANK">
+<meta name="twitter:description" content="레인보우 식스 클랜 래더 · 시즌 랭킹과 전체 경기 기록을 실시간으로 공개합니다.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
@@ -239,6 +253,88 @@
   .btn-approve:hover{background:#a8ec74;}
   .btn-reject{background:transparent;color:var(--danger);border:1px solid var(--danger);}
   .btn-reject:hover{background:rgba(255,92,73,0.1);}
+
+  /* ===== 대회 (TOURNAMENT) ===== */
+  .tsec{margin-bottom:26px;}
+  .tsec:last-child{margin-bottom:0;}
+  .tsec-h{
+    font-family:'Oswald',sans-serif;font-size:15px;font-weight:700;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--amber);margin:0 0 4px;
+  }
+  .tsec-sub{font-size:13px;color:var(--text-dim);margin:0 0 12px;font-weight:600;}
+
+  .team-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;}
+  .team-card{border:1px solid var(--border);background:var(--panel-2);border-left:3px solid var(--olive);padding:11px 13px;}
+  .team-card.is-merc{border-left-color:var(--amber-dim);}
+  .tc-name{
+    font-family:'Oswald',sans-serif;font-size:15.5px;font-weight:700;letter-spacing:.06em;
+    color:var(--text);text-transform:uppercase;
+  }
+  .tc-roster{font-size:14px;color:var(--text-dim);margin-top:3px;font-weight:600;line-height:1.6;}
+  .tc-roster em{font-style:normal;color:var(--olive);}
+
+  .rule-list{margin:0;padding-left:16px;font-size:14.5px;line-height:1.85;font-weight:600;}
+  .rule-list li{margin-bottom:2px;}
+  .rule-list li::marker{color:var(--olive);}
+  .rule-list b{color:var(--amber);}
+
+  .prize{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px;}
+  .prize-card{border:1px solid var(--border);background:var(--panel-2);padding:12px 14px;}
+  .prize-card.p1{border-color:var(--amber-dim);}
+  .prize-rank{
+    font-family:'Oswald',sans-serif;font-size:14px;font-weight:700;letter-spacing:.1em;
+    text-transform:uppercase;margin-bottom:3px;
+  }
+  .prize-card.p1 .prize-rank{color:#ffd24d;}
+  .prize-card.p2 .prize-rank{color:#c9d1b8;}
+  .prize-body{font-size:14px;color:var(--text);font-weight:600;line-height:1.6;}
+  .prize-body b{color:var(--amber);}
+
+  /* 대진표 */
+  .bracket-wrap{overflow-x:auto;padding-bottom:4px;}
+  .bracket{display:flex;gap:14px;min-width:440px;}
+  .br-col{flex:1 1 0;display:flex;flex-direction:column;justify-content:space-around;gap:12px;min-width:118px;}
+  .br-col-h{
+    font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--text-dim);text-align:center;margin-bottom:2px;font-weight:700;
+  }
+  .br-match{display:flex;flex-direction:column;gap:4px;flex:1;justify-content:center;position:relative;}
+  /* 두 칸을 위아래로 벌려 앞 라운드의 각 경기와 높이를 맞춘다 */
+  .br-match.spread{justify-content:space-around;gap:0;}
+  .br-col:not(:last-child) .br-match::after{
+    content:'';position:absolute;left:100%;top:50%;width:14px;height:0;
+    border-top:1px solid var(--olive);
+  }
+  .br-team{
+    border:1px solid var(--border);background:var(--panel-2);padding:8px 10px;
+    font-size:13.5px;font-weight:700;color:var(--text);text-align:center;
+  }
+  .br-team.seed{color:var(--amber);border-color:var(--amber-dim);}
+  .br-team.adv{color:var(--win);border-color:var(--olive);}
+  .br-team.drop{color:var(--danger);border-color:rgba(255,92,73,0.35);}
+  .br-team.gold{color:#ffd24d;border-color:#8a6f14;background:rgba(255,210,77,0.06);}
+
+  .final-box{
+    border:1px solid var(--amber-dim);background:rgba(255,176,32,0.07);
+    padding:16px;text-align:center;margin-top:6px;
+  }
+  .final-label{
+    font-family:'Oswald',sans-serif;font-size:14px;font-weight:700;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--amber);margin-bottom:8px;
+  }
+  .final-vs{
+    font-family:'Oswald',sans-serif;font-size:19px;font-weight:700;letter-spacing:.04em;color:var(--text);
+  }
+  .final-vs span{color:var(--amber);margin:0 10px;}
+  .final-note{font-size:12.5px;color:var(--text-dim);margin-top:7px;font-weight:600;}
+
+  /* 좁은 화면에서는 가로 스크롤 없이 세 칸이 다 들어오도록 줄인다 */
+  @media (max-width:560px){
+    .bracket{min-width:0;gap:7px;}
+    .br-col{min-width:0;}
+    .br-col-h{font-size:9.5px;letter-spacing:.04em;}
+    .br-team{font-size:11.5px;padding:7px 3px;line-height:1.35;}
+  }
 </style>
 </head>
 <body>
@@ -255,8 +351,9 @@
   <nav class="tabs">
     <button class="tab-btn active" data-tab="standing">① STANDING</button>
     <button class="tab-btn" data-tab="mostpoint">② MOST POINT &amp; WIN</button>
-    <button class="tab-btn" data-tab="admin">③ ADMIN</button>
-    <button class="tab-btn" data-tab="history">④ HISTORY</button>
+    <button class="tab-btn" data-tab="history">③ HISTORY</button>
+    <button class="tab-btn" data-tab="admin">④ ADMIN</button>
+    <button class="tab-btn" data-tab="tournament">⑤ TOURNAMENT</button>
   </nav>
 
   <!-- STANDING -->
@@ -387,6 +484,124 @@
       <div class="foot-note" style="margin-top:0;margin-bottom:10px;">모든 승패 기록을 시간순으로 투명하게 공개합니다 · 등록일시(연월일시분초) 및 등록자가 함께 기록됩니다.</div>
       <button class="btn-ghost" id="historyRefreshBtn" style="width:auto;margin-bottom:14px;">↻ 최신 기록 새로고침</button>
       <div id="historyList"></div>
+    </div>
+  </div>
+
+  <!-- TOURNAMENT -->
+  <div class="tab-panel" id="tab-tournament">
+    <div class="panel hud-corner">
+      <h2>대회 안내 · Tournament</h2>
+
+      <div class="tsec">
+        <div class="tsec-h">■ 조편성</div>
+        <div class="tsec-sub">5개 팀 · 팀당 4명</div>
+        <div class="team-cards">
+          <div class="team-card"><div class="tc-name">A팀</div><div class="tc-roster">레나 · 네오 · 블루베리 · 키스</div></div>
+          <div class="team-card"><div class="tc-name">B팀</div><div class="tc-roster">현정 · 구짭 · 범상 · 짱가</div></div>
+          <div class="team-card"><div class="tc-name">C팀</div><div class="tc-roster">멘탈 · 메가 · 소소 · 보리</div></div>
+          <div class="team-card"><div class="tc-name">D팀</div><div class="tc-roster">진원 · 람보 · 플라스 · 수까락</div></div>
+          <div class="team-card"><div class="tc-name">E팀</div><div class="tc-roster">벨리 · 까를 · 티얼 · 조커</div></div>
+          <div class="team-card is-merc"><div class="tc-name">용병</div><div class="tc-roster">렌보짱 · 럭키 · 호신 · 실장<br><em>그 외 상황 봐서</em></div></div>
+        </div>
+      </div>
+
+      <div class="tsec">
+        <div class="tsec-h">■ 예선</div>
+        <div class="tsec-sub">리그전</div>
+        <ul class="rule-list">
+          <li>A팀부터 E팀까지 <b>리그 방식</b>으로 진행합니다.</li>
+          <li><b>1위부터 4위까지</b>만 본선에 진출합니다.</li>
+          <li>5위 팀은 여기서 탈락합니다.</li>
+        </ul>
+      </div>
+
+      <div class="tsec">
+        <div class="tsec-h">■ 본선</div>
+        <div class="tsec-sub">상위 4팀 · 패자부활 방식 (2패 탈락)</div>
+        <ul class="rule-list">
+          <li><b>조추첨</b> — 예선 1~4위를 추첨해 아래 A·B·C·D 자리를 정합니다.</li>
+          <li>1차전에서 진 팀도 <b>패자조</b>에서 한 번 더 기회를 얻습니다.</li>
+          <li>두 번 지면 탈락, 마지막에 <b>무패팀과 생존팀</b>이 결승에서 만납니다.</li>
+        </ul>
+
+        <div class="tsec-h" style="font-size:13px;color:var(--win);margin-top:18px;">승자조</div>
+        <div class="bracket-wrap">
+          <div class="bracket">
+            <div class="br-col">
+              <div class="br-col-h">1차전</div>
+              <div class="br-match">
+                <div class="br-team seed">A</div>
+                <div class="br-team seed">B</div>
+              </div>
+              <div class="br-match">
+                <div class="br-team seed">C</div>
+                <div class="br-team seed">D</div>
+              </div>
+            </div>
+            <div class="br-col">
+              <div class="br-col-h">2차전</div>
+              <div class="br-match spread">
+                <div class="br-team adv">승자</div>
+                <div class="br-team adv">승자</div>
+              </div>
+            </div>
+            <div class="br-col">
+              <div class="br-col-h">승자조 결승</div>
+              <div class="br-match">
+                <div class="br-team gold">★ 결승 직행</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tsec-h" style="font-size:13px;color:var(--danger);margin-top:20px;">패자조</div>
+        <div class="bracket-wrap">
+          <div class="bracket">
+            <div class="br-col">
+              <div class="br-col-h">패자 1차전</div>
+              <div class="br-match">
+                <div class="br-team drop">1차전 패자</div>
+                <div class="br-team drop">1차전 패자</div>
+              </div>
+            </div>
+            <div class="br-col">
+              <div class="br-col-h">패자 2차전</div>
+              <div class="br-match">
+                <div class="br-team adv">승자</div>
+                <div class="br-team drop">승자조 최종 패자</div>
+              </div>
+            </div>
+            <div class="br-col">
+              <div class="br-col-h">패자조 결승</div>
+              <div class="br-match">
+                <div class="br-team gold">★ 결승 진출</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="final-box">
+          <div class="final-label">★ 결승 ★</div>
+          <div class="final-vs">무패팀 <span>VS</span> 생존팀</div>
+          <div class="final-note">승자조를 무패로 통과한 팀과, 패자조를 뚫고 살아남은 팀의 대결</div>
+        </div>
+      </div>
+
+      <div class="tsec">
+        <div class="tsec-h">■ 상금</div>
+        <div class="tsec-sub">팀원 각자 지급</div>
+        <div class="prize">
+          <div class="prize-card p1">
+            <div class="prize-rank">1위</div>
+            <div class="prize-body">각자 원하는 <b>치킨 1마리</b> + 콜라 쿠폰</div>
+          </div>
+          <div class="prize-card p2">
+            <div class="prize-rank">2위</div>
+            <div class="prize-body">메가커피 <b>아메리카노 1잔</b> 쿠폰</div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
