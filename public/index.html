@@ -159,16 +159,6 @@
   .log-row{display:flex;justify-content:space-between;font-size:13.5px;padding:7px 0;border-bottom:1px solid rgba(44,52,31,0.5);font-weight:600;}
   .log-empty{color:var(--text-dim);font-size:13.5px;padding:10px 0;font-weight:600;}
   .log-meta{font-size:11.5px;color:var(--text-dim);font-weight:600;margin-top:2px;}
-  .history-card{
-    padding:16px 6px;border-bottom:1px solid rgba(44,52,31,0.6);font-size:16px;font-weight:700;
-    display:flex;flex-direction:column;gap:5px;
-  }
-  .history-card:last-child{border-bottom:none;}
-  .history-no{
-    color:var(--amber);font-family:'Oswald',sans-serif;font-weight:800;font-size:14px;
-    letter-spacing:.06em;margin-bottom:2px;
-  }
-  .history-card .log-meta{font-size:12.5px;margin-top:4px;}
   .rules{font-size:14px;color:var(--text-dim);line-height:2;font-weight:600;}
   .rules b{color:var(--amber);}
   .toast{
@@ -335,6 +325,45 @@
   }
   .final-vs span{color:var(--amber);margin:0 10px;}
   .final-note{font-size:12.5px;color:var(--text-dim);margin-top:7px;font-weight:600;}
+
+  /* 전체 기록 표 */
+  .history-table th{cursor:default;}
+  .history-table th:hover{color:#f4f6e8;}
+  .history-table td{white-space:normal;vertical-align:top;padding:9px;}
+  .history-table th.h-no{width:48px;}
+  .history-table th.h-when{width:112px;}
+  .history-table th.h-size{width:62px;}
+  .history-table th.h-by{width:126px;}
+  .h-no-cell{font-family:'Oswald',sans-serif;color:var(--text-dim);font-weight:600;}
+  .h-date{font-size:13px;color:var(--text-dim);white-space:nowrap;}
+  .h-time{font-size:12.5px;color:var(--text-dim);white-space:nowrap;}
+  /* .history-table td 의 white-space:normal 보다 우선해야 하므로 td 를 함께 적는다 */
+  .history-table td.h-size-cell{font-size:13.5px;color:var(--text-dim);white-space:nowrap;}
+  .h-by-cell{font-size:13px;color:var(--text-dim);word-break:break-all;}
+  .h-chip{
+    display:inline-block;border:1px solid var(--border);background:var(--panel-2);
+    padding:2px 7px;margin:0 4px 4px 0;font-size:13px;font-weight:700;white-space:nowrap;
+  }
+  .h-chip.w{border-color:rgba(143,224,92,0.35);color:var(--text);}
+  .h-chip.l{border-color:rgba(255,92,73,0.28);color:var(--text-dim);}
+  .h-gain{color:var(--win);margin-left:5px;font-size:12px;}
+
+  /* 좁은 화면에서는 표를 한 건씩 카드로 접는다 */
+  @media (max-width:640px){
+    .history-table{min-width:0;}
+    .history-table thead{display:none;}
+    .history-table tbody tr{
+      display:block;border:1px solid var(--border);background:var(--panel-2);
+      padding:10px 12px;margin-bottom:8px;
+    }
+    .history-table tbody tr:hover td{background:none;}
+    .history-table td{display:block;border:none;padding:2px 0;}
+    .history-table td[data-l]::before{
+      content:attr(data-l);display:block;font-family:'Share Tech Mono',monospace;
+      font-size:10.5px;letter-spacing:.1em;color:var(--text-dim);margin-bottom:2px;font-weight:700;
+    }
+    .history-table td.h-inline{display:inline-block;margin-right:14px;}
+  }
 
   /* 예선 순위표 */
   #groupTable tr.is-adv td{background:rgba(143,224,92,0.045);}
@@ -535,7 +564,22 @@
       <h2>전체 기록 · Match History</h2>
       <div class="foot-note" style="margin-top:0;margin-bottom:10px;">모든 승패 기록을 시간순으로 투명하게 공개합니다 · 등록일시(연월일시분초) 및 등록자가 함께 기록됩니다.</div>
       <button class="btn-ghost" id="historyRefreshBtn" style="width:auto;margin-bottom:14px;">↻ 최신 기록 새로고침</button>
-      <div id="historyList"></div>
+      <div class="table-wrap" id="historyTableWrap">
+        <table id="historyTable" class="history-table">
+          <thead>
+            <tr>
+              <th class="h-no">#</th>
+              <th class="h-when">일시</th>
+              <th class="h-size">규모</th>
+              <th>승리 · WIN</th>
+              <th>패배 · LOSE</th>
+              <th class="h-by">등록자</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="historyEmpty" class="log-empty">기록 없음</div>
     </div>
   </div>
 
@@ -938,18 +982,42 @@ function renderLog() {
 }
 
 function renderHistory() {
-  const box = document.getElementById('historyList');
-  if (!box) return;
-  if (!matches.length) { box.innerHTML = '<div class="log-empty">기록 없음</div>'; return; }
+  const tbody = document.querySelector('#historyTable tbody');
+  const wrap = document.getElementById('historyTableWrap');
+  const empty = document.getElementById('historyEmpty');
+  if (!tbody || !wrap || !empty) return;
+
+  if (!matches.length) {
+    tbody.innerHTML = '';
+    wrap.style.display = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+  wrap.style.display = '';
+  empty.style.display = 'none';
+
   const all = [...matches].reverse();
-  box.innerHTML = all.map((m, i) => {
-    const l = matchLine(m);
-    return `<div class="history-card">
-      <div class="history-no">기록 #${all.length - i}</div>
-      <div><span class="win-txt">WIN(${l.wc})</span> ${l.win}</div>
-      <div><span class="loss-txt">LOSE(${l.lc})</span> ${l.lose}</div>
-      <div class="log-meta">등록자 : ${esc(m.recordedBy || '-')} · 등록일시 : ${formatDateTime(m.ts)}</div>
-    </div>`;
+  tbody.innerHTML = all.map((m, i) => {
+    const winners = m.winners || [];
+    const losers = m.losers || [];
+    const d = new Date(m.ts);
+    const date = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+    const time = `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+
+    const winChips = winners.map(w =>
+      `<span class="h-chip w">${esc(w.handle)}<span class="h-gain">+${w.gained !== undefined ? w.gained : '-'}</span></span>`
+    ).join('') || '<span class="h-chip l">-</span>';
+    const loseChips = losers.map(h => `<span class="h-chip l">${esc(h)}</span>`).join('')
+      || '<span class="h-chip l">-</span>';
+
+    return `<tr>
+      <td class="h-no-cell h-inline" data-l="기록">#${all.length - i}</td>
+      <td class="h-inline" data-l="일시"><div class="h-date">${date}</div><div class="h-time">${time}</div></td>
+      <td class="h-size-cell h-inline" data-l="규모">${winners.length} : ${losers.length}</td>
+      <td data-l="승리 · WIN">${winChips}</td>
+      <td data-l="패배 · LOSE">${loseChips}</td>
+      <td class="h-by-cell" data-l="등록자">${esc(m.recordedBy || '-')}</td>
+    </tr>`;
   }).join('');
 }
 

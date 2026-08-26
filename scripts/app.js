@@ -231,18 +231,42 @@ function renderLog() {
 }
 
 function renderHistory() {
-  const box = document.getElementById('historyList');
-  if (!box) return;
-  if (!matches.length) { box.innerHTML = '<div class="log-empty">기록 없음</div>'; return; }
+  const tbody = document.querySelector('#historyTable tbody');
+  const wrap = document.getElementById('historyTableWrap');
+  const empty = document.getElementById('historyEmpty');
+  if (!tbody || !wrap || !empty) return;
+
+  if (!matches.length) {
+    tbody.innerHTML = '';
+    wrap.style.display = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+  wrap.style.display = '';
+  empty.style.display = 'none';
+
   const all = [...matches].reverse();
-  box.innerHTML = all.map((m, i) => {
-    const l = matchLine(m);
-    return `<div class="history-card">
-      <div class="history-no">기록 #${all.length - i}</div>
-      <div><span class="win-txt">WIN(${l.wc})</span> ${l.win}</div>
-      <div><span class="loss-txt">LOSE(${l.lc})</span> ${l.lose}</div>
-      <div class="log-meta">등록자 : ${esc(m.recordedBy || '-')} · 등록일시 : ${formatDateTime(m.ts)}</div>
-    </div>`;
+  tbody.innerHTML = all.map((m, i) => {
+    const winners = m.winners || [];
+    const losers = m.losers || [];
+    const d = new Date(m.ts);
+    const date = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+    const time = `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+
+    const winChips = winners.map(w =>
+      `<span class="h-chip w">${esc(w.handle)}<span class="h-gain">+${w.gained !== undefined ? w.gained : '-'}</span></span>`
+    ).join('') || '<span class="h-chip l">-</span>';
+    const loseChips = losers.map(h => `<span class="h-chip l">${esc(h)}</span>`).join('')
+      || '<span class="h-chip l">-</span>';
+
+    return `<tr>
+      <td class="h-no-cell h-inline" data-l="기록">#${all.length - i}</td>
+      <td class="h-inline" data-l="일시"><div class="h-date">${date}</div><div class="h-time">${time}</div></td>
+      <td class="h-size-cell h-inline" data-l="규모">${winners.length} : ${losers.length}</td>
+      <td data-l="승리 · WIN">${winChips}</td>
+      <td data-l="패배 · LOSE">${loseChips}</td>
+      <td class="h-by-cell" data-l="등록자">${esc(m.recordedBy || '-')}</td>
+    </tr>`;
   }).join('');
 }
 
