@@ -8,6 +8,7 @@ let requests = [];
 let admins = [];
 let tMatches = [];          // 대회 경기 기록
 let posts = [];             // 게시판 글
+let openCommentForm = null; // 댓글 입력창이 열린 글 id
 
 /* 대회 참가 팀. api/tournament.js 의 TEAMS 와 id 가 일치해야 합니다. */
 const TOURNAMENT_TEAMS = [
@@ -98,7 +99,6 @@ function ratio(p) {
   if (total === 0) return 0;
   return Math.round((p.wins / total) * 1000) / 10;
 }
-function parity(p) { return p.wins * 5 + p.losses * 2; }
 function findPlayer(handle) { return players.find(p => p.handle === handle); }
 function medalClass(rank) { return rank === 1 ? 'rank1' : rank === 2 ? 'rank2' : rank === 3 ? 'rank3' : ''; }
 function pad2(n) { return String(n).padStart(2, '0'); }
@@ -124,7 +124,6 @@ function sortedPlayers() {
       case 'loss':   av = a.losses; bv = b.losses; break;
       case 'ratio':  av = ratio(a); bv = ratio(b); break;
       case 'streak': av = a.streak; bv = b.streak; break;
-      case 'parity': av = parity(a); bv = parity(b); break;
       default:       av = a.point; bv = b.point;
     }
     return sortDir * (av - bv);
@@ -158,9 +157,8 @@ function renderStanding() {
       <td class="loss-txt">${p.losses}</td>
       <td>${ratio(p)}%</td>
       <td>${streakCell}</td>
-      <td>${parity(p)}</td>
     </tr>`;
-  }).join('') || '<tr><td colspan="9" class="log-empty">검색 결과 없음</td></tr>';
+  }).join('') || '<tr><td colspan="8" class="log-empty">검색 결과 없음</td></tr>';
 
   document.querySelectorAll('#standingTable th').forEach(th => {
     th.classList.toggle('sorted', th.dataset.key === sortKey);
@@ -682,7 +680,91 @@ function renderBoard() {
         </span>
       </div>
       <div class="post-body">${esc(p.body)}</div>
+      ${renderComments(p)}
     </div>`).join('');
+}
+
+function renderComments(post) {
+  const list = post.comments || [];
+  const open = openCommentForm === post.id;
+
+  const items = list.map(c => `
+    <div class="cmt">
+      <div class="cmt-head">
+        <span class="cmt-author">${esc(c.author)}</span>
+        <span class="cmt-date">${formatDateTime(c.createdAt)}</span>
+        <span class="cmt-actions">
+          <button class="btn-mini btn-reject" data-cdel="${c.id}">삭제</button>
+        </span>
+      </div>
+      <div class="cmt-body">${esc(c.body)}</div>
+    </div>`).join('');
+
+  const form = open ? `
+    <div class="cmt-form">
+      <input type="text" data-cauthor="${post.id}" maxlength="20" placeholder="ID">
+      <input type="password" data-cpw="${post.id}" maxlength="4" inputmode="numeric" placeholder="비밀번호 4자리">
+      <textarea class="cmt-text" data-cbody="${post.id}" maxlength="300" rows="2" placeholder="댓글을 입력하세요."></textarea>
+      <button class="btn-mini btn-approve" data-csubmit="${post.id}">댓글 등록</button>
+    </div>` : '';
+
+  return `<div class="cmt-wrap">
+    ${items}
+    <button class="cmt-toggle" data-ctoggle="${post.id}">${open ? '✕ 댓글 쓰기 닫기' : `💬 댓글 ${list.length}${list.length ? '개' : ' 쓰기'}`}</button>
+    ${form}
+  </div>`;
+}
+
+async function createComment(postId) {
+  const author = document.querySelector(`[data-cauthor="${postId}"]`).value.trim();
+  const password = document.querySelector(`[data-cpw="${postId}"]`).value;
+  const body = document.querySelector(`[data-cbody="${postId}"]`).value.trim();
+
+  if (!author) return showToast('ID를 입력해주세요.');
+  if (!/^\d{4}$/.test(password)) return showToast('비밀번호는 숫자 4자리로 입력해주세요.');
+  if (!body) return showToast('댓글 내용을 입력해주세요.');
+
+  try {
+    await apiPost('/api/post', { action: 'comment', postId: Number(postId), author, password, body });
+    openCommentForm = null;
+    await loadPosts();
+    renderBoard();
+    showToast('댓글을 등록했습니다.');
+  } catch (e) { showToast(e.message); }
+}
+
+/** 댓글 삭제: 관리자는 비밀번호 없이, 그 외에는 비밀번호를 확인한다 */
+function deleteComment(id) {
+  if (currentAdmin) {
+    if (!confirm('이 댓글을 삭제할까요?')) return;
+    return submitCommentDelete(id, null).catch(e => showToast(e.message));
+  }
+  openModal(`
+    <h3>댓글 삭제</h3>
+    <label>비밀번호 (숫자 4자리)</label>
+    <input type="password" id="cdelPw" maxlength="4" inputmode="numeric" placeholder="0000">
+    <div class="modal-error" id="cdelErr"></div>
+    <button class="btn" id="cdelSubmit">삭제하기</button>
+    <button class="btn-ghost" style="width:100%;margin-top:8px;" onclick="closeModal()">취소</button>
+  `);
+  const err = document.getElementById('cdelErr');
+  document.getElementById('cdelSubmit').addEventListener('click', async () => {
+    const password = document.getElementById('cdelPw').value;
+    if (!/^\d{4}$/.test(password)) { err.textContent = '비밀번호는 숫자 4자리입니다.'; return; }
+    try {
+      await submitCommentDelete(id, password);
+      closeModal();
+    } catch (e) { err.textContent = e.message; }
+  });
+}
+
+async function submitCommentDelete(id, password) {
+  const payload = { action: 'removeComment', id: Number(id) };
+  if (password !== null) payload.password = password;
+  await apiPost('/api/post', payload);
+  await loadPosts();
+  renderBoard();
+  showToast('댓글을 삭제했습니다.');
 }
 
 async function createPost() {
@@ -800,6 +882,12 @@ function initBoardEvents() {
     const d = e.target.dataset || {};
     if (d.edit) showEditModal(d.edit);
     if (d.del) deletePost(d.del);
+    if (d.ctoggle) {
+      openCommentForm = openCommentForm === Number(d.ctoggle) ? null : Number(d.ctoggle);
+      renderBoard();
+    }
+    if (d.csubmit) createComment(d.csubmit);
+    if (d.cdel) deleteComment(d.cdel);
   });
 
   const checkAll = document.getElementById('postCheckAll');

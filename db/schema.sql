@@ -82,3 +82,14 @@ CREATE TABLE IF NOT EXISTS posts (
   updated_at BIGINT
 );
 CREATE INDEX IF NOT EXISTS idx_posts_created ON posts (created_at DESC);
+
+-- 게시판 댓글. 글이 지워지면 댓글도 함께 사라진다.
+CREATE TABLE IF NOT EXISTS post_comments (
+  id         BIGSERIAL PRIMARY KEY,
+  post_id    BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  author     TEXT NOT NULL,
+  pw_hash    TEXT NOT NULL,
+  body       TEXT NOT NULL,
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_comments_post ON post_comments (post_id, created_at);

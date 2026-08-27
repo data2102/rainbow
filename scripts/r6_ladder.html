@@ -359,6 +359,32 @@
   .btn-edit:hover{color:var(--text);border-color:var(--olive);}
   .post-body{font-size:14.5px;line-height:1.75;font-weight:600;white-space:pre-wrap;word-break:break-word;}
 
+  /* 게시판 댓글 */
+  .cmt-wrap{margin-top:10px;border-left:2px solid var(--olive-dim);padding-left:12px;}
+  .cmt{padding:7px 0;border-bottom:1px solid rgba(44,52,31,0.4);}
+  .cmt:last-of-type{border-bottom:none;}
+  .cmt-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .cmt-author{font-size:13px;font-weight:800;color:var(--text);}
+  .cmt-date{font-size:11px;color:var(--text-dim);font-weight:600;}
+  .cmt-actions{margin-left:auto;}
+  .cmt-actions .btn-mini{padding:3px 8px;font-size:10.5px;}
+  .cmt-body{font-size:13.5px;line-height:1.7;font-weight:600;white-space:pre-wrap;word-break:break-word;margin-top:2px;}
+  .cmt-toggle{
+    background:transparent;border:none;color:var(--olive);cursor:pointer;padding:0;
+    font-family:'Share Tech Mono',monospace;font-size:12.5px;font-weight:700;letter-spacing:.02em;
+  }
+  .cmt-toggle:hover{color:var(--amber);text-decoration:underline;}
+  .cmt-form{display:grid;grid-template-columns:1.4fr 1fr;gap:6px;margin-top:9px;}
+  .cmt-form .cmt-text{grid-column:1/-1;}
+  .cmt-form input,.cmt-form textarea{
+    width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);
+    font-family:'Share Tech Mono',monospace;padding:8px 9px;font-size:13.5px;font-weight:600;
+  }
+  .cmt-form textarea{resize:vertical;line-height:1.6;min-height:60px;}
+  .cmt-form input:focus,.cmt-form textarea:focus{outline:none;border-color:var(--amber-dim);}
+  .cmt-form .btn-mini{grid-column:1/-1;justify-self:start;padding:7px 16px;}
+  @media (max-width:520px){.cmt-form{grid-template-columns:1fr;}}
+
   /* 회원 관리 */
   .member-list{
     max-height:340px;overflow-y:auto;border:1px solid var(--border);background:var(--bg);
@@ -516,13 +542,12 @@
               <th data-key="loss">Loss</th>
               <th data-key="ratio">Ratio</th>
               <th data-key="streak">Streak</th>
-              <th data-key="parity">Parity</th>
             </tr>
           </thead>
           <tbody></tbody>
         </table>
       </div>
-      <div class="foot-note">Parity = 기여도(승×5 + 패×2) · Point 기준 정렬이 기본값입니다.</div>
+      <div class="foot-note">Point 기준 정렬이 기본값입니다 · 열 제목을 누르면 정렬 기준이 바뀝니다.</div>
     </div>
   </div>
 

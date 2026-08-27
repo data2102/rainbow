@@ -2,6 +2,7 @@ import { q, body, methodGuard, hashPw, verifyPw, currentAdmin, requireAdmin, aud
 
 const MAX_AUTHOR = 20;
 const MAX_BODY = 1000;
+const MAX_COMMENT = 300;
 
 /**
  * 기능 개선 게시판.
@@ -22,6 +23,16 @@ async function ensureTable() {
       updated_at BIGINT
     )`);
   await q(`CREATE INDEX IF NOT EXISTS idx_posts_created ON posts (created_at DESC)`);
+  await q(`
+    CREATE TABLE IF NOT EXISTS post_comments (
+      id         BIGSERIAL PRIMARY KEY,
+      post_id    BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+      author     TEXT NOT NULL,
+      pw_hash    TEXT NOT NULL,
+      body       TEXT NOT NULL,
+      created_at BIGINT NOT NULL
+    )`);
+  await q(`CREATE INDEX IF NOT EXISTS idx_comments_post ON post_comments (post_id, created_at)`);
   ensured = true;
 }
 
@@ -33,6 +44,16 @@ function rowToPost(r) {
     body: r.body,
     createdAt: Number(r.created_at),
     updatedAt: r.updated_at ? Number(r.updated_at) : null,
+  };
+}
+
+function rowToComment(r) {
+  return {
+    id: Number(r.id),
+    postId: Number(r.post_id),
+    author: r.author,
+    body: r.body,
+    createdAt: Number(r.created_at),
   };
 }
 
@@ -52,6 +73,8 @@ export default async function handler(req, res) {
     if (action === 'remove')     return await remove(req, res);
     if (action === 'removeMany') return await removeMany(req, res);
     if (action === 'clear')      return await clear(req, res);
+    if (action === 'comment')       return await addComment(req, res);
+    if (action === 'removeComment') return await removeComment(req, res);
     return res.status(400).json({ error: '알 수 없는 요청입니다.' });
   } catch (e) {
     res.status(500).json({ error: '처리 실패: ' + e.message });
@@ -59,9 +82,61 @@ export default async function handler(req, res) {
 }
 
 async function listPosts(res) {
-  const rows = await q(`SELECT * FROM posts ORDER BY created_at DESC`);
+  const [rows, comments] = await Promise.all([
+    q(`SELECT * FROM posts ORDER BY created_at DESC`),
+    q(`SELECT * FROM post_comments ORDER BY created_at ASC`),
+  ]);
+  const byPost = new Map();
+  for (const c of comments) {
+    const key = Number(c.post_id);
+    if (!byPost.has(key)) byPost.set(key, []);
+    byPost.get(key).push(rowToComment(c));
+  }
   res.setHeader('Cache-Control', 'no-store');
-  res.status(200).json({ posts: rows.map(rowToPost) });
+  res.status(200).json({
+    posts: rows.map(r => ({ ...rowToPost(r), comments: byPost.get(Number(r.id)) || [] })),
+  });
+}
+
+async function addComment(req, res) {
+  const { postId, author, password, body: text } = body(req);
+  const name = String(author || '').trim();
+  const content = String(text || '').trim();
+
+  if (!Number.isInteger(Number(postId))) return res.status(400).json({ error: '댓글을 달 글을 찾을 수 없습니다.' });
+  if (!name) return res.status(400).json({ error: 'ID를 입력해주세요.' });
+  if (name.length > MAX_AUTHOR) return res.status(400).json({ error: `ID는 ${MAX_AUTHOR}자 이내로 입력해주세요.` });
+  if (!checkPw(password)) return res.status(400).json({ error: '비밀번호는 숫자 4자리로 입력해주세요.' });
+  if (!content) return res.status(400).json({ error: '댓글 내용을 입력해주세요.' });
+  if (content.length > MAX_COMMENT) return res.status(400).json({ error: `댓글은 ${MAX_COMMENT}자 이내로 입력해주세요.` });
+
+  const exists = await q(`SELECT 1 FROM posts WHERE id = $1`, [Number(postId)]);
+  if (!exists.length) return res.status(404).json({ error: '이미 삭제된 글입니다.' });
+
+  const rows = await q(
+    `INSERT INTO post_comments (post_id, author, pw_hash, body, created_at)
+     VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+    [Number(postId), name, hashPw(String(password)), content, Date.now()]
+  );
+  res.status(200).json({ ok: true, comment: rowToComment(rows[0]) });
+}
+
+async function removeComment(req, res) {
+  const { id, password } = body(req);
+  if (!Number.isInteger(Number(id))) return res.status(400).json({ error: '삭제할 댓글을 찾을 수 없습니다.' });
+
+  const rows = await q(`SELECT * FROM post_comments WHERE id = $1`, [Number(id)]);
+  if (!rows.length) return res.status(404).json({ error: '이미 삭제된 댓글입니다.' });
+  const comment = rows[0];
+
+  const admin = await currentAdmin(req);
+  if (!admin && !verifyPw(String(password || ''), comment.pw_hash)) {
+    return res.status(403).json({ error: '비밀번호가 일치하지 않습니다.' });
+  }
+
+  await q(`DELETE FROM post_comments WHERE id = $1`, [comment.id]);
+  if (admin) await audit(admin, 'delete_comment', { id: comment.id, author: comment.author });
+  res.status(200).json({ ok: true });
 }
 
 async function create(req, res) {
