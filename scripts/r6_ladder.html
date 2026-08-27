@@ -158,6 +158,8 @@
     background:var(--amber);color:var(--bg);border:none;padding:13px 20px;font-size:14.5px;
     cursor:pointer;width:100%;margin-top:14px;
   }
+  /* 폭을 좁힌 단독 버튼을 가운데로 (width:100% 인 .btn 기본값을 보완) */
+  .btn-center{max-width:240px;margin-left:auto;margin-right:auto;display:block;}
   .btn:disabled{background:var(--olive-dim);color:var(--text-dim);cursor:not-allowed;}
   .btn:hover:not(:disabled){background:#ffc85a;}
   .btn-ghost{
@@ -623,7 +625,7 @@
     <div class="panel hud-corner" id="adminLocked">
       <h2>관리자 전용 · Admin Only</h2>
       <div class="foot-note" style="margin-top:0;margin-bottom:14px;">이 페이지는 관리자 로그인 후에만 이용할 수 있습니다.</div>
-      <button class="btn" id="adminLockedLoginBtn" style="max-width:240px;">관리자 로그인</button>
+      <button class="btn btn-center" id="adminLockedLoginBtn">관리자 로그인</button>
     </div>
 
     <div id="adminAuthed" style="display:none;">
