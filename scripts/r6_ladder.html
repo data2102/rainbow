@@ -409,14 +409,14 @@
   .history-table th.h-when{width:112px;}
   .history-table th.h-size{width:62px;}
   .history-table th.h-by{width:126px;}
-  .h-no-cell{font-family:'Oswald',sans-serif;color:var(--text-dim);font-weight:600;}
-  .h-date{font-size:13px;color:var(--text-dim);white-space:nowrap;}
-  .h-time{font-size:12.5px;color:var(--text-dim);white-space:nowrap;}
+  .h-no-cell{font-family:'Oswald',sans-serif;color:var(--text);font-weight:600;}
+  .h-date{font-size:13px;color:var(--text);white-space:nowrap;}
+  .h-time{font-size:12.5px;color:var(--text);white-space:nowrap;}
   /* .history-table td 의 white-space:normal 보다 우선해야 하므로 td 를 함께 적는다 */
-  .history-table td.h-size-cell{font-size:13.5px;color:var(--text-dim);white-space:nowrap;}
-  /* 등록자는 데이터가 아니라 부가정보다. 승·패 이름과 색이 겹치지 않도록
-     올리브빛 text-dim 대신 중립 회색을 쓰고 한 단계 더 작게 둔다. */
-  .h-by-cell{font-size:12px;color:#8b9082;word-break:break-all;letter-spacing:.02em;}
+  .history-table td.h-size-cell{font-size:13.5px;color:var(--text);white-space:nowrap;}
+  /* 승·패는 초록/붉은색으로 구분되므로, 나머지 항목은 본문 색으로 두어
+     읽기 쉽게 한다. 회색으로 낮추면 어두운 바탕에서 잘 보이지 않는다. */
+  .h-by-cell{font-size:13px;color:var(--text);word-break:break-all;}
   .h-chip{
     display:inline-block;border:1px solid var(--border);background:var(--panel-2);
     padding:2px 7px;margin:0 4px 4px 0;font-size:13px;font-weight:700;white-space:nowrap;
