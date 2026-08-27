@@ -72,6 +72,9 @@
   --rise:              #e4453a;  --rise-bg:    #ffeceb;
   --fall:              #1b64da;  --fall-bg:    #e9f1ff;
 
+  /* STANDING 상위권 표시 */
+  --top-rank:          #a06800;  --top-rank-bg:  #ffeeb8;  --top-rank-row: #fffaeb;
+
   --success:           #12b886;  --success-bg: #e6fcf5;
   --warning:           #f59f00;  --warning-bg: #fff9db;
   --danger:            #f03e3e;  --danger-bg:  #fff0f0;
@@ -163,6 +166,8 @@
 
   --rise:              #ff7a70;  --rise-bg:    #3a1c19;
   --fall:              #7ab4ff;  --fall-bg:    #142238;
+
+  --top-rank:          #f5c451;  --top-rank-bg:  #3d2f08;  --top-rank-row: #23200f;
 
   --success:           #34d399;  --success-bg: #0f2e26;
   --warning:           #fbbf24;  --warning-bg: #2e2408;
@@ -352,6 +357,15 @@ tbody tr:hover td{ background:var(--surface-sunken); }
 
 .rank-cell{ width:44px; font-weight:var(--fw-bold); color:var(--text-tertiary); }
 .rank1,.rank2,.rank3{ color:var(--text-primary); }
+
+/* STANDING 상위 5명만 금색으로 묶어 보여준다 (2페이지 순위표에는 적용하지 않는다) */
+#standingTable tr.top-rank-row td{ background:var(--top-rank-row); }
+#standingTable tr.top-rank-row:hover td{ background:var(--top-rank-bg); }
+#standingTable tr.top-rank-row td:first-child{ box-shadow:inset 3px 0 0 var(--top-rank); }
+#standingTable tr.top-rank-row .rank-cell{
+  color:var(--top-rank); font-size:var(--fs-subhead); font-weight:var(--fw-bold);
+}
+#standingTable tr.top-rank-row td:nth-child(2){ font-weight:var(--fw-bold); }
 .clan-tag{ color:var(--text-secondary); font-weight:var(--fw-medium); }
 
 /* 색은 신호일 때만 — 승/패 */

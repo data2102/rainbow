@@ -22,6 +22,7 @@ const MERCENARIES = ['렌보짱', '럭키', '호신', '실장'];
 const ADVANCING = 4;        // 예선 통과 팀 수
 const CLAN_TOP = 5;         // 클랜 순위에 보여줄 등수
 const TOP_N = 5;            // 개인 순위 표에 보여줄 인원
+const STANDING_HIGHLIGHT = 5; // STANDING 표에서 색을 달리 줄 상위 등수
 
 function teamLabel(id) {
   const t = TOURNAMENT_TEAMS.find(t => t.id === id);
@@ -150,7 +151,9 @@ function renderStanding() {
     else if (p.streak > 0)   streakCell = `<span class="streak-pos">+${p.streak}</span>`;
     else if (p.streak < 0)   streakCell = `<span class="streak-neg">${p.streak}</span>`;
     else                     streakCell = '0';
-    return `<tr>
+    // 상위 등수는 STANDING 표에서만 색을 달리한다 (2페이지 순위표는 그대로 둔다)
+    const topRow = p.rank <= STANDING_HIGHLIGHT ? ' class="top-rank-row"' : '';
+    return `<tr${topRow}>
       <td class="rank-cell ${medalClass(p.rank)}">${p.rank}</td>
       <td>${esc(p.handle)}</td>
       <td class="clan-tag">${esc(p.clan)}</td>
