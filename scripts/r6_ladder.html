@@ -414,13 +414,21 @@
   .h-time{font-size:12.5px;color:var(--text-dim);white-space:nowrap;}
   /* .history-table td 의 white-space:normal 보다 우선해야 하므로 td 를 함께 적는다 */
   .history-table td.h-size-cell{font-size:13.5px;color:var(--text-dim);white-space:nowrap;}
-  .h-by-cell{font-size:13px;color:var(--text-dim);word-break:break-all;}
+  /* 등록자는 데이터가 아니라 부가정보다. 승·패 이름과 색이 겹치지 않도록
+     올리브빛 text-dim 대신 중립 회색을 쓰고 한 단계 더 작게 둔다. */
+  .h-by-cell{font-size:12px;color:#8b9082;word-break:break-all;letter-spacing:.02em;}
   .h-chip{
     display:inline-block;border:1px solid var(--border);background:var(--panel-2);
     padding:2px 7px;margin:0 4px 4px 0;font-size:13px;font-weight:700;white-space:nowrap;
   }
-  .h-chip.w{border-color:rgba(143,224,92,0.35);color:var(--text);}
-  .h-chip.l{border-color:rgba(255,92,73,0.28);color:var(--text-dim);}
+  .h-chip.w{
+    border-color:rgba(143,224,92,0.45);background:rgba(143,224,92,0.08);color:#d6f0bd;
+  }
+  /* 패배 선수도 엄연한 데이터다. 등록자와 같은 회색이면 묻히므로
+     붉은 계열로 두어 승리와 한눈에 갈리게 한다. */
+  .h-chip.l{
+    border-color:rgba(255,92,73,0.45);background:rgba(255,92,73,0.07);color:#ff9484;
+  }
   .h-gain{color:var(--win);margin-left:5px;font-size:12px;}
 
   /* 좁은 화면에서는 표를 한 건씩 카드로 접는다 */
