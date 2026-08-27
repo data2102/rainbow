@@ -172,6 +172,26 @@ function renderTop5() {
     <tr><td class="rank-cell ${medalClass(i + 1)}">${i + 1}</td><td>${esc(p.handle)}</td>
     <td class="clan-tag">${esc(p.clan)}</td>
     <td class="win-txt">${p.wins}</td><td class="loss-txt">${p.losses}</td><td>${ratio(p)}%</td></tr>`).join('');
+
+  // 승률은 경기를 치른 선수만 대상으로 한다. 0전 0승이 100%로 잡히거나
+  // 0%로 목록을 채우는 것을 막기 위해서다.
+  // 승률이 같으면 승수가 많은 쪽을 위로 둔다. 1승 0패와 9승 0패는 같은 100%지만
+  // 무게가 다르기 때문이다.
+  const byRatio = players
+    .filter(p => p.wins + p.losses > 0)
+    .sort((a, b) => ratio(b) - ratio(a) || b.wins - a.wins || a.handle.localeCompare(b.handle))
+    .slice(0, 10);
+
+  const ratioBody = document.getElementById('topRatioBody');
+  if (ratioBody) {
+    ratioBody.innerHTML = byRatio.map((p, i) => `
+      <tr><td class="rank-cell ${medalClass(i + 1)}">${i + 1}</td><td>${esc(p.handle)}</td>
+      <td class="clan-tag">${esc(p.clan)}</td>
+      <td>${ratio(p)}%</td>
+      <td class="win-txt">${p.wins}</td><td class="loss-txt">${p.losses}</td>
+      <td>${p.wins + p.losses}</td></tr>`).join('')
+      || '<tr><td colspan="7" class="log-empty">아직 경기 기록이 없습니다.</td></tr>';
+  }
 }
 
 function getChecked(listId) {
