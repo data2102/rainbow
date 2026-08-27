@@ -67,6 +67,13 @@
   h1{font-family:'Oswald',sans-serif;font-weight:800;font-size:36px;letter-spacing:.04em;margin:0;color:var(--text);text-transform:uppercase;}
   h1 span{color:var(--amber);}
   .subline{font-size:13.5px;color:var(--text-dim);margin-top:6px;font-weight:600;}
+  .home-link{
+    background:none;border:none;padding:0;cursor:pointer;
+    font-family:inherit;font-size:inherit;font-weight:700;letter-spacing:inherit;
+    color:var(--text);border-bottom:1px dotted var(--olive);
+  }
+  .home-link:hover{color:var(--amber);border-bottom-color:var(--amber);}
+  .home-link:focus-visible{outline:2px solid var(--amber);outline-offset:2px;}
   .live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--win);margin-right:6px;box-shadow:0 0 6px var(--win);animation:pulse 2s infinite;}
   @media (prefers-reduced-motion: reduce){.live-dot{animation:none;}}
   @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
@@ -518,7 +525,7 @@
     <div>
       <div class="eyebrow">Team Clancy's · Tactical Ladder System</div>
       <h1>RAINBOWSIX RANK</h1>
-      <div class="subline"><span class="live-dot"></span>RAINBOW SIX · 시즌 랭킹 · 실시간 반영</div>
+      <div class="subline"><span class="live-dot"></span><button type="button" class="home-link" id="homeLink">RAINBOW SIX</button> · 시즌 랭킹 · 실시간 반영</div>
     </div>
     <div class="auth-bar" id="authBar"></div>
   </header>
@@ -537,7 +544,7 @@
     <div class="panel hud-corner">
       <h2>전체 랭킹 · Standing</h2>
       <div class="search-row">
-        <input type="text" id="searchInput" placeholder="아이디 또는 클랜으로 검색...">
+        <input type="search" id="searchInput" autocomplete="off" placeholder="아이디 또는 클랜으로 검색...">
       </div>
       <div class="table-wrap">
         <table id="standingTable">
@@ -651,7 +658,7 @@
         <div class="foot-note" style="margin-top:0;margin-bottom:10px;">
           명단에서 회원을 바로 삭제합니다. 삭제해도 지난 경기 기록은 HISTORY에 그대로 남습니다.
         </div>
-        <input type="text" id="memberSearch" placeholder="아이디 또는 클랜으로 검색...">
+        <input type="search" id="memberSearch" autocomplete="off" placeholder="아이디 또는 클랜으로 검색...">
         <div class="member-list" id="memberList"></div>
         <div class="foot-note" id="memberCount"></div>
       </div>
@@ -660,7 +667,7 @@
         <h2>어드민 계정 관리</h2>
         <div id="adminList"></div>
         <label>신규 어드민 ID 추가</label>
-        <input type="text" id="newAdminId" placeholder="예: ADMIN_NewName">
+        <input type="text" id="newAdminId" autocomplete="off" placeholder="예: ADMIN_NewName">
         <button class="btn" id="addAdminBtn">어드민 추가 (초기 비밀번호 1234)</button>
       </div>
 
@@ -837,7 +844,7 @@
             </div>
             <div class="t-note-cell">
               <label class="t-lab">메모 (선택)</label>
-              <input type="text" id="tNote" maxlength="60" placeholder="예: 승자조 1차전">
+              <input type="text" id="tNote" maxlength="60" autocomplete="off" placeholder="예: 승자조 1차전">
             </div>
           </div>
           <button class="btn" id="tRecordBtn">대회 경기 기록</button>
@@ -877,11 +884,11 @@
         <div class="post-form-row">
           <div>
             <label class="t-lab">ID *</label>
-            <input type="text" id="postAuthor" maxlength="20" placeholder="예: SNC_LeNa">
+            <input type="text" id="postAuthor" maxlength="20" autocomplete="off" placeholder="예: SNC_LeNa">
           </div>
           <div>
             <label class="t-lab">비밀번호 * (숫자 4자리)</label>
-            <input type="password" id="postPw" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="0000">
+            <input type="password" id="postPw" maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="0000">
           </div>
         </div>
         <label class="t-lab">내용 *</label>

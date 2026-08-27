@@ -1056,8 +1056,8 @@ function showAdminLoginModal() {
   openModal(`
     <button class="modal-x" onclick="closeModal()">✕</button>
     <h3>관리자 로그인 · ADMIN LOGIN</h3>
-    <label>관리자 ID</label><input type="text" id="adminLoginId">
-    <label>비밀번호</label><input type="password" id="adminLoginPw">
+    <label>관리자 ID</label><input type="text" id="adminLoginId" autocomplete="username">
+    <label>비밀번호</label><input type="password" id="adminLoginPw" autocomplete="current-password">
     <div class="modal-error" id="adminLoginErr"></div>
     <button class="btn" id="adminLoginSubmit">로그인</button>
     <div class="foot-note">로그인 상태는 12시간 유지되며, 페이지를 새로고침하면 다시 로그인해야 합니다.</div>`);
@@ -1204,15 +1204,32 @@ async function handleImportFile(e) {
 
 /* ---------- 초기화 ---------- */
 
+function activateTab(name) {
+  const panel = document.getElementById('tab-' + name);
+  if (!panel) return;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  panel.classList.add('active');
+
+  if (name === 'standing') {
+    // 브라우저가 검색창을 자동으로 채워두면 목록이 비어 보인다.
+    // STANDING 으로 올 때는 항상 전체 목록부터 보여준다.
+    const search = document.getElementById('searchInput');
+    if (search && search.value) { search.value = ''; }
+    renderStanding();
+  }
+  if (name === 'history') refreshAll();
+}
+
 function initTabs() {
   document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-      btn.classList.add('active');
-      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
-      if (btn.dataset.tab === 'history') refreshAll();
-    });
+    btn.addEventListener('click', () => activateTab(btn.dataset.tab));
+  });
+
+  const home = document.getElementById('homeLink');
+  if (home) home.addEventListener('click', () => {
+    activateTab('standing');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   });
 }
 
