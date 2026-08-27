@@ -8,6 +8,9 @@ let requests = [];
 let admins = [];
 let tMatches = [];          // 대회 경기 기록
 let posts = [];             // 게시판 글
+let season = null;          // 진행 중인 시즌
+let seasons = [];           // 지난 시즌 결산
+let seasonTop = 10;         // 결산 표에 보여줄 등수
 let openCommentForm = null; // 댓글 입력창이 열린 글 id
 
 /* 대회 참가 팀. api/tournament.js 의 TEAMS 와 id 가 일치해야 합니다. */
@@ -68,6 +71,7 @@ async function handleRes(r) {
 
 async function loadState() {
   const d = await apiGet('/api/state');
+  season = d.season || null;
   players = d.players || [];
   matches = d.matches || [];
   requests = d.requests || [];
@@ -78,6 +82,15 @@ async function loadTournament() {
     const d = await apiGet('/api/tournament');
     tMatches = d.matches || [];
   } catch { tMatches = []; }
+}
+
+async function loadSeasons() {
+  try {
+    const d = await apiGet('/api/season');
+    season = d.current || season;
+    seasons = d.seasons || [];
+    if (d.top) seasonTop = d.top;
+  } catch { seasons = []; }
 }
 
 async function loadPosts() {
@@ -473,6 +486,69 @@ function renderAll() {
   renderMemberList();
   renderTournament();
   renderBoard();
+  renderSeasons();
+}
+
+/* ---------- 월간 결산 (MONTHLY) ---------- */
+
+/** epoch ms 를 한국 시각 기준 'YYYY-MM-DD' 로 */
+function formatKstDate(ts) {
+  const d = new Date(ts + 9 * 60 * 60 * 1000);
+  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+}
+
+/** 시즌이 끝나는 시각은 다음 시즌의 시작이므로, 표기는 하루 앞당긴다 */
+function seasonRange(s) {
+  return `${formatKstDate(s.startsAt)} ~ ${formatKstDate(s.endsAt - 1)}`;
+}
+
+function seasonRatio(r) {
+  const total = r.wins + r.losses;
+  return total === 0 ? 0 : Math.round((r.wins / total) * 1000) / 10;
+}
+
+function seasonTable(rows) {
+  if (!rows.length) return '<div class="season-empty">경기 기록이 없습니다.</div>';
+  return `<div class="table-wrap"><table>
+    <thead><tr><th>Rank</th><th>ID</th><th>Clan</th><th>Win</th><th>Loss</th><th>Ratio</th></tr></thead>
+    <tbody>${rows.map(r => `
+      <tr><td class="rank-cell ${medalClass(r.rank)}">${r.rank}</td>
+      <td>${esc(r.handle)}</td><td class="clan-tag">${esc(r.clan)}</td>
+      <td class="win-txt">${r.wins}</td><td class="loss-txt">${r.losses}</td>
+      <td>${seasonRatio(r)}%</td></tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+function renderSeasons() {
+  const nowEl = document.getElementById('seasonNow');
+  const listEl = document.getElementById('seasonList');
+  if (!nowEl || !listEl) return;
+
+  if (season) {
+    const left = Math.max(0, Math.ceil((season.endsAt - Date.now()) / 86400000));
+    nowEl.innerHTML = `<div class="season-now">
+      <div><span class="season-now-k">진행 중</span><span class="season-now-v em">${esc(season.label)}</span></div>
+      <div><span class="season-now-k">기간</span><span class="season-now-v">${seasonRange(season)}</span></div>
+      <div><span class="season-now-k">남은 기간</span><span class="season-now-v">${left}일</span></div>
+      <div><span class="season-now-k">이번 달 경기</span><span class="season-now-v">${matches.length}건</span></div>
+    </div>`;
+  } else {
+    nowEl.innerHTML = '';
+  }
+
+  // 마감된 시즌만 결산에 올린다. 진행 중인 달은 STANDING 에서 실시간으로 볼 수 있다.
+  const done = seasons.filter(s => s.closedAt);
+  listEl.innerHTML = done.length
+    ? done.map(s => `<div class="season-card">
+        <div class="season-head">
+          <span class="season-title">${esc(s.label)}</span>
+          <span class="season-range">${seasonRange(s)}</span>
+          <span class="season-count">경기 ${s.matches}건</span>
+        </div>
+        ${seasonTable(s.standings)}
+      </div>`).join('')
+    : `<div class="season-empty">아직 마감된 달이 없습니다 · 첫 결산은 ${
+        season ? formatKstDate(season.endsAt) : '다음 달 1일'} 에 올라옵니다.</div>`;
 }
 
 /* ---------- 대회 (TOURNAMENT) ---------- */
@@ -1278,6 +1354,7 @@ function activateTab(name) {
     renderStanding();
   }
   if (name === 'history') refreshAll();
+  if (name === 'season') { loadSeasons().then(renderSeasons); }
 }
 
 function initTabs() {
@@ -1363,6 +1440,7 @@ function initAdminEvents() {
 
 async function refreshAll() {
   await loadState();
+  await loadSeasons();
   await loadTournament();
   await loadPosts();
   await loadAdmins();

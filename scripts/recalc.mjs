@@ -18,7 +18,10 @@ const apply = process.argv[2] === 'apply';
 
 const [players, matches] = await Promise.all([
   q(`SELECT handle, point, wins, losses, streak, last_result FROM players ORDER BY handle`),
-  q(`SELECT winners, losers, ts FROM matches ORDER BY ts ASC`),
+  // 성적은 시즌 단위로 리셋되므로 이번 시즌 경기만 다시 계산한다
+  q(`SELECT winners, losers, ts FROM matches
+      WHERE season = (SELECT id FROM seasons WHERE closed_at IS NULL ORDER BY starts_at DESC LIMIT 1)
+      ORDER BY ts ASC`),
 ]);
 
 if (!players.length) {

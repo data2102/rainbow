@@ -1,4 +1,5 @@
 import { tx, body, methodGuard, requireAdmin, audit, winGain, lossGain } from './_lib.js';
+import { ensureSeason } from './_season.js';
 
 export default async function handler(req, res) {
   if (!methodGuard(req, res, ['POST'])) return;
@@ -16,6 +17,8 @@ export default async function handler(req, res) {
 
   try {
     const result = await tx(async (c) => {
+      // 달이 바뀐 뒤 첫 기록이면 여기서 시즌을 넘긴다. 새 경기는 새 시즌에 들어간다.
+      const season = await ensureSeason(c);
       const all = [...winners, ...losers];
       const { rows } = await c.query(
         `SELECT * FROM players WHERE handle = ANY($1) FOR UPDATE`, [all]
@@ -51,8 +54,8 @@ export default async function handler(req, res) {
       }
 
       await c.query(
-        `INSERT INTO matches (winners, losers, ts, recorded_by) VALUES ($1, $2, $3, $4)`,
-        [JSON.stringify(winnerResults), JSON.stringify(losers), ts, me]
+        `INSERT INTO matches (winners, losers, ts, recorded_by, season) VALUES ($1, $2, $3, $4, $5)`,
+        [JSON.stringify(winnerResults), JSON.stringify(losers), ts, me, season.current ? season.current.id : null]
       );
 
       return { winnerResults, ts };

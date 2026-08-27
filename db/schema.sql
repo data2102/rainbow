@@ -19,9 +19,33 @@ CREATE TABLE IF NOT EXISTS matches (
   winners     JSONB NOT NULL,   -- [{handle, gained}]
   losers      JSONB NOT NULL,   -- ["handle", ...]
   ts          BIGINT NOT NULL,  -- epoch ms
-  recorded_by TEXT
+  recorded_by TEXT,
+  season      TEXT              -- 속한 시즌 id. 시즌 제도 이전 기록은 NULL
 );
 CREATE INDEX IF NOT EXISTS idx_matches_ts ON matches (ts DESC);
+CREATE INDEX IF NOT EXISTS idx_matches_season ON matches (season, ts DESC);
+
+-- 시즌(월간 리셋). 한국 시각 매월 1일 00시에 넘어가며,
+-- 첫 시즌만 예외로 2026-08-27 ~ 2026-09-30 이다. 규칙은 api/_season.js 에 있다.
+CREATE TABLE IF NOT EXISTS seasons (
+  id         TEXT PRIMARY KEY,   -- '2026-09', '2026-10' ...
+  label      TEXT NOT NULL,
+  starts_at  BIGINT NOT NULL,    -- epoch ms
+  ends_at    BIGINT NOT NULL,    -- epoch ms (이 시각은 다음 시즌에 속한다)
+  closed_at  BIGINT              -- 마감된 시즌만 값이 있다
+);
+
+-- 시즌이 끝나는 순간의 최종 순위를 그대로 저장한다.
+CREATE TABLE IF NOT EXISTS season_standings (
+  season_id TEXT NOT NULL REFERENCES seasons(id) ON DELETE CASCADE,
+  rank      INTEGER NOT NULL,
+  handle    TEXT NOT NULL,
+  clan      TEXT NOT NULL,
+  point     INTEGER NOT NULL,
+  wins      INTEGER NOT NULL,
+  losses    INTEGER NOT NULL,
+  PRIMARY KEY (season_id, handle)
+);
 
 CREATE TABLE IF NOT EXISTS admins (
   id           TEXT PRIMARY KEY,

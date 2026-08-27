@@ -383,6 +383,34 @@ tbody tr:hover td{ background:var(--surface-sunken); }
 .up-badge{ color:var(--rise); background:var(--rise-bg); }
 .down-badge{ color:var(--fall); background:var(--fall-bg); }
 
+/* ---------- 월간 결산 ---------- */
+.season-now{
+  display:flex; flex-wrap:wrap; gap:var(--sp-4) var(--sp-8); align-items:baseline;
+  background:var(--accent-bg); border-radius:var(--radius-md);
+  padding:var(--sp-4) var(--sp-5); margin-bottom:var(--sp-6);
+}
+.season-now-k{
+  display:block; font-size:var(--fs-footnote); color:var(--text-secondary);
+  margin-bottom:2px;
+}
+.season-now-v{ font-size:var(--fs-subhead); font-weight:var(--fw-bold); color:var(--text-primary); }
+.season-now-v.em{ color:var(--accent-strong); }
+
+.season-card{ margin-bottom:var(--sp-8); }
+.season-card:last-child{ margin-bottom:0; }
+.season-head{
+  display:flex; flex-wrap:wrap; align-items:baseline; gap:var(--sp-3);
+  border-bottom:1px solid var(--border-strong); padding-bottom:var(--sp-3);
+  margin-bottom:var(--sp-3);
+}
+.season-title{ font-size:var(--fs-heading); font-weight:var(--fw-bold); letter-spacing:var(--ls-tight); }
+.season-range{ font-size:var(--fs-footnote); color:var(--text-tertiary); }
+.season-count{
+  margin-left:auto; font-size:var(--fs-footnote); color:var(--text-secondary);
+  background:var(--surface-sunken); border-radius:var(--radius-pill); padding:2px var(--sp-3);
+}
+.season-empty{ font-size:var(--fs-caption); color:var(--text-tertiary); padding:var(--sp-5) 0; }
+
 .search-row{ display:flex; gap:var(--sp-3); margin-bottom:var(--sp-4); flex-wrap:wrap; }
 input[type=text],input[type=password],input[type=search],select,textarea{
   background:var(--surface); border:1px solid var(--border-strong);
@@ -764,9 +792,10 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
     <button class="tab-btn active" data-tab="standing">① STANDING</button>
     <button class="tab-btn" data-tab="mostpoint">② MOST POINT &amp; WIN</button>
     <button class="tab-btn" data-tab="history">③ HISTORY</button>
-    <button class="tab-btn" data-tab="tournament">④ TOURNAMENT</button>
-    <button class="tab-btn" data-tab="board">⑤ BOARD</button>
-    <button class="tab-btn" data-tab="admin">⑥ ADMIN</button>
+    <button class="tab-btn" data-tab="season">④ MONTHLY</button>
+    <button class="tab-btn" data-tab="tournament">⑤ TOURNAMENT</button>
+    <button class="tab-btn" data-tab="board">⑥ BOARD</button>
+    <button class="tab-btn" data-tab="admin">⑦ ADMIN</button>
   </nav>
 
   <!-- STANDING -->
@@ -947,6 +976,19 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
         </table>
       </div>
       <div id="historyEmpty" class="log-empty">기록 없음</div>
+    </div>
+  </div>
+
+  <!-- MONTHLY — 시즌(월) 단위 결산 -->
+  <div class="tab-panel" id="tab-season">
+    <div class="panel hud-corner">
+      <h2>월간 결산 · Monthly</h2>
+      <div class="foot-note" style="margin-top:0;margin-bottom:14px;">
+        기록은 매월 1일 00시(한국 시각)에 초기화되고, 직전 달의 최종 순위가 아래에 남습니다 ·
+        첫 시즌만 <b>2026년 8월 27일 ~ 9월 30일</b>을 한 달로 잡았습니다.
+      </div>
+      <div id="seasonNow"></div>
+      <div id="seasonList"></div>
     </div>
   </div>
 

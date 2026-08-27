@@ -161,7 +161,7 @@ export function rowToPlayer(r) {
 }
 
 export function rowToMatch(r) {
-  return { winners: r.winners, losers: r.losers, ts: Number(r.ts), recordedBy: r.recorded_by };
+  return { winners: r.winners, losers: r.losers, ts: Number(r.ts), recordedBy: r.recorded_by, season: r.season || null };
 }
 
 export function rowToRequest(r) {

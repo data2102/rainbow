@@ -2,6 +2,7 @@ import {
   q, tx, body, methodGuard, requireAdmin, audit,
   normalizeMatch, parseHandle, hashPw, rowToPlayer, rowToMatch, rowToRequest,
 } from './_lib.js';
+import { syncSeason } from './_season.js';
 
 export default async function handler(req, res) {
   if (!methodGuard(req, res, ['GET', 'POST'])) return;
@@ -38,6 +39,7 @@ async function exportAll(res) {
 
 async function importAll(req, res, me) {
   const { payload, mode = 'replace' } = body(req);
+  await syncSeason();
   if (!payload || !Array.isArray(payload.players)) {
     return res.status(400).json({ error: '올바른 백업 형식이 아닙니다.' });
   }
@@ -66,9 +68,9 @@ async function importAll(req, res, me) {
     for (const raw of (payload.matches || [])) {
       const m = normalizeMatch(raw);
       await c.query(
-        `INSERT INTO matches (winners, losers, ts, recorded_by) VALUES ($1,$2,$3,$4)`,
+        `INSERT INTO matches (winners, losers, ts, recorded_by, season) VALUES ($1,$2,$3,$4,$5)`,
         [JSON.stringify(m.winners || []), JSON.stringify(m.losers || []),
-         m.ts || Date.now(), m.recordedBy || '이전 기록']
+         m.ts || Date.now(), m.recordedBy || '이전 기록', m.season || null]
       );
     }
 
@@ -94,16 +96,22 @@ async function importAll(req, res, me) {
   res.status(200).json({ ok: true });
 }
 
+/**
+ * 이번 시즌만 초기화한다. 지난 달 결산과 그 경기 기록은 그대로 둔다.
+ * (매월 1일 자동 리셋과 같은 범위)
+ */
 async function reset(req, res, me) {
   const { keepPlayers = true } = body(req);
+  const season = await syncSeason();
   await tx(async (c) => {
-    await c.query(`DELETE FROM matches`);
+    if (season) await c.query(`DELETE FROM matches WHERE season = $1`, [season.id]);
+    else await c.query(`DELETE FROM matches WHERE season IS NULL`);
     if (keepPlayers) {
       await c.query(`UPDATE players SET point=0, wins=0, losses=0, streak=0, last_result=NULL, last_match=NULL`);
     } else {
       await c.query(`DELETE FROM players`);
     }
   });
-  await audit(me, 'reset', { keepPlayers });
+  await audit(me, 'reset', { keepPlayers, season: season ? season.id : null });
   res.status(200).json({ ok: true });
 }
