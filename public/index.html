@@ -613,6 +613,19 @@
         경기를 한 번이라도 치른 선수만 표시합니다 · 승률이 같으면 승수가 많은 선수가 위로 갑니다.
       </div>
     </div>
+
+    <div class="panel hud-corner">
+      <h2>Clan Top 5</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Rank</th><th>Clan</th><th>인원</th><th>Point</th><th>Win</th><th>Loss</th><th>Ratio</th></tr>
+          </thead>
+          <tbody id="clanBody"></tbody>
+        </table>
+      </div>
+      <div class="foot-note" id="clanNote"></div>
+    </div>
   </div>
 
   <!-- ADMIN -->
@@ -948,6 +961,7 @@ const TOURNAMENT_TEAMS = [
 ];
 const MERCENARIES = ['렌보짱', '럭키', '호신', '실장'];
 const ADVANCING = 4;        // 예선 통과 팀 수
+const CLAN_TOP = 5;         // 클랜 순위에 보여줄 등수
 
 function teamLabel(id) {
   const t = TOURNAMENT_TEAMS.find(t => t.id === id);
@@ -1126,6 +1140,59 @@ function renderTop5() {
       <td>${p.wins + p.losses}</td></tr>`).join('')
       || '<tr><td colspan="7" class="log-empty">아직 경기 기록이 없습니다.</td></tr>';
   }
+}
+
+/** 클랜별 합산 순위. 소속 선수들의 포인트·승·패를 더한다. */
+function clanStandings() {
+  const map = new Map();
+  for (const p of players) {
+    const clan = (p.clan || '').trim();
+    // '-' 는 클랜이 아니라 무소속 표시라 순위에서 뺀다
+    if (!clan || clan === '-') continue;
+    if (!map.has(clan)) map.set(clan, { clan, members: 0, point: 0, wins: 0, losses: 0 });
+    const c = map.get(clan);
+    c.members++;
+    c.point += p.point;
+    c.wins += p.wins;
+    c.losses += p.losses;
+  }
+
+  const list = [...map.values()].sort((a, b) =>
+    b.point - a.point || b.wins - a.wins || a.losses - b.losses || a.clan.localeCompare(b.clan));
+
+  // 전적이 같으면 같은 등수를 준다. 5위에 동률이 걸리면 그 클랜들을 모두 보여준다.
+  list.forEach((c, i) => {
+    const prev = list[i - 1];
+    const same = prev && prev.point === c.point && prev.wins === c.wins && prev.losses === c.losses;
+    c.rank = same ? prev.rank : i + 1;
+    if (same) { prev.tied = true; c.tied = true; }
+  });
+  return list.filter(c => c.rank <= CLAN_TOP);
+}
+
+function renderClanTop() {
+  const tbody = document.getElementById('clanBody');
+  const note = document.getElementById('clanNote');
+  if (!tbody || !note) return;
+
+  const list = clanStandings();
+  tbody.innerHTML = list.map(c => {
+    const total = c.wins + c.losses;
+    const rate = total ? Math.round((c.wins / total) * 1000) / 10 : 0;
+    return `<tr>
+      <td class="rank-cell ${medalClass(c.rank)}">${c.rank}${c.tied ? '<span class="tie-tag">동률</span>' : ''}</td>
+      <td class="clan-tag" style="font-size:15px;">${esc(c.clan)}</td>
+      <td>${c.members}명</td>
+      <td>${c.point}</td>
+      <td class="win-txt">${c.wins}</td>
+      <td class="loss-txt">${c.losses}</td>
+      <td>${rate}%</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="7" class="log-empty">클랜에 소속된 선수가 없습니다.</td></tr>';
+
+  const tied = list.some(c => c.tied);
+  note.innerHTML = '소속 선수들의 포인트·승·패를 합산했습니다 · 포인트 합계가 높은 순 · 클랜이 없는 선수(<b>-</b>)는 제외'
+    + (tied ? ' · <b style="color:var(--amber);">전적이 같은 클랜은 같은 등수로 함께 표시됩니다.</b>' : '');
 }
 
 function getChecked(listId) {
@@ -1334,6 +1401,7 @@ async function removeMember(handle) {
 function renderAll() {
   renderStanding();
   renderTop5();
+  renderClanTop();
   renderChecklists();
   renderLog();
   renderHistory();
