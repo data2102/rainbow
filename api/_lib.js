@@ -134,6 +134,11 @@ export function normalizeMatch(m) {
   return m;
 }
 
+/** 패배 시 점수 변화 */
+export function lossGain() {
+  return 1;
+}
+
 /** 승리 시 획득 점수: 기본 +3, 3연승 +1, 5연승 +2 */
 export function winGain(newStreak) {
   if (newStreak === 3) return 4;

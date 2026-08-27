@@ -1,4 +1,4 @@
-import { tx, body, methodGuard, requireAdmin, audit, winGain } from './_lib.js';
+import { tx, body, methodGuard, requireAdmin, audit, winGain, lossGain } from './_lib.js';
 
 export default async function handler(req, res) {
   if (!methodGuard(req, res, ['POST'])) return;
@@ -44,9 +44,9 @@ export default async function handler(req, res) {
         const p = rows.find(r => r.handle === h);
         const streak = p.last_result === 'L' ? p.streak - 1 : -1;
         await c.query(
-          `UPDATE players SET point = point - 1, losses = losses + 1, streak = $1,
-                  last_result = 'L', last_match = $2 WHERE handle = $3`,
-          [streak, now, h]
+          `UPDATE players SET point = point + $1, losses = losses + 1, streak = $2,
+                  last_result = 'L', last_match = $3 WHERE handle = $4`,
+          [lossGain(), streak, now, h]
         );
       }
 
