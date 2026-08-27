@@ -76,8 +76,10 @@ async function ensureTables(c) {
       point     INTEGER NOT NULL,
       wins      INTEGER NOT NULL,
       losses    INTEGER NOT NULL,
+      streak    INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (season_id, handle)
     )`);
+  await c.query(`ALTER TABLE season_standings ADD COLUMN IF NOT EXISTS streak INTEGER NOT NULL DEFAULT 0`);
   await c.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS season TEXT`);
   await c.query(`CREATE INDEX IF NOT EXISTS idx_matches_season ON matches (season, ts DESC)`);
   ensuredTables = true;
@@ -95,10 +97,10 @@ async function resetPlayers(c) {
 async function snapshot(c, seasonId) {
   await c.query(`DELETE FROM season_standings WHERE season_id = $1`, [seasonId]);
   await c.query(
-    `INSERT INTO season_standings (season_id, rank, handle, clan, point, wins, losses)
+    `INSERT INTO season_standings (season_id, rank, handle, clan, point, wins, losses, streak)
      SELECT $1,
             row_number() OVER (ORDER BY point DESC, wins DESC, handle ASC),
-            handle, clan, point, wins, losses
+            handle, clan, point, wins, losses, streak
        FROM players
       WHERE wins + losses > 0`,
     [seasonId]

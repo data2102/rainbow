@@ -383,6 +383,29 @@ tbody tr:hover td{ background:var(--surface-sunken); }
 .up-badge{ color:var(--rise); background:var(--rise-bg); }
 .down-badge{ color:var(--fall); background:var(--fall-bg); }
 
+/* ---------- 월 선택(달력) ---------- */
+.panel-head{
+  display:flex; align-items:center; gap:var(--sp-3);
+  flex-wrap:wrap; margin-bottom:var(--sp-5);
+}
+.panel-head h2{ margin:0; }
+.month-bar{
+  display:flex; align-items:center; gap:var(--sp-3); flex-wrap:wrap;
+  margin-bottom:var(--sp-4);
+}
+.month-bar-k{ font-size:var(--fs-caption); color:var(--text-secondary); font-weight:var(--fw-medium); }
+.month-select{
+  flex:none; width:auto; min-width:170px; max-width:100%; padding:var(--sp-2) var(--sp-4);
+  font-size:var(--fs-caption); font-weight:var(--fw-medium);
+  border-radius:var(--radius-md); cursor:pointer;
+}
+.month-past{
+  font-size:var(--fs-footnote); font-weight:var(--fw-medium);
+  color:var(--warning-strong); background:var(--warning-bg);
+  border-radius:var(--radius-pill); padding:3px var(--sp-3);
+}
+.month-past:empty{ display:none; }
+
 /* ---------- 월간 결산 ---------- */
 .season-now{
   display:flex; flex-wrap:wrap; gap:var(--sp-4) var(--sp-8); align-items:baseline;
@@ -801,7 +824,11 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   <!-- STANDING -->
   <div class="tab-panel active" id="tab-standing">
     <div class="panel hud-corner">
-      <h2>전체 랭킹 · Standing</h2>
+      <div class="panel-head">
+        <h2>전체 랭킹 · Standing</h2>
+        <select class="month-select" aria-label="조회할 월 선택"></select>
+        <span class="month-past"></span>
+      </div>
       <div class="search-row">
         <input type="text" id="searchInput" autocomplete="off" placeholder="아이디 또는 클랜으로 검색...">
       </div>
@@ -828,6 +855,11 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 
   <!-- MOST POINT & WIN -->
   <div class="tab-panel" id="tab-mostpoint">
+    <div class="month-bar">
+      <span class="month-bar-k">조회 기간</span>
+      <select class="month-select" aria-label="조회할 월 선택"></select>
+      <span class="month-past"></span>
+    </div>
     <div class="split">
       <div class="panel hud-corner">
         <h2>Most Point Top 5</h2>
@@ -957,7 +989,11 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   <!-- HISTORY -->
   <div class="tab-panel" id="tab-history">
     <div class="panel hud-corner">
-      <h2>전체 기록 · Match History</h2>
+      <div class="panel-head">
+        <h2>전체 기록 · Match History</h2>
+        <select class="month-select" aria-label="조회할 월 선택"></select>
+        <span class="month-past"></span>
+      </div>
       <div class="foot-note" style="margin-top:0;margin-bottom:10px;">모든 승패 기록을 시간순으로 투명하게 공개합니다 · 등록일시(연월일시분초) 및 등록자가 함께 기록됩니다.</div>
       <button class="btn-ghost" id="historyRefreshBtn" style="width:auto;margin-bottom:14px;">↻ 최신 기록 새로고침</button>
       <div class="table-wrap" id="historyTableWrap">
@@ -982,10 +1018,14 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   <!-- MONTHLY — 시즌(월) 단위 결산 -->
   <div class="tab-panel" id="tab-season">
     <div class="panel hud-corner">
-      <h2>월간 결산 · Monthly</h2>
+      <div class="panel-head">
+        <h2>월간 결산 · Monthly</h2>
+        <select class="month-select" aria-label="조회할 월 선택"></select>
+      </div>
       <div class="foot-note" style="margin-top:0;margin-bottom:14px;">
-        기록은 매월 1일 00시(한국 시각)에 초기화되고, 직전 달의 최종 순위가 아래에 남습니다 ·
-        첫 시즌만 <b>2026년 8월 27일 ~ 9월 30일</b>을 한 달로 잡았습니다.
+        기록은 매월 1일 00시(한국 시각)에 초기화되고, 마감된 달의 순위는 그대로 남습니다 ·
+        위 달력에서 달을 고르면 1~4페이지가 모두 그 달 기준으로 바뀝니다 ·
+        첫 시즌만 <b>2026년 8월 27일 ~ 9월 30일</b>을 한 달로 잡아 8월 기록은 9월에 합산됩니다.
       </div>
       <div id="seasonNow"></div>
       <div id="seasonList"></div>

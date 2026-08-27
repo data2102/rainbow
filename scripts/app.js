@@ -9,8 +9,10 @@ let admins = [];
 let tMatches = [];          // 대회 경기 기록
 let posts = [];             // 게시판 글
 let season = null;          // 진행 중인 시즌
-let seasons = [];           // 지난 시즌 결산
-let seasonTop = 10;         // 결산 표에 보여줄 등수
+let seasons = [];           // 시즌 목록(진행 중 + 마감)
+let seasonTop = 10;         // 월간 결산 표에 보여줄 등수
+let viewSeasonId = null;    // 화면에서 보고 있는 달. null 이면 진행 중인 달
+const seasonCache = {};     // 지난 달 상세 (id -> {players, matches})
 let openCommentForm = null; // 댓글 입력창이 열린 글 id
 
 /* 대회 참가 팀. api/tournament.js 의 TEAMS 와 id 가 일치해야 합니다. */
@@ -93,6 +95,35 @@ async function loadSeasons() {
   } catch { seasons = []; }
 }
 
+/** 지난 달 상세는 고를 때 한 번만 받아 두고 재사용한다 */
+async function loadSeasonDetail(id) {
+  if (seasonCache[id]) return seasonCache[id];
+  const d = await apiGet('/api/season?id=' + encodeURIComponent(id));
+  seasonCache[id] = { players: d.players || [], matches: d.matches || [], season: d.season };
+  return seasonCache[id];
+}
+
+/* ---------- 보고 있는 달 ---------- */
+
+/** 진행 중인 달을 보고 있으면 true. 이때는 실시간 데이터를 그대로 쓴다. */
+function isLiveView() {
+  return !viewSeasonId || (season && viewSeasonId === season.id);
+}
+function viewPlayers() {
+  if (isLiveView()) return players;
+  const d = seasonCache[viewSeasonId];
+  return d ? d.players : [];
+}
+function viewMatches() {
+  if (isLiveView()) return matches;
+  const d = seasonCache[viewSeasonId];
+  return d ? d.matches : [];
+}
+function viewSeason() {
+  if (isLiveView()) return season;
+  return seasons.find(s => s.id === viewSeasonId) || null;
+}
+
 async function loadPosts() {
   try {
     const d = await apiGet('/api/post');
@@ -129,7 +160,7 @@ function esc(s) {
 }
 
 function sortedPlayers() {
-  const arr = [...players];
+  const arr = [...viewPlayers()];
   arr.sort((a, b) => {
     let av, bv;
     switch (sortKey) {
@@ -184,8 +215,9 @@ function renderStanding() {
 }
 
 function renderTop5() {
-  const byPoint = [...players].sort((a, b) => b.point - a.point).slice(0, TOP_N);
-  const byWin = [...players].sort((a, b) => b.wins - a.wins).slice(0, TOP_N);
+  const list = viewPlayers();
+  const byPoint = [...list].sort((a, b) => b.point - a.point).slice(0, TOP_N);
+  const byWin = [...list].sort((a, b) => b.wins - a.wins).slice(0, TOP_N);
 
   document.getElementById('topPointBody').innerHTML = byPoint.map((p, i) => `
     <tr><td class="rank-cell ${medalClass(i + 1)}">${i + 1}</td><td>${esc(p.handle)}</td>
@@ -201,7 +233,7 @@ function renderTop5() {
   // 0%로 목록을 채우는 것을 막기 위해서다.
   // 승률이 같으면 승수가 많은 쪽을 위로 둔다. 1승 0패와 9승 0패는 같은 100%지만
   // 무게가 다르기 때문이다.
-  const byRatio = players
+  const byRatio = list
     .filter(p => p.wins + p.losses > 0)
     .sort((a, b) => ratio(b) - ratio(a) || b.wins - a.wins || a.handle.localeCompare(b.handle))
     .slice(0, TOP_N);
@@ -221,7 +253,7 @@ function renderTop5() {
 /** 클랜별 합산 순위. 소속 선수들의 포인트·승·패를 더한다. */
 function clanStandings() {
   const map = new Map();
-  for (const p of players) {
+  for (const p of viewPlayers()) {
     const clan = (p.clan || '').trim();
     // '-' 는 클랜이 아니라 무소속 표시라 순위에서 뺀다
     if (!clan || clan === '-') continue;
@@ -333,7 +365,8 @@ function renderHistory() {
   const empty = document.getElementById('historyEmpty');
   if (!tbody || !wrap || !empty) return;
 
-  if (!matches.length) {
+  const rows = viewMatches();
+  if (!rows.length) {
     tbody.innerHTML = '';
     wrap.style.display = 'none';
     empty.style.display = 'block';
@@ -342,7 +375,7 @@ function renderHistory() {
   wrap.style.display = '';
   empty.style.display = 'none';
 
-  const all = [...matches].reverse();
+  const all = [...rows].reverse();
   tbody.innerHTML = all.map((m, i) => {
     const winners = m.winners || [];
     const losers = m.losers || [];
@@ -486,7 +519,68 @@ function renderAll() {
   renderMemberList();
   renderTournament();
   renderBoard();
+  renderMonthPickers();
   renderSeasons();
+}
+
+/* ---------- 월 선택(달력) ---------- */
+
+/**
+ * 고를 수 있는 달 목록. 첫 시즌은 8월 27일에 시작하지만 9월에 끝나므로
+ * "2026년 9월" 하나로만 보여준다. (8월 기록은 9월에 합산되어 있다)
+ */
+function monthOptions() {
+  const list = seasons.length
+    ? [...seasons]
+    : (season ? [season] : []);
+  list.sort((a, b) => b.startsAt - a.startsAt);
+  return list.map(s => {
+    const d = new Date(s.endsAt - 1 + 9 * 60 * 60 * 1000);
+    const y = d.getUTCFullYear();
+    const m = d.getUTCMonth() + 1;
+    const live = season && s.id === season.id;
+    return { id: s.id, text: `${y}년 ${m}월` + (live ? ' (진행 중)' : '') };
+  });
+}
+
+function renderMonthPickers() {
+  const opts = monthOptions();
+  const selected = viewSeasonId || (season ? season.id : (opts[0] ? opts[0].id : ''));
+  const html = opts.map(o =>
+    `<option value="${esc(o.id)}"${o.id === selected ? ' selected' : ''}>${esc(o.text)}</option>`
+  ).join('');
+
+  document.querySelectorAll('.month-select').forEach(sel => {
+    sel.innerHTML = html || '<option value="">기록 없음</option>';
+    sel.value = selected;
+    sel.disabled = opts.length <= 1;
+  });
+
+  const cur = viewSeason();
+  const badge = isLiveView() ? '' : (cur ? `지난 기록 · ${esc(cur.label)}` : '지난 기록');
+  document.querySelectorAll('.month-past').forEach(el => { el.innerHTML = badge; });
+}
+
+/** 달을 바꾸면 1~4페이지가 모두 그 달 기준으로 다시 그려진다 */
+async function selectMonth(id) {
+  if (!id || id === viewSeasonId) return;
+  viewSeasonId = id;
+  if (!isLiveView()) {
+    try { await loadSeasonDetail(id); }
+    catch (e) { showToast(e.message); viewSeasonId = null; }
+  }
+  renderMonthPickers();
+  renderStanding();
+  renderTop5();
+  renderClanTop();
+  renderHistory();
+  renderSeasons();
+}
+
+function initMonthPickers() {
+  document.querySelectorAll('.month-select').forEach(sel => {
+    sel.addEventListener('change', () => selectMonth(sel.value));
+  });
 }
 
 /* ---------- 월간 결산 (MONTHLY) ---------- */
@@ -524,31 +618,42 @@ function renderSeasons() {
   const listEl = document.getElementById('seasonList');
   if (!nowEl || !listEl) return;
 
-  if (season) {
-    const left = Math.max(0, Math.ceil((season.endsAt - Date.now()) / 86400000));
-    nowEl.innerHTML = `<div class="season-now">
-      <div><span class="season-now-k">진행 중</span><span class="season-now-v em">${esc(season.label)}</span></div>
-      <div><span class="season-now-k">기간</span><span class="season-now-v">${seasonRange(season)}</span></div>
-      <div><span class="season-now-k">남은 기간</span><span class="season-now-v">${left}일</span></div>
-      <div><span class="season-now-k">이번 달 경기</span><span class="season-now-v">${matches.length}건</span></div>
-    </div>`;
-  } else {
-    nowEl.innerHTML = '';
-  }
+  const s = viewSeason();
+  if (!s) { nowEl.innerHTML = ''; listEl.innerHTML = '<div class="season-empty">기록이 없습니다.</div>'; return; }
 
-  // 마감된 시즌만 결산에 올린다. 진행 중인 달은 STANDING 에서 실시간으로 볼 수 있다.
-  const done = seasons.filter(s => s.closedAt);
-  listEl.innerHTML = done.length
-    ? done.map(s => `<div class="season-card">
-        <div class="season-head">
-          <span class="season-title">${esc(s.label)}</span>
-          <span class="season-range">${seasonRange(s)}</span>
-          <span class="season-count">경기 ${s.matches}건</span>
-        </div>
-        ${seasonTable(s.standings)}
-      </div>`).join('')
-    : `<div class="season-empty">아직 마감된 달이 없습니다 · 첫 결산은 ${
-        season ? formatKstDate(season.endsAt) : '다음 달 1일'} 에 올라옵니다.</div>`;
+  const live = isLiveView();
+  const games = viewMatches().length;
+  const left = Math.max(0, Math.ceil((s.endsAt - Date.now()) / 86400000));
+
+  nowEl.innerHTML = `<div class="season-now">
+    <div><span class="season-now-k">${live ? '진행 중' : '마감'}</span>
+         <span class="season-now-v em">${esc(s.label)}</span></div>
+    <div><span class="season-now-k">기간</span><span class="season-now-v">${seasonRange(s)}</span></div>
+    ${live
+      ? `<div><span class="season-now-k">남은 기간</span><span class="season-now-v">${left}일</span></div>`
+      : ''}
+    <div><span class="season-now-k">경기</span><span class="season-now-v">${games}건</span></div>
+  </div>`;
+
+  // 요약의 등수는 STANDING 과 반드시 같아야 한다.
+  // 마감된 달은 저장해 둔 등수를 그대로 쓰고, 진행 중인 달만 여기서 매긴다.
+  const played = viewPlayers().filter(p => p.wins + p.losses > 0);
+  const ranked = (live
+    ? [...played]
+        .sort((a, b) => b.point - a.point || b.wins - a.wins
+          || (a.handle < b.handle ? -1 : a.handle > b.handle ? 1 : 0))
+        .map((p, i) => ({ ...p, rank: i + 1 }))
+    : played)
+    .slice(0, seasonTop);
+
+  listEl.innerHTML = `<div class="season-card">
+    <div class="season-head">
+      <span class="season-title">${esc(s.label)} 요약</span>
+      <span class="season-range">상위 ${seasonTop}위</span>
+      <span class="season-count">${live ? '진행 중 · 실시간' : '마감된 기록'}</span>
+    </div>
+    ${seasonTable(ranked)}
+  </div>`;
 }
 
 /* ---------- 대회 (TOURNAMENT) ---------- */
@@ -1354,7 +1459,7 @@ function activateTab(name) {
     renderStanding();
   }
   if (name === 'history') refreshAll();
-  if (name === 'season') { loadSeasons().then(renderSeasons); }
+  if (name === 'season') { loadSeasons().then(() => { renderMonthPickers(); renderSeasons(); }); }
 }
 
 function initTabs() {
@@ -1459,6 +1564,7 @@ async function boot() {
   initAdminEvents();
   initTournamentEvents();
   initBoardEvents();
+  initMonthPickers();
   renderAuthBar();
   try {
     await refreshAll();
