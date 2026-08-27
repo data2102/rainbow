@@ -12,7 +12,9 @@
     "admin": "node scripts/admin.mjs",
     "admin:reset": "node scripts/admin.mjs reset",
     "admin:rename": "node scripts/admin.mjs rename",
-    "admin:reset-all": "node scripts/admin.mjs reset-all"
+    "admin:reset-all": "node scripts/admin.mjs reset-all",
+    "recalc": "node scripts/recalc.mjs",
+    "recalc:apply": "node scripts/recalc.mjs apply"
   },
   "dependencies": {
     "express": "^4.22.2",
