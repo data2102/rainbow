@@ -70,3 +70,15 @@ CREATE TABLE IF NOT EXISTS tournament_matches (
   recorded_by TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_tmatches_ts ON tournament_matches (ts DESC);
+
+-- 기능 개선 게시판. 누구나 글을 쓰고, 본인이 정한 4자리 비밀번호로
+-- 수정·삭제한다. 관리자는 비밀번호 없이 삭제할 수 있다.
+CREATE TABLE IF NOT EXISTS posts (
+  id         BIGSERIAL PRIMARY KEY,
+  author     TEXT NOT NULL,
+  pw_hash    TEXT NOT NULL,
+  body       TEXT NOT NULL,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT
+);
+CREATE INDEX IF NOT EXISTS idx_posts_created ON posts (created_at DESC);

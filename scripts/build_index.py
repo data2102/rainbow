@@ -30,8 +30,8 @@ head = orig[:orig.index(marker)] if marker in orig else orig
 
 # select 스타일 보강 + 연결 실패 배너 스타일
 head = head.replace(
-    "  .modal-box input:focus{outline:none;border-color:var(--amber-dim);}",
-    """  .modal-box input:focus,.modal-box select:focus{outline:none;border-color:var(--amber-dim);}
+    "  .modal-box input:focus,.modal-box textarea:focus{outline:none;border-color:var(--amber-dim);}",
+    """  .modal-box input:focus,.modal-box textarea:focus,.modal-box select:focus{outline:none;border-color:var(--amber-dim);}
   .modal-box select{
     width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);
     font-family:'Share Tech Mono',monospace;padding:10px;font-size:14.5px;font-weight:600;

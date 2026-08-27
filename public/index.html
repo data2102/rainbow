@@ -212,7 +212,12 @@
     width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);
     font-family:'Share Tech Mono',monospace;padding:10px;font-size:14.5px;font-weight:600;
   }
-  .modal-box input:focus,.modal-box select:focus{outline:none;border-color:var(--amber-dim);}
+  .modal-box textarea{
+    width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);
+    font-family:'Share Tech Mono',monospace;padding:10px;font-size:14.5px;font-weight:600;
+    resize:vertical;line-height:1.7;
+  }
+  .modal-box input:focus,.modal-box textarea:focus,.modal-box select:focus{outline:none;border-color:var(--amber-dim);}
   .modal-box select{
     width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);
     font-family:'Share Tech Mono',monospace;padding:10px;font-size:14.5px;font-weight:600;
@@ -328,6 +333,39 @@
   }
   .final-vs span{color:var(--amber);margin:0 10px;}
   .final-note{font-size:12.5px;color:var(--text-dim);margin-top:7px;font-weight:600;}
+
+  /* 게시판 */
+  .post-form{border:1px solid var(--border);background:var(--panel-2);padding:14px;margin-bottom:16px;}
+  .post-form-row{display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-bottom:10px;}
+  @media (max-width:520px){.post-form-row{grid-template-columns:1fr;}}
+  .post-form input,.post-form textarea{
+    width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);
+    font-family:'Share Tech Mono',monospace;padding:10px;font-size:14.5px;font-weight:600;
+  }
+  .post-form textarea{resize:vertical;line-height:1.7;min-height:92px;}
+  .post-form input:focus,.post-form textarea:focus{outline:none;border-color:var(--amber-dim);}
+  .post-form .btn{margin-top:12px;}
+
+  .post-toolbar{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+    border:1px solid var(--amber-dim);background:rgba(255,176,32,0.06);padding:9px 12px;margin-bottom:12px;
+  }
+  .post-checkall{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer;}
+  .post-checkall input{accent-color:var(--amber);width:16px;height:16px;cursor:pointer;}
+  .post-toolbar-actions{display:flex;gap:6px;flex-wrap:wrap;}
+
+  .post{border-bottom:1px solid rgba(44,52,31,0.6);padding:13px 2px;}
+  .post:last-child{border-bottom:none;}
+  .post-head{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:6px;}
+  .post-pick{accent-color:var(--amber);width:16px;height:16px;cursor:pointer;flex:none;}
+  .post-author{font-size:14.5px;font-weight:800;color:var(--text);}
+  .post-date{font-size:11.5px;color:var(--text-dim);font-weight:600;}
+  .post-edited{font-size:11px;color:var(--amber);font-weight:700;}
+  .post-actions{margin-left:auto;display:flex;gap:5px;}
+  .post-actions .btn-mini{padding:5px 10px;font-size:11px;}
+  .btn-edit{background:transparent;color:var(--text-dim);border:1px solid var(--border);}
+  .btn-edit:hover{color:var(--text);border-color:var(--olive);}
+  .post-body{font-size:14.5px;line-height:1.75;font-weight:600;white-space:pre-wrap;word-break:break-word;}
 
   /* 회원 관리 */
   .member-list{
@@ -466,6 +504,7 @@
     <button class="tab-btn" data-tab="history">③ HISTORY</button>
     <button class="tab-btn" data-tab="admin">④ ADMIN</button>
     <button class="tab-btn" data-tab="tournament">⑤ TOURNAMENT</button>
+    <button class="tab-btn" data-tab="board">⑥ BOARD</button>
   </nav>
 
   <!-- STANDING -->
@@ -800,6 +839,44 @@
 
     </div>
   </div>
+
+  <!-- BOARD -->
+  <div class="tab-panel" id="tab-board">
+    <div class="panel hud-corner">
+      <h2>게시판 · 기능 개선</h2>
+      <div class="foot-note" style="margin-top:0;margin-bottom:14px;">
+        사이트에 넣었으면 하는 기능이나 고쳤으면 하는 점을 남겨주세요 ·
+        <b>비밀번호는 숫자 4자리</b>이며, 나중에 글을 수정하거나 지울 때 필요합니다.
+      </div>
+
+      <div class="post-form">
+        <div class="post-form-row">
+          <div>
+            <label class="t-lab">ID *</label>
+            <input type="text" id="postAuthor" maxlength="20" placeholder="예: SNC_LeNa">
+          </div>
+          <div>
+            <label class="t-lab">비밀번호 * (숫자 4자리)</label>
+            <input type="password" id="postPw" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="0000">
+          </div>
+        </div>
+        <label class="t-lab">내용 *</label>
+        <textarea id="postBody" maxlength="1000" rows="4" placeholder="어떤 기능이 있었으면 좋겠는지 적어주세요."></textarea>
+        <button class="btn" id="postSubmit">글 등록</button>
+      </div>
+
+      <div class="post-toolbar" id="postAdminBar" style="display:none;">
+        <label class="post-checkall"><input type="checkbox" id="postCheckAll"> 전체 선택</label>
+        <div class="post-toolbar-actions">
+          <button class="btn-mini btn-reject" id="postDeleteSelected">선택 삭제</button>
+          <button class="btn-mini btn-reject" id="postDeleteAll">전체 삭제</button>
+        </div>
+      </div>
+
+      <div class="foot-note" id="postCount" style="margin-bottom:6px;"></div>
+      <div id="postList"></div>
+    </div>
+  </div>
 </div>
 <div class="toast" id="toast"></div>
 <div class="modal-overlay" id="modalOverlay">
@@ -816,6 +893,7 @@ let matches = [];
 let requests = [];
 let admins = [];
 let tMatches = [];          // 대회 경기 기록
+let posts = [];             // 게시판 글
 
 /* 대회 참가 팀. api/tournament.js 의 TEAMS 와 id 가 일치해야 합니다. */
 const TOURNAMENT_TEAMS = [
@@ -882,6 +960,13 @@ async function loadTournament() {
     const d = await apiGet('/api/tournament');
     tMatches = d.matches || [];
   } catch { tMatches = []; }
+}
+
+async function loadPosts() {
+  try {
+    const d = await apiGet('/api/post');
+    posts = d.posts || [];
+  } catch { posts = []; }
 }
 
 async function loadAdmins() {
@@ -1181,6 +1266,7 @@ function renderAll() {
   renderAdminList();
   renderMemberList();
   renderTournament();
+  renderBoard();
 }
 
 /* ---------- 대회 (TOURNAMENT) ---------- */
@@ -1448,6 +1534,169 @@ function initTournamentEvents() {
       recordFixture(a, b, winner);
     }
   });
+}
+
+/* ---------- 게시판 ---------- */
+
+function renderBoard() {
+  const list = document.getElementById('postList');
+  const count = document.getElementById('postCount');
+  const bar = document.getElementById('postAdminBar');
+  if (!list || !count || !bar) return;
+
+  bar.style.display = currentAdmin && posts.length ? 'flex' : 'none';
+  const checkAll = document.getElementById('postCheckAll');
+  if (checkAll) checkAll.checked = false;
+
+  count.textContent = posts.length ? `총 ${posts.length}개의 글` : '';
+
+  if (!posts.length) {
+    list.innerHTML = '<div class="log-empty">아직 등록된 글이 없습니다. 첫 의견을 남겨주세요.</div>';
+    return;
+  }
+
+  list.innerHTML = posts.map(p => `
+    <div class="post" data-post="${p.id}">
+      <div class="post-head">
+        ${currentAdmin ? `<input type="checkbox" class="post-pick" value="${p.id}">` : ''}
+        <span class="post-author">${esc(p.author)}</span>
+        <span class="post-date">${formatDateTime(p.createdAt)}</span>
+        ${p.updatedAt ? '<span class="post-edited">수정됨</span>' : ''}
+        <span class="post-actions">
+          <button class="btn-mini btn-edit" data-edit="${p.id}">수정</button>
+          <button class="btn-mini btn-reject" data-del="${p.id}">삭제</button>
+        </span>
+      </div>
+      <div class="post-body">${esc(p.body)}</div>
+    </div>`).join('');
+}
+
+async function createPost() {
+  const author = document.getElementById('postAuthor').value.trim();
+  const password = document.getElementById('postPw').value;
+  const body = document.getElementById('postBody').value.trim();
+
+  if (!author) return showToast('ID를 입력해주세요.');
+  if (!/^\d{4}$/.test(password)) return showToast('비밀번호는 숫자 4자리로 입력해주세요.');
+  if (!body) return showToast('내용을 입력해주세요.');
+
+  try {
+    await apiPost('/api/post', { action: 'create', author, password, body });
+    document.getElementById('postPw').value = '';
+    document.getElementById('postBody').value = '';
+    await loadPosts();
+    renderBoard();
+    showToast('글을 등록했습니다.');
+  } catch (e) { showToast(e.message); }
+}
+
+/** 수정: 글쓴이만 가능하므로 관리자도 비밀번호를 입력해야 한다 */
+function showEditModal(id) {
+  const post = posts.find(p => p.id === Number(id));
+  if (!post) return;
+  openModal(`
+    <h3>글 수정</h3>
+    <label>내용</label>
+    <textarea id="editBody" maxlength="1000" rows="5">${esc(post.body)}</textarea>
+    <label>비밀번호 (숫자 4자리)</label>
+    <input type="password" id="editPw" maxlength="4" inputmode="numeric" placeholder="0000">
+    <div class="modal-error" id="editErr"></div>
+    <button class="btn" id="editSubmit">수정하기</button>
+    <button class="btn-ghost" style="width:100%;margin-top:8px;" onclick="closeModal()">취소</button>
+  `);
+  const err = document.getElementById('editErr');
+  document.getElementById('editSubmit').addEventListener('click', async () => {
+    const body = document.getElementById('editBody').value.trim();
+    const password = document.getElementById('editPw').value;
+    if (!body) { err.textContent = '내용을 입력해주세요.'; return; }
+    if (!/^\d{4}$/.test(password)) { err.textContent = '비밀번호는 숫자 4자리입니다.'; return; }
+    try {
+      await apiPost('/api/post', { action: 'update', id: Number(id), password, body });
+      closeModal();
+      await loadPosts();
+      renderBoard();
+      showToast('글을 수정했습니다.');
+    } catch (e) { err.textContent = e.message; }
+  });
+}
+
+/** 삭제: 관리자는 비밀번호 없이, 그 외에는 비밀번호를 확인한다 */
+function deletePost(id) {
+  if (currentAdmin) {
+    if (!confirm('이 글을 삭제할까요?')) return;
+    return submitDelete(id, null);
+  }
+  openModal(`
+    <h3>글 삭제</h3>
+    <label>비밀번호 (숫자 4자리)</label>
+    <input type="password" id="delPw" maxlength="4" inputmode="numeric" placeholder="0000">
+    <div class="modal-error" id="delErr"></div>
+    <button class="btn" id="delSubmit">삭제하기</button>
+    <button class="btn-ghost" style="width:100%;margin-top:8px;" onclick="closeModal()">취소</button>
+  `);
+  const err = document.getElementById('delErr');
+  document.getElementById('delSubmit').addEventListener('click', async () => {
+    const password = document.getElementById('delPw').value;
+    if (!/^\d{4}$/.test(password)) { err.textContent = '비밀번호는 숫자 4자리입니다.'; return; }
+    try {
+      await submitDelete(id, password);
+      closeModal();
+    } catch (e) { err.textContent = e.message; }
+  });
+}
+
+async function submitDelete(id, password) {
+  const payload = { action: 'remove', id: Number(id) };
+  if (password !== null) payload.password = password;
+  await apiPost('/api/post', payload);
+  await loadPosts();
+  renderBoard();
+  showToast('글을 삭제했습니다.');
+}
+
+async function deleteSelectedPosts() {
+  const ids = Array.from(document.querySelectorAll('.post-pick:checked')).map(el => Number(el.value));
+  if (!ids.length) return showToast('삭제할 글을 선택해주세요.');
+  if (!confirm(`선택한 ${ids.length}개의 글을 삭제할까요?`)) return;
+  try {
+    const d = await apiPost('/api/post', { action: 'removeMany', ids });
+    await loadPosts();
+    renderBoard();
+    showToast(`${d.deleted}개의 글을 삭제했습니다.`);
+  } catch (e) { showToast(e.message); }
+}
+
+async function deleteAllPosts() {
+  if (!posts.length) return showToast('삭제할 글이 없습니다.');
+  if (!confirm(`게시판의 글 ${posts.length}개를 모두 삭제할까요?\n\n되돌릴 수 없습니다.`)) return;
+  try {
+    const d = await apiPost('/api/post', { action: 'clear' });
+    await loadPosts();
+    renderBoard();
+    showToast(`${d.deleted}개의 글을 모두 삭제했습니다.`);
+  } catch (e) { showToast(e.message); }
+}
+
+function initBoardEvents() {
+  const submit = document.getElementById('postSubmit');
+  if (submit) submit.addEventListener('click', createPost);
+
+  const list = document.getElementById('postList');
+  if (list) list.addEventListener('click', e => {
+    const d = e.target.dataset || {};
+    if (d.edit) showEditModal(d.edit);
+    if (d.del) deletePost(d.del);
+  });
+
+  const checkAll = document.getElementById('postCheckAll');
+  if (checkAll) checkAll.addEventListener('change', () => {
+    document.querySelectorAll('.post-pick').forEach(el => { el.checked = checkAll.checked; });
+  });
+
+  const sel = document.getElementById('postDeleteSelected');
+  if (sel) sel.addEventListener('click', deleteSelectedPosts);
+  const all = document.getElementById('postDeleteAll');
+  if (all) all.addEventListener('click', deleteAllPosts);
 }
 
 /* ---------- 토스트 / 모달 ---------- */
@@ -1786,6 +2035,7 @@ function initAdminEvents() {
 async function refreshAll() {
   await loadState();
   await loadTournament();
+  await loadPosts();
   await loadAdmins();
   renderAll();
 }
@@ -1800,6 +2050,7 @@ async function boot() {
   initStandingEvents();
   initAdminEvents();
   initTournamentEvents();
+  initBoardEvents();
   renderAuthBar();
   try {
     await refreshAll();
