@@ -23,27 +23,13 @@ if not orig_path.exists():
 orig = orig_path.read_text(encoding='utf-8')
 app = (ROOT / 'scripts' / 'app.js').read_text(encoding='utf-8')
 
-# CSS + 마크업만 사용한다. 구버전 원본 HTML을 그대로 넘긴 경우 인라인 스크립트가
-# 딸려오므로 첫 스크립트 태그 앞에서 잘라낸다.
+# CSS + 마크업만 사용한다. 구버전 원본 HTML을 그대로 넘긴 경우 본문에 인라인 스크립트가
+# 딸려오므로 <body> 뒤에 처음 나오는 스크립트 태그 앞에서 잘라낸다.
+# (<head> 안의 테마 적용 스크립트는 남겨야 하므로 <body> 이후만 찾는다.)
 marker = '<' + 'script>'
-head = orig[:orig.index(marker)] if marker in orig else orig
-
-# select 스타일 보강 + 연결 실패 배너 스타일
-head = head.replace(
-    "  .modal-box input:focus,.modal-box textarea:focus{outline:none;border-color:var(--amber-dim);}",
-    """  .modal-box input:focus,.modal-box textarea:focus,.modal-box select:focus{outline:none;border-color:var(--amber-dim);}
-  .modal-box select{
-    width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);
-    font-family:'Share Tech Mono',monospace;padding:10px;font-size:14.5px;font-weight:600;
-  }
-  #connBanner{
-    display:none;border:1px solid var(--danger);background:rgba(255,92,73,0.1);
-    color:var(--danger);padding:12px 14px;margin-bottom:14px;font-size:13.5px;font-weight:700;
-  }"""
-)
-
-# 서버 연결 실패 배너 삽입
-head = head.replace('  <nav class="tabs">', '  <div id="connBanner"></div>\n\n  <nav class="tabs">')
+body_at = orig.index('<body>')
+cut = orig.find(marker, body_at)
+head = orig[:cut] if cut != -1 else orig
 
 # 초기 비밀번호 안내 문구 수정
 head = head.replace(

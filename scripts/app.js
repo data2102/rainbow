@@ -1289,6 +1289,21 @@ function initTabs() {
   });
 }
 
+/**
+ * 화면 밝기(화이트/다크) 전환.
+ * 기본값은 화이트이고, 사용자가 고른 값만 브라우저에 남겨 다음 방문에도 유지한다.
+ * 첫 페인트 전에 적용하는 코드는 index.html <head> 안에 따로 들어있다.
+ */
+function initTheme() {
+  const btn = document.getElementById('themeToggle');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('r6-theme', next); } catch { /* 사생활 보호 모드 등 */ }
+  });
+}
+
 function initStandingEvents() {
   document.getElementById('searchInput').addEventListener('input', renderStanding);
   document.querySelectorAll('#standingTable th').forEach(th => {
@@ -1357,6 +1372,7 @@ function showFatal(msg) {
 }
 
 async function boot() {
+  initTheme();
   initTabs();
   initStandingEvents();
   initAdminEvents();
