@@ -406,6 +406,7 @@
   .member-row:hover{background:rgba(255,176,32,0.05);}
   .member-id{font-size:14px;font-weight:700;}
   .member-meta{font-size:11.5px;color:var(--text-dim);font-weight:600;margin-top:1px;}
+  .member-actions{display:flex;gap:5px;flex:none;}
   .member-row .btn-mini{flex:none;padding:5px 10px;font-size:11px;}
 
   /* 전체 기록 표 */
@@ -1261,13 +1262,48 @@ function renderMemberList() {
         <div class="member-id">${esc(p.handle)} <span class="clan-tag">${esc(p.clan)}</span></div>
         <div class="member-meta">${p.point}점 · ${p.wins}승 ${p.losses}패</div>
       </div>
-      <button class="btn-mini btn-reject" data-member="${esc(p.handle)}">삭제</button>
+      <span class="member-actions">
+        <button class="btn-mini btn-edit" data-medit="${esc(p.handle)}">수정</button>
+        <button class="btn-mini btn-reject" data-member="${esc(p.handle)}">삭제</button>
+      </span>
     </div>`).join('')
     || `<div class="log-empty">${q ? '검색 결과 없음' : '등록된 회원이 없습니다.'}</div>`;
 
   count.textContent = q
     ? `${players.length}명 중 ${list.length}명 표시`
     : `등록된 회원 ${players.length}명`;
+}
+
+function showMemberEditModal(handle) {
+  const p = players.find(x => x.handle === handle);
+  if (!p) return;
+  openModal(`
+    <h3>회원 정보 수정</h3>
+    <label>ID</label>
+    <input type="text" id="meId" maxlength="40" value="${esc(p.handle)}">
+    <label>CLAN</label>
+    <input type="text" id="meClan" maxlength="20" value="${esc(p.clan)}">
+    <div class="foot-note" style="margin-top:8px;">
+      ID를 바꾸면 지난 경기 기록에 남은 이름도 함께 바뀝니다 · 점수와 전적은 그대로입니다.
+    </div>
+    <div class="modal-error" id="meErr"></div>
+    <button class="btn" id="meSubmit">저장</button>
+    <button class="btn-ghost" style="width:100%;margin-top:8px;" onclick="closeModal()">취소</button>
+  `);
+  const err = document.getElementById('meErr');
+  document.getElementById('meSubmit').addEventListener('click', async () => {
+    const newHandle = document.getElementById('meId').value.trim();
+    const clan = document.getElementById('meClan').value.trim();
+    if (!newHandle) { err.textContent = 'ID를 입력해주세요.'; return; }
+    try {
+      const d = await apiPost('/api/player', { action: 'update', handle, newHandle, clan });
+      closeModal();
+      await refreshAll();
+      showToast(d.matchesUpdated
+        ? `수정했습니다. 경기 기록 ${d.matchesUpdated}건의 이름도 함께 바꿨습니다.`
+        : '수정했습니다.');
+    } catch (e) { err.textContent = e.message; }
+  });
 }
 
 async function removeMember(handle) {
@@ -2110,8 +2146,9 @@ function initAdminEvents() {
 
   const memberList = document.getElementById('memberList');
   if (memberList) memberList.addEventListener('click', e => {
-    const handle = e.target.dataset && e.target.dataset.member;
-    if (handle) removeMember(handle);
+    const d = e.target.dataset || {};
+    if (d.member) removeMember(d.member);
+    if (d.medit) showMemberEditModal(d.medit);
   });
 
   document.getElementById('adminLockedLoginBtn').addEventListener('click', showAdminLoginModal);
