@@ -21,6 +21,7 @@ const TOURNAMENT_TEAMS = [
 const MERCENARIES = ['렌보짱', '럭키', '호신', '실장'];
 const ADVANCING = 4;        // 예선 통과 팀 수
 const CLAN_TOP = 5;         // 클랜 순위에 보여줄 등수
+const TOP_N = 5;            // 개인 순위 표에 보여줄 인원
 
 function teamLabel(id) {
   const t = TOURNAMENT_TEAMS.find(t => t.id === id);
@@ -167,8 +168,8 @@ function renderStanding() {
 }
 
 function renderTop5() {
-  const byPoint = [...players].sort((a, b) => b.point - a.point).slice(0, 10);
-  const byWin = [...players].sort((a, b) => b.wins - a.wins).slice(0, 10);
+  const byPoint = [...players].sort((a, b) => b.point - a.point).slice(0, TOP_N);
+  const byWin = [...players].sort((a, b) => b.wins - a.wins).slice(0, TOP_N);
 
   document.getElementById('topPointBody').innerHTML = byPoint.map((p, i) => `
     <tr><td class="rank-cell ${medalClass(i + 1)}">${i + 1}</td><td>${esc(p.handle)}</td>
@@ -187,7 +188,7 @@ function renderTop5() {
   const byRatio = players
     .filter(p => p.wins + p.losses > 0)
     .sort((a, b) => ratio(b) - ratio(a) || b.wins - a.wins || a.handle.localeCompare(b.handle))
-    .slice(0, 10);
+    .slice(0, TOP_N);
 
   const ratioBody = document.getElementById('topRatioBody');
   if (ratioBody) {
