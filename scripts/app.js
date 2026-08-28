@@ -1903,8 +1903,8 @@ const ROOM_CAPACITY = 16;
 
 /* ---------- 출발 카운트다운 ---------- */
 
-/** 5초를 세고 START. 방장이 누른 시각(startedAt)을 기준으로 삼는다. */
-const CD_MS = 5000;
+/** 3초를 세고 START. 방장이 누른 시각(startedAt)을 기준으로 삼는다. */
+const CD_MS = 3000;
 let cdTimer = null;
 let cdLast = null;
 let cdPlayedAt = 0;   // 이미 보여준 startedAt — 같은 출발을 두 번 세지 않는다
@@ -1945,7 +1945,7 @@ function playCountdown(startedAt, onGo) {
   const tick = () => {
     const left = Math.ceil((startedAt + CD_MS - Date.now()) / 1000);
     if (left > 0) {
-      paint(String(Math.min(left, 5)), false);
+      paint(String(Math.min(left, CD_MS / 1000)), false);
     } else {
       paint('START', true);
       clearInterval(cdTimer);

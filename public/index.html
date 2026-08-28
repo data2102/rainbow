@@ -1815,9 +1815,10 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
              <b>여러 방이 동시에 열리면 목록에 방이 여러 개 뜨기 때문</b>입니다.
              스크립트는 목록을 읽을 수 없어 엉뚱한 방에 들어갑니다.
              주소로 곧장 붙으면 그럴 일이 없습니다.</p>
-          <p class="setup-warn">컴퓨터마다 게임이 뜨는 속도가 달라서, 오프닝이 길면 키가 허공에
-             나갈 수 있습니다. 그때는 <code>r6launch.ahk</code> 를 메모장으로 열어 위쪽의
-             <b>WaitMenu</b> 값을 늘려보세요(기본 12초). <b>Debug</b> 를 <code>true</code> 로
+          <p class="setup-warn">컴퓨터마다 게임이 뜨는 속도가 다릅니다. 메뉴가 뜨기도 전에 키가
+             나가면 <code>r6launch.ahk</code> 를 메모장으로 열어 위쪽의 <b>WaitMenu</b> 를
+             올리고(기본 6초), 메뉴가 뜬 뒤에도 한참 서 있으면 줄이세요.
+             <b>Debug</b> 를 <code>true</code> 로
              두면 무엇을 누르는지, 마우스가 어디로 가는지 화면에 보여줍니다.
              MANUAL JOIN 창의 칸을 못 누르면 <b>XY_HOST · XY_PORT · XY_JOIN</b> 값을 고치세요. 기본 등록으로 되돌리려면
              <b>r6clan.reg</b> 를 다시 실행하면 됩니다.</p>
@@ -3836,8 +3837,8 @@ const ROOM_CAPACITY = 16;
 
 /* ---------- 출발 카운트다운 ---------- */
 
-/** 5초를 세고 START. 방장이 누른 시각(startedAt)을 기준으로 삼는다. */
-const CD_MS = 5000;
+/** 3초를 세고 START. 방장이 누른 시각(startedAt)을 기준으로 삼는다. */
+const CD_MS = 3000;
 let cdTimer = null;
 let cdLast = null;
 let cdPlayedAt = 0;   // 이미 보여준 startedAt — 같은 출발을 두 번 세지 않는다
@@ -3878,7 +3879,7 @@ function playCountdown(startedAt, onGo) {
   const tick = () => {
     const left = Math.ceil((startedAt + CD_MS - Date.now()) / 1000);
     if (left > 0) {
-      paint(String(Math.min(left, 5)), false);
+      paint(String(Math.min(left, CD_MS / 1000)), false);
     } else {
       paint('START', true);
       clearInterval(cdTimer);
