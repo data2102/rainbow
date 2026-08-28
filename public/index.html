@@ -1688,9 +1688,28 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
             <li><b>PLAYER NAME</b> <span>사이트 아이디와 같게</span> — 누가 누군지 바로 보입니다</li>
           </ul>
           <p class="setup-warn">JOIN GAME 목록에 아무것도 안 뜨면 방화벽입니다.
-             윈도우 방화벽에서 <b>RainbowSix.exe 를 허용</b>하거나
-             <b>UDP 2346 · 2347 · 2348</b> 을 열어주세요. 그래도 안 되면
-             <kbd>MANUAL JOIN</kbd> 으로 주소를 붙여넣으면 됩니다.</p>
+             그래도 안 되면 <kbd>MANUAL JOIN</kbd> 으로 주소를 넣으면 됩니다.</p>
+        </div>
+      </details>
+
+      <details class="setup">
+        <summary>접속이 오래 걸릴 때 — 방화벽 열기</summary>
+        <div class="setup-body">
+          <p>게임은 접속할 때 상대의 포트 <b>세 개</b>를 두드려 봅니다
+             — <b>2346</b>(JOIN) · <b>2347</b>(ANNOUNCE) · <b>2348</b>(INFO).
+             막혀 있는 포트가 있으면 "응답 없음"으로 판정될 때까지 기다렸다가
+             다음을 시도합니다. <b>그 기다림이 쌓여 접속이 느려집니다.</b></p>
+          <ol>
+            <li><a href="/r6firewall.bat" download>r6firewall.bat 내려받기</a></li>
+            <li>오른쪽 클릭 → <b>관리자 권한으로 실행</b></li>
+            <li><b>방장과 참가자 모두</b> 한 번씩 해야 효과가 있습니다</li>
+          </ol>
+          <p>그래도 느리면 <kbd>MULTIPLAYER OPTIONS</kbd> 에서
+             <b>INTERNET / LAN</b> 을 바꿔가며 재보세요. Radmin 은 랜처럼 보이지만
+             실제로는 인터넷을 타기 때문에, <b>INTERNET</b> 쪽이 더 나을 수 있습니다.
+             <b>BEHIND FIREWALL</b> 은 <b>NO</b> 여야 합니다 — YES 는 일부러 느리게 도는 설정입니다.</p>
+          <p class="setup-warn">메모장으로 열면 무엇을 하는지 다 보입니다. 게임 허용과
+             UDP 세 포트를 여는 것이 전부이고, 되돌리는 명령도 적혀 있습니다.</p>
         </div>
       </details>
 
