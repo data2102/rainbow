@@ -642,7 +642,7 @@ function renderAttendance() {
       <td class="h-inline" data-l="ID">${esc(log.handle)}</td>
       <td class="h-inline" data-l="출근">${formatClock(log.clockIn)}</td>
       <td class="h-inline" data-l="퇴근">${log.clockOut != null
-        ? formatClock(log.clockOut) : '<span class="att-live">근무 중</span>'}</td>
+        ? formatClock(log.clockOut) : '<span class="att-live">게임 중</span>'}</td>
       <td class="h-inline att-dur" data-l="시간">${formatDuration(logDuration(log))}</td>
       <td class="h-by-cell">${currentAdmin
         ? `<button class="btn-mini btn-reject" data-attdel="${log.id}">삭제</button>` : ''}</td>
@@ -697,7 +697,7 @@ function initAttendanceEvents() {
     punchAttendance(btn.dataset.att, btn.dataset.handle);
   });
 
-  // 근무 중인 사람의 경과 시간을 1분마다 갱신한다
+  // 게임 중인 사람의 경과 시간을 1분마다 갱신한다
   setInterval(() => {
     if (panel.classList.contains('active') && attLogs.some(l => l.clockOut == null)) {
       renderAttendanceBoard();

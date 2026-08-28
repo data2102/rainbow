@@ -95,7 +95,7 @@ async function resetPlayers(c) {
 
 /**
  * 퇴근을 안 찍고 달이 넘어간 기록을 시즌 끝 시각으로 닫는다.
- * 열어두면 다음 달까지 근무 중으로 남아 게임시간이 부풀려진다.
+ * 열어두면 다음 달까지 게임 중으로 남아 게임시간이 부풀려진다.
  * 출퇴근 테이블은 늦게 생기므로 있을 때만 손댄다.
  */
 async function closeOpenAttendance(c, seasonId, endsAt) {
