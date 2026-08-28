@@ -578,6 +578,20 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .pill-remove{ color:var(--danger-strong); background:var(--danger-bg); }
 .pill-warn{ color:var(--warning-strong); background:var(--warning-bg); }
 
+/* ---------- 계정 권한 ---------- */
+.role-select{
+  width:auto; min-width:110px; padding:var(--sp-1) var(--sp-3);
+  font-size:var(--fs-caption); border-radius:var(--radius-sm); cursor:pointer;
+}
+.role-tag{
+  display:inline-block; font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+  border-radius:var(--radius-pill); padding:2px var(--sp-3);
+  background:var(--surface-sunken); color:var(--text-secondary);
+}
+.role-tag.admin{ background:var(--accent-bg); color:var(--accent-strong); }
+.role-tag.master{ background:var(--warning-bg); color:var(--warning-strong); }
+.acct-email{ color:var(--text-tertiary); font-size:var(--fs-footnote); }
+
 /* ---------- 회원 관리 ---------- */
 .member-list{
   max-height:340px; overflow-y:auto;
@@ -865,7 +879,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   <nav class="tabs">
     <button class="tab-btn active" data-tab="standing">① 순위</button>
     <button class="tab-btn" data-tab="mostpoint">② 상세순위</button>
-    <button class="tab-btn" data-tab="history">③ 경기기록</button>
+    <button class="tab-btn" data-tab="history">③ 리폿(경기결과)</button>
     <button class="tab-btn" data-tab="attendance">④ 출석</button>
     <button class="tab-btn" data-tab="tournament">⑤ 대회</button>
     <button class="tab-btn" data-tab="board">⑥ 게시판</button>
@@ -964,45 +978,10 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
     <div class="panel hud-corner" id="adminLocked">
       <h2>관리자 전용 · Admin Only</h2>
       <div class="foot-note" style="margin-top:0;margin-bottom:14px;">이 페이지는 관리자 로그인 후에만 이용할 수 있습니다.</div>
-      <button class="btn btn-center" id="adminLockedLoginBtn">관리자 로그인</button>
+      <button class="btn btn-center" id="adminLockedLoginBtn">로그인</button>
     </div>
 
     <div id="adminAuthed" style="display:none;">
-      <div class="panel hud-corner">
-        <h2>승패 기록 · Report Match</h2>
-        <div class="foot-note" style="margin-top:0;margin-bottom:14px;">7:7, 8:8, 7:8 등 팀전 지원 — 승리한 인원과 패배한 인원을 각각 여러 명 체크한 뒤 기록하세요.</div>
-        <div class="team-grid">
-          <div>
-            <div class="side-label" style="color:var(--success-strong);">WIN TEAM · 승리 팀</div>
-            <div class="checklist" id="winList"></div>
-          </div>
-          <div>
-            <div class="side-label" style="color:var(--danger-strong);">LOSE TEAM · 패배 팀</div>
-            <div class="checklist" id="loseList"></div>
-          </div>
-        </div>
-        <button class="btn" id="submitMatch" disabled>기록 확정 (Record Match)</button>
-        <div class="foot-note">동일 선수를 양쪽에 동시 체크할 수 없습니다. 최소 각 팀 1명 이상 선택하세요.</div>
-      </div>
-
-      <div class="split">
-        <div class="panel hud-corner">
-          <h2>득점 규칙 · Rule</h2>
-          <div class="rules">
-            · 개인 승리 시 <b>+3점</b><br>
-            · 개인 패배 시 <b>+1점</b><br>
-            · 3연승 시 기본점수에 <b>+1점</b> 추가<br>
-            · 5연승 시 기본점수에 <b>+2점</b> 추가<br>
-            · 5연승 달성 시 Streak에 <b style="color:var(--danger);">UP</b> 아이콘 표기<br>
-            · 5연패 달성 시 Streak에 <b style="color:var(--blue);">DOWN</b> 아이콘 표기
-          </div>
-        </div>
-        <div class="panel hud-corner">
-          <h2>최근 기록 · Recent Log</h2>
-          <div id="logBody"><div class="log-empty">기록 없음</div></div>
-        </div>
-      </div>
-
       <div class="panel hud-corner">
         <h2>가입 · 삭제 승인 대기</h2>
         <div id="pendingList"><div class="log-empty">대기 중인 요청이 없습니다.</div></div>
@@ -1018,12 +997,32 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
         <div class="foot-note" id="memberCount"></div>
       </div>
 
+      <div class="panel hud-corner" id="rolePanel">
+        <h2>계정 권한</h2>
+        <div class="foot-note" style="margin-top:0;margin-bottom:12px;" id="roleNote"></div>
+        <div class="search-row">
+          <input type="text" id="roleSearch" autocomplete="off" placeholder="아이디 또는 클랜으로 검색...">
+        </div>
+        <div class="table-wrap">
+          <table id="roleTable">
+            <thead><tr><th>ID</th><th>Clan</th><th>이메일</th><th>권한</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="panel hud-corner">
-        <h2>어드민 계정 관리</h2>
-        <div id="adminList"></div>
-        <label>신규 어드민 ID 추가</label>
-        <input type="text" id="newAdminId" autocomplete="off" placeholder="예: ADMIN_NewName">
-        <button class="btn" id="addAdminBtn">어드민 추가 (초기 비밀번호 1234)</button>
+        <h2>계정 로그</h2>
+        <div class="foot-note" style="margin-top:0;margin-bottom:12px;">
+          가입 승인 · 계정 삭제 · 권한 변경 기록입니다 · 최근 200건.
+        </div>
+        <div class="table-wrap">
+          <table id="acctLogTable" class="history-table">
+            <thead><tr><th class="h-when">일시</th><th>내용</th><th>대상</th><th class="h-by">처리자</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="acctLogEmpty" class="log-empty">기록 없음</div>
       </div>
 
       <div class="panel hud-corner">
@@ -1039,6 +1038,31 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 
   <!-- HISTORY -->
   <div class="tab-panel" id="tab-history">
+    <div id="reportGate" class="panel hud-corner" style="display:none;">
+      <h2>승패 기록</h2>
+      <div class="foot-note" style="margin-top:0;">로그인하면 경기 결과를 기록할 수 있습니다.</div>
+      <button class="btn btn-center" id="reportLoginBtn">로그인</button>
+    </div>
+
+    <div id="reportBox" style="display:none;">
+    <div class="panel hud-corner">
+      <h2>승패 기록 · Report Match</h2>
+      <div class="foot-note" style="margin-top:0;margin-bottom:14px;">7:7, 8:8, 7:8 등 팀전 지원 — 승리한 인원과 패배한 인원을 각각 여러 명 체크한 뒤 기록하세요.</div>
+      <div class="team-grid">
+        <div>
+          <div class="side-label" style="color:var(--success-strong);">WIN TEAM · 승리 팀</div>
+          <div class="checklist" id="winList"></div>
+        </div>
+        <div>
+          <div class="side-label" style="color:var(--danger-strong);">LOSE TEAM · 패배 팀</div>
+          <div class="checklist" id="loseList"></div>
+        </div>
+      </div>
+      <button class="btn" id="submitMatch" disabled>기록 확정 (Record Match)</button>
+      <div class="foot-note">동일 선수를 양쪽에 동시 체크할 수 없습니다. 최소 각 팀 1명 이상 선택하세요.</div>
+    </div>
+    </div>
+
     <div class="panel hud-corner">
       <div class="panel-head">
         <h2>전체 기록 · Match History</h2>
@@ -1064,6 +1088,23 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
       </div>
       <div id="historyEmpty" class="log-empty">기록 없음</div>
     </div>
+
+      <div class="panel hud-corner">
+        <h2>최근 기록 · Recent Log</h2>
+        <div id="logBody"><div class="log-empty">기록 없음</div></div>
+      </div>
+
+      <div class="panel hud-corner">
+        <h2>득점 규칙 · Rule</h2>
+        <div class="rules">
+          · 개인 승리 시 <b>+3점</b><br>
+          · 개인 패배 시 <b>+1점</b><br>
+          · 3연승 시 기본점수에 <b>+1점</b> 추가<br>
+          · 5연승 시 기본점수에 <b>+2점</b> 추가<br>
+          · 5연승 달성 시 Streak에 <b style="color:var(--danger);">UP</b> 아이콘 표기<br>
+          · 5연패 달성 시 Streak에 <b style="color:var(--blue);">DOWN</b> 아이콘 표기
+        </div>
+      </div>
   </div>
 
   <!-- ATTENDANCE — 출퇴근 기록 -->

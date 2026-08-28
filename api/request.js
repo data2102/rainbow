@@ -1,4 +1,7 @@
-import { q, body, methodGuard, requireAdmin, audit, genReqId, parseHandle } from './_lib.js';
+import {
+  q, body, methodGuard, requireAdmin, audit, genReqId, parseHandle,
+  hashPw, TEMP_PASSWORD,
+} from './_lib.js';
 
 export default async function handler(req, res) {
   if (!methodGuard(req, res, ['POST'])) return;
@@ -60,19 +63,23 @@ async function resolve(req, res, action) {
         await q(`DELETE FROM requests WHERE id = $1`, [id]);
         return res.status(400).json({ error: '이미 존재하는 ID라 요청을 삭제했습니다.' });
       }
+      // 승인과 동시에 로그인할 수 있는 계정이 된다. 권한은 일반부터.
       const parsed = parseHandle(r.new_id);
       await q(
-        `INSERT INTO players (handle, clan, name) VALUES ($1, $2, $3)`,
-        [r.new_id, r.new_clan || parsed.clan, parsed.name]
+        `INSERT INTO players (handle, clan, name, email, pw_hash, role)
+         VALUES ($1,$2,$3,$4,$5,'member')`,
+        [r.new_id, r.new_clan || parsed.clan, parsed.name, r.email || null, hashPw(TEMP_PASSWORD)]
       );
     } else {
       await q(`DELETE FROM players WHERE handle = $1`, [r.target_id]);
+      await q(`DELETE FROM sessions WHERE admin_id = $1`, [r.target_id]);
     }
   }
 
   await q(`DELETE FROM requests WHERE id = $1`, [id]);
-  await audit(me, action === 'approve' ? 'approve_request' : 'reject_request', {
-    type: r.type, target: r.new_id || r.target_id,
-  });
+  // 누가 언제 승인·삭제했는지 남긴다 (ts 는 audit_log 가 자동으로 찍는다)
+  const what = action === 'reject' ? 'reject_request'
+    : (r.type === 'add' ? 'approve_add' : 'approve_remove');
+  await audit(me, what, { target: r.new_id || r.target_id, clan: r.new_clan, email: r.email });
   res.status(200).json({ ok: true });
 }

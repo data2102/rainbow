@@ -7,7 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import state from './api/state.js';
-import admin from './api/admin.js';
+import account from './api/account.js';
 import match from './api/match.js';
 import request from './api/request.js';
 import data from './api/data.js';
@@ -31,7 +31,7 @@ const wrap = (fn) => (req, res) => {
 };
 
 app.all('/api/state', wrap(state));
-app.all('/api/admin', wrap(admin));
+app.all('/api/account', wrap(account));
 app.all('/api/match', wrap(match));
 app.all('/api/request', wrap(request));
 app.all('/api/data', wrap(data));

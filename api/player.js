@@ -27,8 +27,9 @@ async function remove(req, res) {
   const removed = await tx(async (c) => {
     const { rows } = await c.query(`DELETE FROM players WHERE handle = $1 RETURNING *`, [handle]);
     if (!rows.length) return null;
-    // 이 회원을 대상으로 남아 있던 삭제 요청은 함께 정리한다
+    // 이 회원을 대상으로 남아 있던 삭제 요청과 로그인 세션은 함께 정리한다
     await c.query(`DELETE FROM requests WHERE type = 'remove' AND target_id = $1`, [handle]);
+    await c.query(`DELETE FROM sessions WHERE admin_id = $1`, [handle]);
     return rows[0];
   });
 

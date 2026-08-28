@@ -1,9 +1,9 @@
-import { tx, body, methodGuard, requireAdmin, audit, winGain, lossGain } from './_lib.js';
+import { tx, body, methodGuard, requireUser, audit, winGain, lossGain } from './_lib.js';
 import { ensureSeason } from './_season.js';
 
 export default async function handler(req, res) {
   if (!methodGuard(req, res, ['POST'])) return;
-  const me = await requireAdmin(req, res);
+  const me = await requireUser(req, res);
   if (!me) return;
 
   const { winners = [], losers = [] } = body(req);

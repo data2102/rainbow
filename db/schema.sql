@@ -1,10 +1,15 @@
 -- r6rank.co.kr / LADDER ZONE 스키마
 -- Postgres 13+ 기준
 
+-- 선수 명단이 곧 로그인 계정이다.
+-- 권한은 member(일반) < admin(관리자) < master(마스터) 셋뿐이다.
 CREATE TABLE IF NOT EXISTS players (
   handle      TEXT PRIMARY KEY,
   clan        TEXT NOT NULL DEFAULT '-',
   name        TEXT NOT NULL,
+  email       TEXT,
+  pw_hash     TEXT,
+  role        TEXT NOT NULL DEFAULT 'member',
   point       INTEGER NOT NULL DEFAULT 0,
   wins        INTEGER NOT NULL DEFAULT 0,
   losses      INTEGER NOT NULL DEFAULT 0,
@@ -84,13 +89,15 @@ CREATE TABLE IF NOT EXISTS requests (
   type         TEXT NOT NULL CHECK (type IN ('add','remove')),
   new_id       TEXT,
   new_clan     TEXT,
+  email        TEXT,
   target_id    TEXT,
   requested_at BIGINT NOT NULL
 );
 
+-- 로그인 세션. admin_id 는 players.handle 을 가리킨다 (이름은 예전 그대로 둔다).
 CREATE TABLE IF NOT EXISTS sessions (
   token      TEXT PRIMARY KEY,
-  admin_id   TEXT NOT NULL REFERENCES admins(id) ON DELETE CASCADE,
+  admin_id   TEXT NOT NULL,
   expires_at TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions (expires_at);

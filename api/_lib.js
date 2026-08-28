@@ -66,40 +66,101 @@ export function isLegacyHash(stored) {
   return !!stored && !stored.startsWith('scrypt$');
 }
 
-/* ---------- 세션 ---------- */
+/* ---------- 계정 · 세션 ---------- */
+
+/**
+ * 계정은 곧 선수 명단이다. players 한 줄이 로그인 계정 하나다.
+ * 권한은 일반(member) < 관리자(admin) < 마스터(master) 셋뿐이다.
+ */
+export const ROLES = ['member', 'admin', 'master'];
+export const ROLE_LABEL = { member: '일반', admin: '관리자', master: '마스터' };
+const RANK = { member: 1, admin: 2, master: 3 };
+
+/** 처음 마스터 권한을 가지는 계정 */
+export const MASTER_HANDLE = 'LOTUS_TeaRs';
+
+/** 계정 제도를 처음 켤 때 한 번만 도는 정리 작업 */
+let accountsReady = false;
+export async function ensureAccounts() {
+  if (accountsReady) return;
+  const has = await q(
+    `SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'players' AND column_name = 'pw_hash'`
+  );
+  if (!has.length) {
+    await q(`ALTER TABLE players ADD COLUMN IF NOT EXISTS pw_hash TEXT`);
+    await q(`ALTER TABLE players ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'member'`);
+    await q(`ALTER TABLE players ADD COLUMN IF NOT EXISTS email TEXT`);
+    await q(`ALTER TABLE requests ADD COLUMN IF NOT EXISTS email TEXT`);
+
+    // 명단에 있는 모두에게 같은 임시 비밀번호를 준다. 어차피 공개된 값이라
+    // 한 번만 해시해서 나눠 써도 잃을 것이 없고, 콜드 스타트가 느려지지 않는다.
+    await q(`UPDATE players SET pw_hash = $1 WHERE pw_hash IS NULL`, [hashPw(TEMP_PASSWORD)]);
+    await q(`UPDATE players SET role = 'master' WHERE handle = $1`, [MASTER_HANDLE]);
+
+    // 예전 ADMIN_* 계정은 더 쓰지 않는다
+    await q(`DELETE FROM admins WHERE id ILIKE 'ADMIN%'`);
+    // 세션은 이제 선수 명단을 가리킨다
+    await q(`ALTER TABLE sessions DROP CONSTRAINT IF EXISTS sessions_admin_id_fkey`);
+    await q(`DELETE FROM sessions`);
+  }
+  accountsReady = true;
+}
 
 const SESSION_HOURS = 12;
 
-export async function createSession(adminId) {
+export async function createSession(handle) {
   const token = randomUUID() + randomBytes(16).toString('hex');
   await q(
     `INSERT INTO sessions (token, admin_id, expires_at) VALUES ($1, $2, now() + interval '${SESSION_HOURS} hours')`,
-    [token, adminId]
+    [token, handle]
   );
   await q(`DELETE FROM sessions WHERE expires_at < now()`);
   return token;
 }
 
-export async function currentAdmin(req) {
+/** 로그인한 사람. { handle, role } 또는 null */
+export async function currentUser(req) {
+  await ensureAccounts();
   const auth = req.headers?.authorization || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
   if (!token) return null;
   const rows = await q(
-    `SELECT admin_id FROM sessions WHERE token = $1 AND expires_at > now()`,
+    `SELECT p.handle, p.role FROM sessions s
+       JOIN players p ON p.handle = s.admin_id
+      WHERE s.token = $1 AND s.expires_at > now()`,
     [token]
   );
-  return rows.length ? rows[0].admin_id : null;
+  return rows.length ? { handle: rows[0].handle, role: rows[0].role || 'member' } : null;
 }
 
-export async function requireAdmin(req, res) {
-  const id = await currentAdmin(req);
-  if (!id) {
-    res.status(401).json({ error: '관리자 로그인이 필요합니다.' });
+/** 관리자 이상이면 그 아이디를, 아니면 null (권한 없이 조용히 넘어가는 곳에 쓴다) */
+export async function currentAdmin(req) {
+  const me = await currentUser(req);
+  return me && RANK[me.role] >= RANK.admin ? me.handle : null;
+}
+
+async function gate(req, res, need) {
+  const me = await currentUser(req);
+  if (!me) {
+    res.status(401).json({ error: '로그인이 필요합니다.' });
     return null;
   }
-  return id;
+  if (RANK[me.role] < RANK[need]) {
+    res.status(403).json({ error: `${ROLE_LABEL[need]} 권한이 필요합니다.` });
+    return null;
+  }
+  return me.handle;
 }
 
+/** 로그인만 하면 된다 (일반 이상) */
+export function requireUser(req, res) { return gate(req, res, 'member'); }
+/** 관리자 이상 */
+export function requireAdmin(req, res) { return gate(req, res, 'admin'); }
+/** 마스터만 */
+export function requireMaster(req, res) { return gate(req, res, 'master'); }
+
+/** 누가 무엇을 했는지 남긴다. ts 는 audit_log 가 자동으로 찍는다. */
 export async function audit(adminId, action, detail) {
   try {
     await q(`INSERT INTO audit_log (admin_id, action, detail) VALUES ($1, $2, $3)`, [

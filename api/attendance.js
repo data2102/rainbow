@@ -1,4 +1,4 @@
-import { q, tx, body, methodGuard, currentAdmin, audit } from './_lib.js';
+import { q, tx, body, methodGuard, currentUser, requireUser, requireAdmin, audit } from './_lib.js';
 import { syncSeason } from './_season.js';
 
 /**
@@ -107,7 +107,12 @@ export default async function handler(req, res) {
       if (!season) return res.status(400).json({ error: '아직 시즌이 시작되지 않았습니다.' });
       return await punch(res, action, handle, season);
     }
-    if (action === 'schedule') return await setSchedule(res, handle, body(req).slots);
+    if (action === 'schedule') {
+      // 로그인한 사람만 체크할 수 있다
+      const me = await requireUser(req, res);
+      if (!me) return;
+      return await setSchedule(res, handle, body(req).slots);
+    }
     if (action === 'remove') return await remove(req, res, id);
     return res.status(400).json({ error: '알 수 없는 요청입니다.' });
   } catch (e) {
@@ -173,8 +178,8 @@ async function setSchedule(res, handle, slots) {
 
 /** 잘못 찍힌 기록 지우기 — 관리자만 */
 async function remove(req, res, id) {
-  const me = await currentAdmin(req);
-  if (!me) return res.status(401).json({ error: '관리자 로그인이 필요합니다.' });
+  const me = await requireAdmin(req, res);
+  if (!me) return;
   const rows = await q(`DELETE FROM attendance WHERE id = $1 RETURNING handle`, [Number(id)]);
   if (!rows.length) return res.status(404).json({ error: '이미 지워진 기록입니다.' });
   await audit(me, 'remove_attendance', { id, handle: rows[0].handle });

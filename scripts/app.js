@@ -5,7 +5,9 @@
 let players = [];
 let matches = [];
 let requests = [];
-let admins = [];
+let me = null;              // 로그인한 계정 { handle, role }
+let accounts = [];          // 계정 권한 목록 (관리자 이상)
+let acctLogs = [];          // 계정 로그
 let tMatches = [];          // 대회 경기 기록
 let posts = [];             // 게시판 글
 let season = null;          // 진행 중인 시즌
@@ -36,7 +38,7 @@ function teamLabel(id) {
   const t = TOURNAMENT_TEAMS.find(t => t.id === id);
   return t ? t.label : id;
 }
-let currentAdmin = null;
+
 let authToken = null;       // 메모리에만 보관 (새로고침 시 재로그인)
 
 let sortKey = 'point';
@@ -66,7 +68,7 @@ async function handleRes(r) {
   let data = null;
   try { data = await r.json(); } catch { /* noop */ }
   if (!r.ok) {
-    if (r.status === 401) { authToken = null; currentAdmin = null; renderAuthBar(); }
+    if (r.status === 401) { authToken = null; me = null; renderAuthBar(); }
     throw new Error((data && data.error) || `서버 오류 (${r.status})`);
   }
   return data;
@@ -143,12 +145,17 @@ async function loadPosts() {
   } catch { posts = []; }
 }
 
-async function loadAdmins() {
-  if (!currentAdmin) { admins = []; return; }
+/** 계정 권한 목록과 로그. 관리자 이상만 받아온다. */
+async function loadAccounts() {
+  if (!isAdmin()) { accounts = []; acctLogs = []; return; }
   try {
-    const d = await apiPost('/api/admin', { action: 'list' });
-    admins = d.admins || [];
-  } catch { admins = []; }
+    const d = await apiPost('/api/account', { action: 'list' });
+    accounts = d.accounts || [];
+  } catch { accounts = []; }
+  try {
+    const d = await apiPost('/api/account', { action: 'logs' });
+    acctLogs = d.logs || [];
+  } catch { acctLogs = []; }
 }
 
 /* ---------- 계산 ---------- */
@@ -435,20 +442,6 @@ function renderPending() {
   });
 }
 
-function renderAdminList() {
-  const box = document.getElementById('adminList');
-  if (!box) return;
-  box.innerHTML = admins.map(a => `
-    <div class="req-row" style="flex-direction:row;align-items:center;justify-content:space-between;">
-      <div>${esc(a.id)}${a.mustChangePassword ? ' <span class="pill pill-warn">비번변경 필요</span>' : ''}</div>
-      <button class="btn-mini btn-reject" data-admin="${esc(a.id)}">삭제</button>
-    </div>`).join('') || '<div class="log-empty">등록된 관리자가 없습니다.</div>';
-
-  box.querySelectorAll('button[data-admin]').forEach(btn => {
-    btn.addEventListener('click', () => removeAdmin(btn.dataset.admin));
-  });
-}
-
 function renderMemberList() {
   const box = document.getElementById('memberList');
   const count = document.getElementById('memberCount');
@@ -527,7 +520,8 @@ function renderAll() {
   renderLog();
   renderHistory();
   renderPending();
-  renderAdminList();
+  renderRoleTable();
+  renderAcctLogs();
   renderMemberList();
   renderTournament();
   renderBoard();
@@ -862,7 +856,7 @@ function renderGroupFixtures() {
   const list = groupFixtures();
   const done = list.filter(f => f.match).length;
 
-  note.textContent = currentAdmin
+  note.textContent = isAdmin()
     ? `${list.length}경기 중 ${done}경기 완료 · 이긴 팀을 누르면 바로 기록되고 위 순위표에 반영됩니다.`
     : `${list.length}경기 중 ${done}경기 완료 · 결과 등록은 관리자만 할 수 있습니다.`;
 
@@ -875,12 +869,12 @@ function renderGroupFixtures() {
           <span class="fx-vs">승</span>
           <span class="loss-txt">${esc(teamLabel(loser))}</span>
         </span>
-        ${currentAdmin ? `<button class="btn-mini btn-reject" data-tdel="${f.match.id}">삭제</button>` : ''}
+        ${isAdmin() ? `<button class="btn-mini btn-reject" data-tdel="${f.match.id}">삭제</button>` : ''}
       </div>`;
     }
     return `<div class="fx">
       <span class="fx-pair">${esc(teamLabel(f.a))}<span class="fx-vs">vs</span>${esc(teamLabel(f.b))}</span>
-      ${currentAdmin
+      ${isAdmin()
         ? `<span class="fx-actions">
              <button class="btn-mini btn-approve" data-fx="${f.a}:${f.b}:${f.a}">${esc(teamLabel(f.a))} 승</button>
              <button class="btn-mini btn-approve" data-fx="${f.a}:${f.b}:${f.b}">${esc(teamLabel(f.b))} 승</button>
@@ -895,9 +889,9 @@ function renderTournamentForm() {
   const hint = document.getElementById('tFormHint');
   if (!form || !hint) return;
 
-  form.style.display = currentAdmin ? 'block' : 'none';
-  hint.style.display = currentAdmin ? 'none' : 'block';
-  if (!currentAdmin) return;
+  form.style.display = isAdmin() ? 'block' : 'none';
+  hint.style.display = isAdmin() ? 'none' : 'block';
+  if (!isAdmin()) return;
 
   // 팀 선택지는 한 번만 채운다
   const selA = document.getElementById('tTeamA');
@@ -943,7 +937,7 @@ function renderTournamentLog() {
           <span class="loss-txt">${esc(teamLabel(loser))}</span>
         </span>
         ${m.note ? `<span class="tlog-note">${esc(m.note)}</span>` : ''}
-        ${currentAdmin ? `<button class="btn-mini btn-reject" data-tdel="${m.id}">삭제</button>` : ''}
+        ${isAdmin() ? `<button class="btn-mini btn-reject" data-tdel="${m.id}">삭제</button>` : ''}
       </div>
       <div class="tlog-meta">등록자 : ${esc(m.recordedBy || '-')} · ${formatDateTime(m.ts)}</div>
     </div>`;
@@ -1030,7 +1024,7 @@ function renderBoard() {
   const bar = document.getElementById('postAdminBar');
   if (!list || !count || !bar) return;
 
-  bar.style.display = currentAdmin && posts.length ? 'flex' : 'none';
+  bar.style.display = isAdmin() && posts.length ? 'flex' : 'none';
   const checkAll = document.getElementById('postCheckAll');
   if (checkAll) checkAll.checked = false;
 
@@ -1044,7 +1038,7 @@ function renderBoard() {
   list.innerHTML = posts.map(p => `
     <div class="post" data-post="${p.id}">
       <div class="post-head">
-        ${currentAdmin ? `<input type="checkbox" class="post-pick" value="${p.id}">` : ''}
+        ${isAdmin() ? `<input type="checkbox" class="post-pick" value="${p.id}">` : ''}
         <span class="post-author">${esc(p.author)}</span>
         <span class="post-date">${formatDateTime(p.createdAt)}</span>
         ${p.updatedAt ? '<span class="post-edited">수정됨</span>' : ''}
@@ -1109,7 +1103,7 @@ async function createComment(postId) {
 
 /** 댓글 삭제: 관리자는 비밀번호 없이, 그 외에는 비밀번호를 확인한다 */
 function deleteComment(id) {
-  if (currentAdmin) {
+  if (isAdmin()) {
     if (!confirm('이 댓글을 삭제할까요?')) return;
     return submitCommentDelete(id, null).catch(e => showToast(e.message));
   }
@@ -1192,7 +1186,7 @@ function showEditModal(id) {
 
 /** 삭제: 관리자는 비밀번호 없이, 그 외에는 비밀번호를 확인한다 */
 function deletePost(id) {
-  if (currentAdmin) {
+  if (isAdmin()) {
     if (!confirm('이 글을 삭제할까요?')) return;
     return submitDelete(id, null);
   }
@@ -1296,197 +1290,265 @@ function closeModal() {
 }
 window.closeModal = closeModal;
 
+/* ---------- 권한 ---------- */
+
+const ROLE_LABEL = { member: '일반', admin: '관리자', master: '마스터' };
+const ROLE_RANK = { member: 1, admin: 2, master: 3 };
+
+function isLoggedIn() { return !!me; }
+function isAdmin()    { return !!me && ROLE_RANK[me.role] >= ROLE_RANK.admin; }
+function isMaster()   { return !!me && me.role === 'master'; }
+
 /* ---------- 인증 UI ---------- */
 
 function renderAuthBar() {
   const bar = document.getElementById('authBar');
-  const adminHtml = currentAdmin
-    ? `<span class="auth-user">관리자 : ${esc(currentAdmin)}</span>
+  bar.innerHTML = me
+    ? `<span class="auth-user">${esc(ROLE_LABEL[me.role] || '일반')} · ${esc(me.handle)}</span>
        <button class="auth-btn" id="btnChangePw">비밀번호 변경</button>
-       <button class="auth-btn" id="btnAdminLogout">로그아웃</button>`
-    : `<button class="auth-btn" id="btnAdminLogin">관리자 로그인</button>`;
+       <button class="auth-btn" id="btnLogout">로그아웃</button>`
+    : `<button class="auth-btn" id="btnSignup">회원가입</button>
+       <button class="auth-btn" id="btnFindPw">비밀번호 찾기</button>
+       <button class="auth-btn" id="btnLogin">로그인</button>`;
 
-  bar.innerHTML = `
-    <button class="auth-btn" id="btnReqAdd">신규회원 등록 신청</button>
-    <button class="auth-btn" id="btnReqRemove">회원 삭제 요청</button>
-    ${adminHtml}`;
-
-  document.getElementById('btnReqAdd').addEventListener('click', showRequestAddModal);
-  document.getElementById('btnReqRemove').addEventListener('click', showRequestRemoveModal);
-  if (currentAdmin) {
-    document.getElementById('btnChangePw').addEventListener('click', () => showChangePasswordModal(false));
-    document.getElementById('btnAdminLogout').addEventListener('click', doAdminLogout);
-  } else {
-    document.getElementById('btnAdminLogin').addEventListener('click', showAdminLoginModal);
-  }
-  renderAdminGate();
+  const on = (id, fn) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('click', fn);
+  };
+  on('btnChangePw', () => showChangePasswordModal());
+  on('btnLogout', doLogout);
+  on('btnSignup', showSignupModal);
+  on('btnFindPw', showFindPwModal);
+  on('btnLogin', showLoginModal);
+  renderGates();
 }
 
-function renderAdminGate() {
-  const locked = document.getElementById('adminLocked');
-  const authed = document.getElementById('adminAuthed');
-  if (!locked || !authed) return;
-  locked.style.display = currentAdmin ? 'none' : 'block';
-  authed.style.display = currentAdmin ? 'block' : 'none';
+/** 권한에 따라 보이고 안 보이고를 한 곳에서 정한다 */
+function renderGates() {
+  const set = (id, show) => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = show ? 'block' : 'none';
+  };
+  // ③ 리폿 — 로그인하면 승패를 기록할 수 있다
+  set('reportGate', !isLoggedIn());
+  set('reportBox', isLoggedIn());
+  // ⑦ 관리자 — 관리자 이상만
+  set('adminLocked', !isAdmin());
+  set('adminAuthed', isAdmin());
+
+  const rolePanel = document.getElementById('rolePanel');
+  if (rolePanel) rolePanel.style.display = isAdmin() ? 'block' : 'none';
 }
 
-/* ---------- 회원 신청 ---------- */
+/* ---------- 로그인 · 회원가입 · 비밀번호 ---------- */
 
-function showRequestAddModal() {
+function showLoginModal() {
   openModal(`
     <button class="modal-x" onclick="closeModal()">✕</button>
-    <h3>신규회원 등록 신청</h3>
-    <label>ID *</label><input type="text" id="reqAddId" maxlength="40">
-    <label>CLAN *</label><input type="text" id="reqAddClan" maxlength="20">
-    <div class="modal-error" id="reqAddErr"></div>
-    <button class="btn" id="reqAddSubmit">신청하기</button>
-    <div class="foot-note">신청 후 관리자 승인이 완료되면 명단에 자동으로 추가됩니다.</div>`);
-  document.getElementById('reqAddSubmit').addEventListener('click', doRequestAdd);
-}
-
-async function doRequestAdd() {
-  const id = document.getElementById('reqAddId').value.trim();
-  const clan = document.getElementById('reqAddClan').value.trim();
-  const err = document.getElementById('reqAddErr');
-  try {
-    await apiPost('/api/request', { action: 'createAdd', id, clan });
-    await refreshAll();
-    closeModal();
-    showToast('등록 신청이 접수되었습니다. 관리자 승인을 기다려주세요.');
-  } catch (e) { err.textContent = e.message; }
-}
-
-function showRequestRemoveModal() {
-  if (!players.length) { showToast('삭제 요청할 수 있는 회원이 없습니다.'); return; }
-  const opts = players.map(p => `<option value="${esc(p.handle)}">${esc(p.handle)} (${esc(p.clan)})</option>`).join('');
-  openModal(`
-    <button class="modal-x" onclick="closeModal()">✕</button>
-    <h3>회원 삭제 요청</h3>
-    <label>삭제를 요청할 회원 ID *</label>
-    <select id="reqRemoveId">${opts}</select>
-    <div class="modal-error" id="reqRemoveErr"></div>
-    <button class="btn" id="reqRemoveSubmit">신청하기</button>
-    <div class="foot-note">신청 후 관리자 승인이 완료되면 명단에서 삭제됩니다.</div>`);
-  document.getElementById('reqRemoveSubmit').addEventListener('click', doRequestRemove);
-}
-
-async function doRequestRemove() {
-  const targetId = document.getElementById('reqRemoveId').value;
-  const err = document.getElementById('reqRemoveErr');
-  try {
-    await apiPost('/api/request', { action: 'createRemove', targetId });
-    await refreshAll();
-    closeModal();
-    showToast('삭제 요청이 접수되었습니다. 관리자 승인을 기다려주세요.');
-  } catch (e) { err.textContent = e.message; }
-}
-
-async function handleRequestAction(reqId, action) {
-  try {
-    await apiPost('/api/request', { action, id: reqId });
-    await refreshAll();
-    showToast(action === 'approve' ? '요청을 승인했습니다.' : '요청을 거절했습니다.');
-  } catch (e) { showToast(e.message); }
-}
-
-/* ---------- 관리자 ---------- */
-
-function showAdminLoginModal() {
-  openModal(`
-    <button class="modal-x" onclick="closeModal()">✕</button>
-    <h3>관리자 로그인 · ADMIN LOGIN</h3>
-    <label>관리자 ID</label><input type="text" id="adminLoginId" autocomplete="username">
-    <label>비밀번호</label><input type="password" id="adminLoginPw" autocomplete="current-password">
-    <div class="modal-error" id="adminLoginErr"></div>
-    <button class="btn" id="adminLoginSubmit">로그인</button>
-    <div class="foot-note">로그인 상태는 12시간 유지되며, 페이지를 새로고침하면 다시 로그인해야 합니다.</div>`);
-  document.getElementById('adminLoginSubmit').addEventListener('click', doAdminLogin);
-  document.getElementById('adminLoginPw').addEventListener('keydown', e => {
-    if (e.key === 'Enter') doAdminLogin();
+    <h3>로그인</h3>
+    <label>ID</label><input type="text" id="loginId" autocomplete="username">
+    <label>비밀번호</label><input type="password" id="loginPw" autocomplete="current-password">
+    <div class="modal-error" id="loginErr"></div>
+    <button class="btn" id="loginSubmit">로그인</button>
+    <div class="foot-note">아이디는 대소문자를 가리지 않습니다 · 초기 비밀번호는 1234입니다.</div>`);
+  document.getElementById('loginSubmit').addEventListener('click', doLogin);
+  document.getElementById('loginPw').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doLogin();
   });
 }
 
-async function doAdminLogin() {
-  const id = document.getElementById('adminLoginId').value.trim();
-  const password = document.getElementById('adminLoginPw').value;
-  const err = document.getElementById('adminLoginErr');
+async function doLogin() {
+  const id = document.getElementById('loginId').value.trim();
+  const password = document.getElementById('loginPw').value;
+  const err = document.getElementById('loginErr');
+  err.textContent = '';
   try {
-    const d = await apiPost('/api/admin', { action: 'login', id, password });
+    const d = await apiPost('/api/account', { action: 'login', id, password });
     authToken = d.token;
-    currentAdmin = d.admin;
+    me = d.account;
     closeModal();
-    await refreshAll();
     renderAuthBar();
-    if (d.mustChangePassword) {
-      showToast(`${d.admin}님 로그인되었습니다. 비밀번호를 변경해주세요.`);
-      showChangePasswordModal(true);
-    } else {
-      showToast(`${d.admin}님 로그인되었습니다.`);
-    }
+    await refreshAll();
+    showToast(`${me.handle} 님, 반갑습니다.`);
   } catch (e) { err.textContent = e.message; }
 }
 
-async function doAdminLogout() {
-  try { await apiPost('/api/admin', { action: 'logout' }); } catch { /* noop */ }
+async function doLogout() {
+  try { await apiPost('/api/account', { action: 'logout' }); } catch { /* noop */ }
   authToken = null;
-  currentAdmin = null;
-  admins = [];
+  me = null;
+  accounts = [];
+  acctLogs = [];
   renderAuthBar();
   renderAll();
   showToast('로그아웃되었습니다.');
 }
 
-function showChangePasswordModal(forced) {
+function showSignupModal() {
   openModal(`
-    ${forced ? '' : '<button class="modal-x" onclick="closeModal()">✕</button>'}
-    <h3>비밀번호 변경${forced ? ' · 최초 로그인' : ''}</h3>
-    ${forced ? '<div class="warn-box">⚠ 초기 비밀번호 상태입니다. 보안을 위해 변경 후 이용해주세요.</div>' : ''}
-    <label>기존 비밀번호</label><input type="password" id="cpOld">
-    <label>새 비밀번호 (8자 이상)</label><input type="password" id="cpNew1">
+    <button class="modal-x" onclick="closeModal()">✕</button>
+    <h3>회원가입</h3>
+    <label>ID *</label><input type="text" id="suId" maxlength="40" placeholder="예: SNC_NewName">
+    <label>CLAN *</label><input type="text" id="suClan" maxlength="20" placeholder="예: SNC">
+    <label>이메일 주소 *</label><input type="text" id="suEmail" maxlength="120" placeholder="예: name@example.com">
+    <div class="modal-error" id="suErr"></div>
+    <button class="btn" id="suSubmit">가입 신청</button>
+    <div class="foot-note">관리자가 승인하면 계정이 만들어집니다 · 초기 비밀번호는 1234입니다 ·
+      이메일은 비밀번호를 잊었을 때 본인 확인에 씁니다.</div>`);
+  document.getElementById('suSubmit').addEventListener('click', doSignup);
+}
+
+async function doSignup() {
+  const id = document.getElementById('suId').value.trim();
+  const clan = document.getElementById('suClan').value.trim();
+  const email = document.getElementById('suEmail').value.trim();
+  const err = document.getElementById('suErr');
+  err.textContent = '';
+  if (!id || !clan || !email) { err.textContent = '세 항목을 모두 입력해주세요.'; return; }
+  try {
+    await apiPost('/api/account', { action: 'signup', id, clan, email });
+    closeModal();
+    showToast('가입 신청을 보냈습니다. 관리자 승인을 기다려주세요.');
+    await refreshAll();
+  } catch (e) { err.textContent = e.message; }
+}
+
+function showFindPwModal() {
+  openModal(`
+    <button class="modal-x" onclick="closeModal()">✕</button>
+    <h3>비밀번호 찾기</h3>
+    <div class="foot-note" style="margin-top:0;">ID · CLAN · 이메일 주소가 모두 맞으면
+      새 비밀번호를 정할 수 있습니다.</div>
+    <label>ID</label><input type="text" id="fpId" maxlength="40">
+    <label>CLAN</label><input type="text" id="fpClan" maxlength="20">
+    <label>이메일 주소</label><input type="text" id="fpEmail" maxlength="120">
+    <label>새 비밀번호 (4자 이상)</label><input type="password" id="fpPw1">
+    <label>새 비밀번호 확인</label><input type="password" id="fpPw2">
+    <div class="modal-error" id="fpErr"></div>
+    <button class="btn" id="fpSubmit">비밀번호 재설정</button>`);
+  document.getElementById('fpSubmit').addEventListener('click', doFindPw);
+}
+
+async function doFindPw() {
+  const id = document.getElementById('fpId').value.trim();
+  const clan = document.getElementById('fpClan').value.trim();
+  const email = document.getElementById('fpEmail').value.trim();
+  const p1 = document.getElementById('fpPw1').value;
+  const p2 = document.getElementById('fpPw2').value;
+  const err = document.getElementById('fpErr');
+  err.textContent = '';
+  if (p1 !== p2) { err.textContent = '새 비밀번호가 서로 일치하지 않습니다.'; return; }
+  try {
+    await apiPost('/api/account', { action: 'resetPw', id, clan, email, password: p1 });
+    closeModal();
+    showToast('비밀번호를 바꿨습니다. 새 비밀번호로 로그인해주세요.');
+  } catch (e) { err.textContent = e.message; }
+}
+
+function showChangePasswordModal() {
+  openModal(`
+    <button class="modal-x" onclick="closeModal()">✕</button>
+    <h3>비밀번호 변경</h3>
+    <label>새 비밀번호 (4자 이상)</label><input type="password" id="cpNew1">
     <label>새 비밀번호 확인</label><input type="password" id="cpNew2">
     <div class="modal-error" id="cpErr"></div>
-    <button class="btn" id="cpSubmit">변경하기</button>`, forced);
-  document.getElementById('cpSubmit').addEventListener('click', () => doChangePassword(forced));
+    <button class="btn" id="cpSubmit">변경하기</button>`);
+  document.getElementById('cpSubmit').addEventListener('click', doChangePassword);
 }
 
 async function doChangePassword() {
-  const oldPassword = document.getElementById('cpOld').value;
   const n1 = document.getElementById('cpNew1').value;
   const n2 = document.getElementById('cpNew2').value;
   const err = document.getElementById('cpErr');
   if (n1 !== n2) { err.textContent = '새 비밀번호가 서로 일치하지 않습니다.'; return; }
   try {
-    await apiPost('/api/admin', { action: 'changePassword', oldPassword, newPassword: n1 });
-    document.getElementById('modalOverlay').classList.remove('force');
+    await apiPost('/api/account', { action: 'changePw', password: n1 });
     closeModal();
-    await loadAdmins();
-    renderAdminList();
     showToast('비밀번호가 변경되었습니다.');
   } catch (e) { err.textContent = e.message; }
 }
 
-async function addAdmin() {
-  const input = document.getElementById('newAdminId');
-  const id = input.value.trim();
-  if (!id) { showToast('ID를 입력해주세요.'); return; }
-  try {
-    const d = await apiPost('/api/admin', { action: 'add', id });
-    input.value = '';
-    await loadAdmins();
-    renderAdminList();
-    alert(`${id} 관리자가 추가되었습니다.\n\n초기 비밀번호 : ${d.tempPassword}\n\n이 창을 닫으면 다시 볼 수 없으니 본인에게 전달해주세요.`);
-  } catch (e) { showToast(e.message); }
+/* ---------- 계정 권한 · 로그 ---------- */
+
+function renderRoleTable() {
+  const tbody = document.querySelector('#roleTable tbody');
+  const note = document.getElementById('roleNote');
+  if (!tbody || !note) return;
+
+  note.innerHTML = isMaster()
+    ? '권한을 바꾸면 바로 적용됩니다 · <b>관리자·마스터 권한은 마스터만 줄 수 있습니다.</b>'
+    : '권한 변경은 마스터만 할 수 있습니다 · 목록만 보여집니다.';
+
+  const search = document.getElementById('roleSearch');
+  const query = search ? search.value.trim().toLowerCase() : '';
+  const list = accounts.filter(a =>
+    !query || a.handle.toLowerCase().includes(query) || (a.clan || '').toLowerCase().includes(query));
+
+  tbody.innerHTML = list.map(a => `<tr>
+    <td>${esc(a.handle)}</td>
+    <td class="clan-tag">${esc(a.clan || '-')}</td>
+    <td class="acct-email">${esc(a.email || '-')}</td>
+    <td>${isMaster()
+      ? `<select class="role-select" data-role="${esc(a.handle)}">${
+          Object.keys(ROLE_LABEL).map(r =>
+            `<option value="${r}"${r === a.role ? ' selected' : ''}>${ROLE_LABEL[r]}</option>`).join('')
+        }</select>`
+      : `<span class="role-tag ${esc(a.role)}">${esc(ROLE_LABEL[a.role] || '일반')}</span>`}</td>
+  </tr>`).join('') || '<tr><td colspan="4" class="log-empty">계정이 없습니다.</td></tr>';
 }
 
-async function removeAdmin(id) {
-  if (!confirm(`${id} 관리자를 삭제하시겠습니까?`)) return;
+const ACCT_ACTION_LABEL = {
+  approve_add: '가입 승인',
+  approve_remove: '삭제 승인',
+  remove_player: '계정 삭제',
+  reject_request: '요청 거절',
+  set_role: '권한 변경',
+};
+
+function renderAcctLogs() {
+  const tbody = document.querySelector('#acctLogTable tbody');
+  const empty = document.getElementById('acctLogEmpty');
+  if (!tbody || !empty) return;
+
+  empty.style.display = acctLogs.length ? 'none' : 'block';
+  tbody.innerHTML = acctLogs.map(l => {
+    const d = l.detail || {};
+    const target = d.handle || d.target || '-';
+    const extra = l.action === 'set_role' && d.from
+      ? ` (${ROLE_LABEL[d.from] || d.from} → ${ROLE_LABEL[d.to] || d.to})` : '';
+    return `<tr>
+      <td class="h-inline" data-l="일시">${formatDateTime(l.ts)}</td>
+      <td class="h-inline" data-l="내용">${esc(ACCT_ACTION_LABEL[l.action] || l.action)}</td>
+      <td class="h-inline" data-l="대상">${esc(target)}${esc(extra)}</td>
+      <td class="h-by-cell" data-l="처리자">${esc(l.by || '-')}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function setRole(handle, role) {
   try {
-    await apiPost('/api/admin', { action: 'remove', id });
-    if (currentAdmin === id) { authToken = null; currentAdmin = null; renderAuthBar(); }
-    await loadAdmins();
-    renderAdminList();
-    showToast('관리자가 삭제되었습니다.');
-  } catch (e) { showToast(e.message); }
+    await apiPost('/api/account', { action: 'setRole', handle, role });
+    await loadAccounts();
+    renderRoleTable();
+    renderAcctLogs();
+    // 내 권한을 스스로 내렸다면 화면도 따라가야 한다
+    if (me && me.handle === handle) { me = { ...me, role }; renderAuthBar(); }
+    showToast(`${handle} → ${ROLE_LABEL[role]}`);
+  } catch (e) {
+    showToast(e.message);
+    renderRoleTable();
+  }
+}
+
+function initAccountEvents() {
+  const search = document.getElementById('roleSearch');
+  if (search) search.addEventListener('input', renderRoleTable);
+
+  const table = document.getElementById('roleTable');
+  if (table) table.addEventListener('change', (e) => {
+    const sel = e.target.closest('[data-role]');
+    if (sel) setRole(sel.dataset.role, sel.value);
+  });
 }
 
 /* ---------- 경기 기록 ---------- */
@@ -1611,8 +1673,10 @@ function initAdminEvents() {
     if (d.medit) showMemberEditModal(d.medit);
   });
 
-  document.getElementById('adminLockedLoginBtn').addEventListener('click', showAdminLoginModal);
-  document.getElementById('addAdminBtn').addEventListener('click', addAdmin);
+  const lockedBtn = document.getElementById('adminLockedLoginBtn');
+  if (lockedBtn) lockedBtn.addEventListener('click', showLoginModal);
+  const reportBtn = document.getElementById('reportLoginBtn');
+  if (reportBtn) reportBtn.addEventListener('click', showLoginModal);
   document.getElementById('historyRefreshBtn').addEventListener('click', async () => {
     await refreshAll();
     showToast('최신 기록을 불러왔습니다.');
@@ -1648,7 +1712,7 @@ async function refreshAll() {
   await loadAttendance();
   await loadTournament();
   await loadPosts();
-  await loadAdmins();
+  await loadAccounts();
   renderAll();
 }
 
@@ -1662,6 +1726,7 @@ async function boot() {
   initTabs();
   initStandingEvents();
   initAdminEvents();
+  initAccountEvents();
   initTournamentEvents();
   initBoardEvents();
   initScheduleEvents();
