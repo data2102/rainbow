@@ -17,7 +17,6 @@ const seasonCache = {};     // 지난 달 상세 (id -> {players, matches})
 let playSlots = [];         // 고를 수 있는 시간대
 let playSchedule = [];      // [{handle, slot}] 오늘의 접속 예상 시간
 let playToday = null;       // 그 예정이 어느 날짜 것인지
-let meSchedule = null;      // 접속 예상 시간에서 고른 내 아이디
 let openCommentForm = null; // 댓글 입력창이 열린 글 id
 
 /* 대회 참가 팀. api/tournament.js 의 TEAMS 와 id 가 일치해야 합니다. */
@@ -486,19 +485,25 @@ function renderSlotSummary() {
   }).join('');
 }
 
-/** 내가 고른 아이디의 시간대만 한 줄로 보여준다 */
+/** 로그인한 계정의 시간대를 체크하는 줄 */
 function renderSlotMine() {
   const el = document.getElementById('slotMine');
   if (!el) return;
 
-  if (!meSchedule) {
-    el.innerHTML = '<span class="mine-none">아이디를 고르면 시간대를 체크할 수 있습니다.</span>';
+  if (!isLoggedIn()) {
+    el.innerHTML = `<span class="mine-k">내 시간대</span>
+      <span class="mine-right">
+        <span class="mine-none">로그인하면 참여 가능한 시간대를 체크할 수 있습니다.</span>
+        <button type="button" class="auth-btn" data-slot-login>로그인</button>
+      </span>`;
     return;
   }
-  const on = scheduleMap().get(meSchedule) || new Set();
-  el.innerHTML = `<span class="slot-chips">${playSlots.map(slot =>
-    `<button type="button" class="slot-chip${on.has(slot) ? ' on' : ''}"
-      data-slot="${slot}" aria-pressed="${on.has(slot)}">${slot}</button>`).join('')}</span>`;
+  const on = scheduleMap().get(me.handle) || new Set();
+  el.innerHTML = `<span class="mine-k">내 시간대</span>
+    <span class="mine-id">${esc(me.handle)}</span>
+    <span class="mine-right"><span class="slot-chips">${playSlots.map(slot =>
+      `<button type="button" class="slot-chip${on.has(slot) ? ' on' : ''}"
+        data-slot="${slot}" aria-pressed="${on.has(slot)}">${slot}</button>`).join('')}</span></span>`;
 }
 
 function renderSchedule() {
@@ -514,10 +519,11 @@ function renderSchedule() {
   renderSlotMine();
 }
 
-/** 칩 하나를 눌러 그 시간대를 켜고 끈다 */
-async function toggleSlot(handle, slot) {
-  const map = scheduleMap();
-  const on = new Set(map.get(handle) || []);
+/** 칩 하나를 눌러 내 그 시간대를 켜고 끈다 (대상은 언제나 로그인한 계정) */
+async function toggleSlot(slot) {
+  if (!isLoggedIn()) return;
+  const handle = me.handle;
+  const on = new Set(scheduleMap().get(handle) || []);
   if (on.has(slot)) on.delete(slot); else on.add(slot);
   const next = [...on];
 
@@ -528,7 +534,8 @@ async function toggleSlot(handle, slot) {
   renderSchedule();
 
   try {
-    await apiPost('/api/attendance', { action: 'schedule', handle, slots: next });
+    // 누구의 시간대인지는 서버가 세션을 보고 정한다
+    await apiPost('/api/attendance', { action: 'schedule', slots: next });
   } catch (e) {
     playSchedule = before;
     renderSchedule();
@@ -537,15 +544,11 @@ async function toggleSlot(handle, slot) {
 }
 
 function initScheduleEvents() {
-  loadMe();
-
-  const sel = document.getElementById('meSchedule');
-  if (sel) sel.addEventListener('change', () => setMe(sel.value));
-
   const el = document.getElementById('slotMine');
   if (el) el.addEventListener('click', (e) => {
+    if (e.target.closest('[data-slot-login]')) { showLoginModal(); return; }
     const btn = e.target.closest('[data-slot]');
-    if (btn && meSchedule) toggleSlot(meSchedule, Number(btn.dataset.slot));
+    if (btn) toggleSlot(Number(btn.dataset.slot));
   });
 
   // 07시를 넘겨 페이지를 켜둔 채로 두면 하루가 바뀐 것을 알아채고 다시 받아온다
@@ -560,40 +563,7 @@ function initScheduleEvents() {
   }, 60000);
 }
 
-/* ---------- 내 아이디 ---------- */
-
-/* 접속 예상 시간에서 쓰는 "나". 한 번 고르면 이 브라우저에 남는다. */
-const ME_KEY = 'r6-me-schedule';
-const ME_LEGACY_KEY = 'r6-me';   // 페이지 전체에서 하나로 쓰던 시절의 값
-
-function loadMe() {
-  try {
-    meSchedule = localStorage.getItem(ME_KEY) || localStorage.getItem(ME_LEGACY_KEY) || null;
-  } catch { meSchedule = null; }
-}
-
-/** 선택 상자를 명단으로 채운다. 명단에서 빠진 아이디가 남아 있으면 놓아준다. */
-function renderMePicker() {
-  const sel = document.getElementById('meSchedule');
-  if (!sel) return;
-  if (meSchedule && !players.some(p => p.handle === meSchedule)) meSchedule = null;
-
-  sel.innerHTML = '<option value="">아이디 선택</option>'
-    + players.map(p => `<option value="${esc(p.handle)}">${esc(p.handle)}</option>`).join('');
-  sel.value = meSchedule || '';
-}
-
-function setMe(handle) {
-  meSchedule = handle || null;
-  try {
-    if (meSchedule) localStorage.setItem(ME_KEY, meSchedule);
-    else localStorage.removeItem(ME_KEY);
-  } catch { /* 사생활 보호 모드 등 */ }
-  renderSlotMine();
-}
-
 function renderAttendance() {
-  renderMePicker();
   renderSchedule();
 }
 

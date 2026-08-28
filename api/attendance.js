@@ -108,10 +108,11 @@ export default async function handler(req, res) {
       return await punch(res, action, handle, season);
     }
     if (action === 'schedule') {
-      // 로그인한 사람만 체크할 수 있다
+      // 로그인한 사람이 자기 시간대만 고친다.
+      // 대상은 세션에서 가져온다. 화면이 보내온 아이디는 쓰지 않는다.
       const me = await requireUser(req, res);
       if (!me) return;
-      return await setSchedule(res, handle, body(req).slots);
+      return await setSchedule(res, me, body(req).slots);
     }
     if (action === 'remove') return await remove(req, res, id);
     return res.status(400).json({ error: '알 수 없는 요청입니다.' });
@@ -154,11 +155,8 @@ async function punch(res, action, handle, season) {
   res.status(200).json({ ok: true, log: out });
 }
 
-/** 접속 예상 시간대를 통째로 다시 저장한다 */
+/** 로그인한 사람의 접속 예상 시간대를 통째로 다시 저장한다 */
 async function setSchedule(res, handle, slots) {
-  if (!handle || typeof handle !== 'string') {
-    return res.status(400).json({ error: '아이디를 선택해주세요.' });
-  }
   const picked = Array.isArray(slots)
     ? [...new Set(slots.map(Number))].filter(n => SLOTS.includes(n))
     : [];
