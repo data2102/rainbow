@@ -1689,12 +1689,17 @@ const GAME_PROTOCOL = 'r6clan://';
  */
 async function launchGame(address, mode) {
   if (address) await copyText(address);
-  window.location.href = GAME_PROTOCOL + (mode === 'create' ? 'create' : 'join');
+  // 참가자에게는 방장 주소를 함께 넘긴다. 여러 방이 동시에 열려 있으면
+  // 목록만 보고는 어느 방인지 가릴 수 없어, 주소로 곧장 붙어야 한다.
+  const url = mode === 'create'
+    ? GAME_PROTOCOL + 'create'
+    : GAME_PROTOCOL + 'join' + (address ? '/' + address : '');
+  window.location.href = url;
   showToast(mode === 'create'
     ? '게임 실행 · CREATE GAME 으로 방을 만들어주세요.'
     : (address
-      ? `게임 실행 · JOIN GAME 목록에서 찾으세요 (주소 ${address} 도 복사됨)`
-      : '게임 실행 · JOIN GAME 목록에서 방장을 찾아 들어가세요.'));
+      ? `게임 실행 · MANUAL JOIN 에 ${address} (복사해뒀습니다)`
+      : '게임 실행 · 방장 주소가 없습니다. JOIN GAME 목록에서 방 번호를 보고 고르세요.'));
 }
 
 /** 클립보드. 막혀 있으면 옛 방식으로 한 번 더 시도한다. */
@@ -1813,8 +1818,55 @@ function maybePlayRoomCountdown() {
   playCountdown(r.startedAt, () => launchGame(r.address, 'join'));
 }
 
+/** 내 Radmin 주소 — 로그인한 사람에게만 보인다 */
+function renderMyIp() {
+  const bar = document.getElementById('myIpBar');
+  const val = document.getElementById('myIpValue');
+  const btn = document.getElementById('myIpEdit');
+  if (!bar || !val || !btn) return;
+  bar.style.display = isLoggedIn() ? 'flex' : 'none';
+  val.textContent = savedAddress || '아직 없음';
+  btn.textContent = savedAddress ? '수정' : '적기';
+}
+
+function showIpModal() {
+  openModal(`
+    <button class="modal-x" onclick="closeModal()">✕</button>
+    <h3>내 Radmin 주소</h3>
+    <div class="foot-note" style="margin-top:0;">Radmin VPN 창에서 내 이름 옆에 있는
+      <b>26.으로 시작하는 주소</b>를 적어주세요. 한 번만 적어두면 됩니다.</div>
+    <label>내 주소</label>
+    <input type="text" id="ipValue" maxlength="21" autocomplete="off"
+           placeholder="예: 26.131.188.239" value="${esc(savedAddress || '')}">
+    <div class="modal-error" id="ipErr"></div>
+    <button class="btn" id="ipSubmit">저장</button>
+    <div class="foot-note">방장이 되면 사람들이 이 주소로 찾아 들어옵니다.
+      컴퓨터를 바꾸지 않는 한 주소는 그대로입니다.</div>`);
+  const go = () => saveMyIp();
+  document.getElementById('ipSubmit').addEventListener('click', go);
+  document.getElementById('ipValue').addEventListener('keydown', e => {
+    if (e.key === 'Enter') go();
+  });
+}
+
+async function saveMyIp() {
+  const input = document.getElementById('ipValue');
+  const err = document.getElementById('ipErr');
+  if (err) err.textContent = '';
+  try {
+    const d = await apiPost('/api/room', { action: 'setIp', address: input.value.trim() });
+    savedAddress = d.address || null;
+    closeModal();
+    renderMyIp();
+    showToast(savedAddress ? `내 주소를 ${savedAddress} 로 저장했습니다.` : '내 주소를 지웠습니다.');
+  } catch (e) {
+    if (err) err.textContent = e.message;
+  }
+}
+
 function renderLauncher() {
   renderVpnBar();
+  renderMyIp();
   const gate = document.getElementById('lcGate');
   const grid = document.getElementById('lcRooms');
   const view = document.getElementById('lcRoom');
@@ -1901,18 +1953,19 @@ function renderRoomView(r) {
            <li><kbd>CREATE GAME</kbd></li>
            <li>맵과 인원을 정하고 사람들이 다 들어오면 <kbd>START MISSION</kbd></li>
          </ol>
-         <div class="steps-alt">내 서버가 사람들 <kbd>JOIN GAME</kbd> 목록에 떠야 합니다 —
-           MULTIPLAYER OPTIONS 의 <b>ANNOUNCE SERVER</b> 체크를 확인하세요.</div>`
-      : `<div class="room-steps-h">게임이 켜지면 — 방장에게 들어가기</div>
+         <div class="steps-alt">여러 방이 함께 열리므로 <b>SERVER NAME 에 방 번호를</b>
+           넣어두세요 (예: <code>${r.room}번방 ${esc(r.host || '')}</code>).
+           목록에 그 이름이 뜹니다.</div>`
+      : `<div class="room-steps-h">게임이 켜지면 — ${esc(r.host || '방장')} 님 방으로</div>
          <ol>
            <li><kbd>MULTIPLAYER</kbd></li>
-           <li><kbd>JOIN GAME</kbd></li>
-           <li>목록에 뜬 방장의 서버를 <b>더블클릭</b></li>
+           <li><kbd>MANUAL JOIN</kbd></li>
+           <li>${r.address
+             ? `<b>${esc(r.address)}</b> 를 넣고 접속 (조인하기를 누르면 복사됩니다)`
+             : '방장의 Radmin 주소를 넣고 접속'}</li>
          </ol>
-         <div class="steps-alt">목록에 안 뜨면 — <kbd>MANUAL JOIN</kbd> 에
-           ${r.address
-             ? `<b>${esc(r.address)}</b> 를 넣으세요 (조인하기를 누르면 복사됩니다)`
-             : '방장의 Radmin 주소를 넣으세요'}</div>`;
+         <div class="steps-alt"><kbd>JOIN GAME</kbd> 목록으로 들어가도 되지만,
+           <b>다른 방도 함께 뜹니다</b> — 방 번호를 보고 골라주세요.</div>`;
   }
 
   const actions = document.getElementById('roomActions');
@@ -1926,7 +1979,7 @@ function renderRoomView(r) {
       const el = document.getElementById(id);
       if (el) el.addEventListener('click', fn);
     };
-    on('roomStart', showStartModal);
+    on('roomStart', startFlow);
     on('roomJoin', () => launchGame(r.address, 'join'));
     on('roomLeave', leaveRoom);
   }
@@ -1937,9 +1990,19 @@ function renderRoomView(r) {
       ? 'Radmin VPN 에서 게임을 열고, 실행하기에 내 Radmin 주소(26.…)를 적어주세요.'
         + ' 방에 있는 모두가 함께 카운트다운을 보고 게임이 켜집니다.'
       : (r.running
-        ? '게임이 켜졌으면 JOIN GAME 목록에서 방장을 찾아 들어가세요 · 게임이 안 켜졌다면 조인하기.'
+        ? '게임이 켜졌으면 MANUAL JOIN 에 위 주소를 넣어 들어가세요 · 안 켜졌다면 조인하기.'
         : '방장이 실행하기를 누르면 다 같이 카운트다운이 돌고 게임이 켜집니다.');
   }
+}
+
+/**
+ * 실행하기.
+ * 내 주소를 이미 적어두었으면 묻지 않고 바로 간다.
+ * 아직 없으면 그때 한 번 받는다 — 사람들이 찾아올 주소이므로 꼭 있어야 한다.
+ */
+function startFlow() {
+  if (savedAddress) { startRoom(savedAddress); return; }
+  showStartModal();
 }
 
 /** 방장이 자기 Radmin 주소를 적는 창 */
@@ -1948,15 +2011,15 @@ function showStartModal() {
   openModal(`
     <button class="modal-x" onclick="closeModal()">✕</button>
     <h3>게임 실행</h3>
-    <div class="foot-note" style="margin-top:0;">바로 실행해도 됩니다 —
-      대개는 방장의 방이 사람들 <b>JOIN GAME</b> 목록에 떠서 주소가 필요 없습니다.
-      목록이 안 뜨는 사람을 위해 적어두면 뒷길이 됩니다.</div>
-    <label>내 Radmin 주소 (선택)</label>
+    <div class="foot-note" style="margin-top:0;">Radmin VPN 창에 보이는
+      <b>내 주소</b>를 적어주세요. 방이 여러 개 열려 있으면 목록만 보고는
+      어느 방인지 가릴 수 없어, 사람들이 이 주소로 곧장 찾아 들어갑니다.</div>
+    <label>내 Radmin 주소</label>
     <input type="text" id="startAddr" maxlength="21" autocomplete="off"
            placeholder="예: 26.131.188.239" value="${esc((here && here.address) || savedAddress || '')}">
     <div class="modal-error" id="startErr"></div>
     <button class="btn" id="startSubmit">실행하기</button>
-    <div class="foot-note">한 번 적어두면 다음부터 자동으로 채워집니다 · 비워두고 실행해도 됩니다.</div>`);
+    <div class="foot-note">한 번 적어두면 다음부터 자동으로 채워집니다.</div>`);
   const go = () => startRoom();
   document.getElementById('startSubmit').addEventListener('click', go);
   document.getElementById('startAddr').addEventListener('keydown', e => {
@@ -2005,14 +2068,21 @@ async function leaveRoom() {
   } catch (e) { showToast(e.message); }
 }
 
-async function startRoom() {
+async function startRoom(known) {
   const input = document.getElementById('startAddr');
   const err = document.getElementById('startErr');
-  const address = input ? input.value.trim() : '';
+  const address = known !== undefined ? known : (input ? input.value.trim() : '');
   if (err) err.textContent = '';
+  if (!address && !confirm(
+    '주소를 적지 않으면 사람들이 자동으로 들어오지 못합니다.\n\n'
+    + '여러 방이 함께 열려 있을 때 JOIN GAME 목록만으로는 어느 방인지 가릴 수 없어,\n'
+    + '각자 목록에서 방 번호를 보고 직접 골라야 합니다.\n\n그래도 실행할까요?')) {
+    return;
+  }
   try {
     const d = await apiPost('/api/room', { action: 'start', address });
     closeModal();
+    savedAddress = address || savedAddress;
     await loadRooms();
     renderLauncher();
     // 5·4·3·2·1 을 세고 게임을 띄운다. 방에 있는 사람들도 같은 시각에 맞춰 함께 센다.
@@ -2048,6 +2118,9 @@ function initLauncherEvents() {
 
   const login = document.getElementById('lcLoginBtn');
   if (login) login.addEventListener('click', showLoginModal);
+
+  const ipEdit = document.getElementById('myIpEdit');
+  if (ipEdit) ipEdit.addEventListener('click', showIpModal);
 
   const copy = document.getElementById('addrCopy');
   if (copy) copy.addEventListener('click', async () => {

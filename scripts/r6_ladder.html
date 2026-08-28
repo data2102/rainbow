@@ -1605,6 +1605,13 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
         <span class="vpn-note">이 네트워크에 먼저 들어와 있어야 게임이 서로를 봅니다.</span>
       </div>
 
+      <div class="vpn-bar" id="myIpBar" style="display:none;">
+        <span class="vpn-k">내 Radmin 주소</span>
+        <code class="vpn-v" id="myIpValue"></code>
+        <button type="button" class="btn-mini btn-edit" id="myIpEdit">수정</button>
+        <span class="vpn-note">한 번만 적어두면 됩니다 · 방장이 되면 사람들이 이 주소로 찾아옵니다.</span>
+      </div>
+
       <details class="setup">
         <summary>처음 한 번만 — 게임 실행 등록하기</summary>
         <div class="setup-body">
@@ -1644,8 +1651,13 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
           </ol>
           <p>마우스 좌표가 아니라 <b>키보드로만</b> 움직입니다 —
              메인 메뉴에서 <kbd>↓</kbd> <kbd>Enter</kbd>, 서버 화면에서
-             방장은 <kbd>Enter</kbd>, 참가자는 <kbd>↑</kbd> <kbd>Enter</kbd>.
+             방장은 <kbd>Enter</kbd>(CREATE GAME), 참가자는 <kbd>↓</kbd> <kbd>Enter</kbd>
+             (MANUAL JOIN) 뒤 방장 주소를 적습니다.
              그래서 <b>해상도가 640×480 이든 1920×1080 이든 똑같이 동작합니다.</b></p>
+          <p>참가자가 목록(JOIN GAME)이 아니라 주소로 들어가는 이유는,
+             <b>여러 방이 동시에 열리면 목록에 방이 여러 개 뜨기 때문</b>입니다.
+             스크립트는 목록을 읽을 수 없어 엉뚱한 방에 들어갑니다.
+             주소로 곧장 붙으면 그럴 일이 없습니다.</p>
           <p class="setup-warn">컴퓨터마다 게임이 뜨는 속도가 달라서, 오프닝이 길면 키가 허공에
              나갈 수 있습니다. 그때는 <code>r6launch.ahk</code> 를 메모장으로 열어 위쪽의
              <b>WaitMenu</b> 값을 늘려보세요(기본 12초). <b>Debug</b> 를 <code>true</code> 로

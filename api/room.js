@@ -197,6 +197,7 @@ export default async function handler(req, res) {
       case 'leave': return await leave(req, res);
       case 'say':   return await say(req, res);
       case 'start': return await start(req, res);
+      case 'setIp': return await setIp(req, res);
       default:      return res.status(400).json({ error: '알 수 없는 요청입니다.' });
     }
   } catch (e) {
@@ -289,6 +290,15 @@ async function say(req, res) {
     [room, KEEP_MSG]
   );
   res.status(200).json({ ok: true });
+}
+
+/** 내 Radmin 주소를 계정에 적어둔다. 방장이 되면 이 주소로 사람들이 찾아온다. */
+async function setIp(req, res) {
+  const me = await requireUser(req, res);
+  if (!me) return;
+  const address = cleanAddress(body(req).address);
+  await q(`UPDATE players SET radmin_ip = $1 WHERE handle = $2`, [address, me]);
+  res.status(200).json({ ok: true, address });
 }
 
 /* ---------- 실행 ---------- */
