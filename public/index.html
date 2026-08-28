@@ -819,9 +819,15 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 ::-webkit-scrollbar-thumb{ background:var(--border-strong); border-radius:var(--radius-pill); }
 ::-webkit-scrollbar-track{ background:transparent; }
 
-/* ---------- 화면 밝기 전환 (우측 상단) ---------- */
+/* ---------- 우측 상단 (관리자 · 화면 밝기 전환) ---------- */
 .head-right{ display:flex; flex-direction:column; align-items:flex-end; gap:var(--sp-3); }
-.theme-btn{
+.head-top{ display:flex; gap:var(--sp-2); flex-wrap:wrap; justify-content:flex-end; }
+.admin-btn.active{
+  background:var(--accent); border-color:var(--accent);
+  color:var(--on-accent); font-weight:var(--fw-bold);
+}
+.admin-btn.active:hover{ color:var(--on-accent); }
+.theme-btn,.admin-btn{
   display:inline-flex; align-items:center; gap:var(--sp-2);
   background:var(--surface-sunken); color:var(--text-secondary);
   border:1px solid var(--border); border-radius:var(--radius-pill);
@@ -829,8 +835,8 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   font-size:var(--fs-footnote); font-weight:var(--fw-medium); cursor:pointer;
   transition:color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
 }
-.theme-btn:hover{ color:var(--text-primary); border-color:var(--border-strong); }
-.theme-btn:focus-visible{ outline:none; box-shadow:var(--shadow-focus); }
+.theme-btn:hover,.admin-btn:hover{ color:var(--text-primary); border-color:var(--border-strong); }
+.theme-btn:focus-visible,.admin-btn:focus-visible{ outline:none; box-shadow:var(--shadow-focus); }
 .theme-btn svg{ width:14px; height:14px; flex:none; }
 /* 버튼은 "지금 상태"가 아니라 "누르면 갈 곳"을 보여준다 */
 .theme-btn .to-dark{ display:inline-flex; align-items:center; gap:var(--sp-2); }
@@ -853,11 +859,14 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
       <div class="subline"><span class="live-dot"></span>RAINBOW SIX · 시즌 랭킹 · 실시간 반영</div>
     </div>
     <div class="head-right">
-      <button type="button" class="theme-btn" id="themeToggle"
-              aria-label="밝은 화면과 어두운 화면 전환">
-        <span class="to-dark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a7 7 0 1 0 10.5 10.5z"></path></svg>다크 모드</span>
-        <span class="to-light"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>화이트 모드</span>
-      </button>
+      <div class="head-top">
+        <button type="button" class="admin-btn" data-tab="admin">⑦ 관리자</button>
+        <button type="button" class="theme-btn" id="themeToggle"
+                aria-label="밝은 화면과 어두운 화면 전환">
+          <span class="to-dark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a7 7 0 1 0 10.5 10.5z"></path></svg>다크 모드</span>
+          <span class="to-light"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>화이트 모드</span>
+        </button>
+      </div>
       <div class="auth-bar" id="authBar"></div>
     </div>
   </header>
@@ -871,7 +880,6 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
     <button class="tab-btn" data-tab="attendance">④ 출석</button>
     <button class="tab-btn" data-tab="tournament">⑤ 대회</button>
     <button class="tab-btn" data-tab="board">⑥ 게시판</button>
-    <button class="tab-btn" data-tab="admin">⑦ 관리자</button>
   </nav>
 
   <!-- STANDING -->
@@ -3101,7 +3109,8 @@ async function handleImportFile(e) {
 function activateTab(name) {
   const panel = document.getElementById('tab-' + name);
   if (!panel) return;
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  // 탭 줄 밖에 있는 버튼(우측 상단 관리자)도 같이 표시를 맞춘다
+  document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   panel.classList.add('active');
 
@@ -3117,7 +3126,7 @@ function activateTab(name) {
 }
 
 function initTabs() {
-  document.querySelectorAll('.tab-btn').forEach(btn => {
+  document.querySelectorAll('[data-tab]').forEach(btn => {
     btn.addEventListener('click', () => activateTab(btn.dataset.tab));
   });
 

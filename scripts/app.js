@@ -1782,7 +1782,8 @@ async function handleImportFile(e) {
 function activateTab(name) {
   const panel = document.getElementById('tab-' + name);
   if (!panel) return;
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  // 탭 줄 밖에 있는 버튼(우측 상단 관리자)도 같이 표시를 맞춘다
+  document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   panel.classList.add('active');
 
@@ -1798,7 +1799,7 @@ function activateTab(name) {
 }
 
 function initTabs() {
-  document.querySelectorAll('.tab-btn').forEach(btn => {
+  document.querySelectorAll('[data-tab]').forEach(btn => {
     btn.addEventListener('click', () => activateTab(btn.dataset.tab));
   });
 
