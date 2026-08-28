@@ -637,6 +637,41 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .h-chip.l{ color:var(--danger-strong); background:var(--danger-bg); }
 .h-gain{ margin-left:var(--sp-1); opacity:.75; }
 
+/* 취소된 기록 — 지우지 않고 줄을 긋는다. 있었던 일은 남는다. */
+.history-table tr.h-void td{ opacity:.55; }
+.history-table tr.h-void .h-chip{ text-decoration:line-through; }
+.history-table tr.h-void .h-date,
+.history-table tr.h-void .h-time,
+.history-table tr.h-void .h-no-cell,
+.history-table tr.h-void td.h-size-cell{ text-decoration:line-through; }
+
+.history-table tr.h-why td{
+  padding-top:0; border-top:none;
+  font-size:var(--fs-footnote); color:var(--text-secondary);
+}
+.void-line{ display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-2); }
+.void-tag{
+  flex:none; padding:2px var(--sp-2); border-radius:var(--radius-sm);
+  background:var(--danger-bg); color:var(--danger-strong);
+  font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+}
+.void-why{ color:var(--text-primary); }
+.void-meta{ color:var(--text-tertiary); }
+.void-line .btn-mini{ margin-left:auto; flex:none; }
+
+@media (max-width:640px){
+  /* 기록과 취소 사유가 한 장의 카드로 보이도록 위아래를 붙인다 */
+  .history-table tbody tr.h-void{
+    margin-bottom:0; border-bottom:none;
+    border-bottom-left-radius:0; border-bottom-right-radius:0;
+  }
+  .history-table tbody tr.h-why{
+    border-top:none; padding-top:var(--sp-2);
+    border-top-left-radius:0; border-top-right-radius:0;
+  }
+  .void-line .btn-mini{ margin-left:0; }
+}
+
 @media (max-width:640px){
   .history-table thead{ display:none; }
   .history-table tbody tr{
@@ -1301,7 +1336,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
       <div class="panel hud-corner">
         <h2>계정 로그</h2>
         <div class="foot-note" style="margin-top:0;margin-bottom:12px;">
-          계정 추가 · 수정 · 삭제 · 가입 승인 · 권한 변경 기록입니다 · 최근 200건.
+          계정 추가 · 수정 · 삭제 · 가입 승인 · 권한 변경, 그리고 경기 기록 취소·되돌림 기록입니다 · 최근 200건.
         </div>
         <div class="table-wrap">
           <table id="acctLogTable" class="history-table">
@@ -1379,6 +1414,26 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
       </div>
       <div id="historyEmpty" class="log-empty">기록 없음</div>
     </div>
+
+      <div class="panel hud-corner" id="voidLogPanel" style="display:none;">
+        <h2>취소된 기록 · Voided</h2>
+        <div class="foot-note" style="margin-top:0;margin-bottom:10px;">중복 등록 등으로 취소한 기록입니다 ·
+          점수는 취소 즉시 되돌려집니다. 기록 자체는 지우지 않고 취소선으로 남겨둡니다.</div>
+        <div class="table-wrap">
+          <table id="voidLogTable" class="history-table">
+            <thead>
+              <tr>
+                <th class="h-when">취소일시</th>
+                <th class="h-no">기록</th>
+                <th>경기</th>
+                <th>사유</th>
+                <th class="h-by">처리자</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
 
       <div class="panel hud-corner">
         <h2>득점 규칙 · Rule</h2>
@@ -2249,15 +2304,147 @@ function renderHistory() {
     const loseChips = losers.map(h => `<span class="h-chip l">${esc(h)}</span>`).join('')
       || '<span class="h-chip l">-</span>';
 
-    return `<tr>
-      <td class="h-no-cell h-inline" data-l="기록">#${all.length - i}</td>
+    // 번호는 취소된 기록까지 세어 붙인다. 취소했다고 뒤 번호가 밀리면
+    // "#12 경기"라고 주고받은 말이 어긋난다.
+    const no = all.length - i;
+    const voided = !!m.voidedAt;
+    const canManage = isAdmin() && isLiveView() && m.id != null;
+
+    const cancelBtn = (canManage && !voided)
+      ? `<div><button class="btn-mini btn-void" data-void="${m.id}" data-do="void">기록 취소</button></div>`
+      : '';
+
+    const main = `<tr class="${voided ? 'h-void' : ''}">
+      <td class="h-no-cell h-inline" data-l="기록">#${no}</td>
       <td class="h-inline" data-l="일시"><div class="h-date">${date}</div><div class="h-time">${time}</div></td>
       <td class="h-size-cell h-inline" data-l="규모">${winners.length} : ${losers.length}</td>
       <td data-l="승리 · WIN">${winChips}</td>
       <td data-l="패배 · LOSE">${loseChips}</td>
-      <td class="h-by-cell" data-l="등록자">${esc(m.recordedBy || '-')}</td>
+      <td class="h-by-cell" data-l="등록자">${esc(m.recordedBy || '-')}${cancelBtn}</td>
+    </tr>`;
+
+    if (!voided) return main;
+
+    const restoreBtn = canManage
+      ? `<button class="btn-mini" data-void="${m.id}" data-do="restore">되돌리기</button>`
+      : '';
+    return main + `<tr class="h-why">
+      <td colspan="6">
+        <div class="void-line">
+          <span class="void-tag">취소됨</span>
+          <span class="void-why">${esc(m.voidReason || '사유 없음')}</span>
+          <span class="void-meta">${esc(m.voidedBy || '-')} · ${formatDateTime(m.voidedAt)}</span>
+          ${restoreBtn}
+        </div>
+      </td>
     </tr>`;
   }).join('');
+
+  renderVoidLog(all);
+}
+
+/** 취소된 기록만 따로 모아 보여준다. 없으면 판 자체를 감춘다. */
+function renderVoidLog(all) {
+  const panel = document.getElementById('voidLogPanel');
+  const tbody = document.querySelector('#voidLogTable tbody');
+  if (!panel || !tbody) return;
+
+  const rows = all
+    .map((m, i) => ({ m, no: all.length - i }))
+    .filter(x => x.m.voidedAt)
+    .sort((a, b) => b.m.voidedAt - a.m.voidedAt);
+
+  panel.style.display = rows.length ? '' : 'none';
+  if (!rows.length) { tbody.innerHTML = ''; return; }
+
+  tbody.innerHTML = rows.map(({ m, no }) => {
+    const w = (m.winners || []).map(x => x.handle).join(', ') || '-';
+    const l = (m.losers || []).join(', ') || '-';
+    return `<tr>
+      <td class="h-inline" data-l="취소일시">${formatDateTime(m.voidedAt)}</td>
+      <td class="h-no-cell h-inline" data-l="기록">#${no}</td>
+      <td data-l="경기"><span class="h-chip w">${esc(w)}</span><span class="h-chip l">${esc(l)}</span></td>
+      <td data-l="사유">${esc(m.voidReason || '-')}</td>
+      <td class="h-by-cell" data-l="처리자">${esc(m.voidedBy || '-')}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ---------- 기록 취소 ---------- */
+
+/**
+ * 취소는 지우는 것이 아니라 "없던 일로 세는 것"이다.
+ * 기록은 취소선을 달고 그대로 남고, 점수만 그 경기가 없었던 것처럼 다시 계산된다.
+ */
+function showVoidModal(id) {
+  const m = viewMatches().find(x => x.id === id);
+  if (!m) { showToast('기록을 찾지 못했습니다.'); return; }
+  const w = (m.winners || []).map(x => x.handle).join(', ');
+  const l = (m.losers || []).join(', ');
+
+  openModal(`
+    <h3>이 기록을 취소할까요?</h3>
+    <div class="foot-note" style="margin-top:0;">
+      ${esc(formatDateTime(m.ts))} · 등록자 ${esc(m.recordedBy || '-')}<br>
+      <b>승리</b> ${esc(w || '-')}<br>
+      <b>패배</b> ${esc(l || '-')}
+    </div>
+    <div class="foot-note">이 경기가 없었던 것으로 보고 <b>전 회원의 점수를 다시 계산</b>합니다 ·
+      기록은 지우지 않고 취소선으로 남습니다.</div>
+    <label>취소 사유 (필수)</label>
+    <input type="text" id="vdReason" maxlength="200" placeholder="예) 같은 경기를 두 번 등록">
+    <div class="modal-error" id="vdErr"></div>
+    <button class="btn" id="vdSubmit">취소 처리</button>`);
+
+  const go = () => doVoid(id);
+  document.getElementById('vdSubmit').addEventListener('click', go);
+  const input = document.getElementById('vdReason');
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+  input.focus();
+}
+
+async function doVoid(id) {
+  const err = document.getElementById('vdErr');
+  const btn = document.getElementById('vdSubmit');
+  const reason = document.getElementById('vdReason').value;
+  err.textContent = '';
+  if (!reason.trim()) { err.textContent = '취소 사유를 적어주세요.'; return; }
+  btn.disabled = true;
+  try {
+    await apiPost('/api/match', { action: 'void', id, reason });
+    closeModal();
+    await refreshAll();
+    showToast('기록을 취소했습니다. 점수를 다시 계산했습니다.');
+  } catch (e) {
+    err.textContent = e.message;
+    btn.disabled = false;
+  }
+}
+
+async function doRestore(id, btn) {
+  if (!confirm('취소를 되돌릴까요? 이 경기를 다시 점수에 넣습니다.')) return;
+  btn.disabled = true;
+  try {
+    await apiPost('/api/match', { action: 'restore', id });
+    await refreshAll();
+    showToast('취소를 되돌렸습니다.');
+  } catch (e) {
+    showToast(e.message);
+    btn.disabled = false;
+  }
+}
+
+/** 전체 기록 표의 취소 · 되돌리기 버튼 */
+function initHistoryEvents() {
+  const wrap = document.getElementById('historyTableWrap');
+  if (!wrap) return;
+  wrap.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-void]');
+    if (!btn) return;
+    const id = Number(btn.dataset.void);
+    if (btn.dataset.do === 'restore') doRestore(id, btn);
+    else showVoidModal(id);
+  });
 }
 
 function renderPending() {
@@ -3447,6 +3634,8 @@ const ACCT_ACTION_LABEL = {
   update_player: '계정 수정',
   remove_player: '계정 삭제',
   set_role: '권한 변경',
+  void_match: '기록 취소',
+  restore_match: '취소 되돌림',
 };
 
 function renderAcctLogs() {
@@ -3457,9 +3646,16 @@ function renderAcctLogs() {
   empty.style.display = acctLogs.length ? 'none' : 'block';
   tbody.innerHTML = acctLogs.map(l => {
     const d = l.detail || {};
-    const target = d.handle || d.to || d.target || '-';
+    let target = d.handle || d.to || d.target || '-';
     let extra = '';
-    if (l.action === 'set_role' && d.from) {
+    if (l.action === 'void_match' || l.action === 'restore_match') {
+      // 표에 붙는 #번호가 아니라 경기 일시로 가리킨다. 번호는 보는 달에 따라
+      // 달라지지만 일시는 어디서 봐도 같은 경기를 가리킨다.
+      target = d.ts ? formatDateTime(Number(d.ts)) + ' 경기' : '경기 기록';
+      const w = (d.winners || []).join(', ');
+      const lo = (d.losers || []).join(', ');
+      extra = ` (승 ${w || '-'} / 패 ${lo || '-'})` + (d.reason ? ` · ${d.reason}` : '');
+    } else if (l.action === 'set_role' && d.from) {
       extra = ` (${ROLE_LABEL[d.from] || d.from} → ${ROLE_LABEL[d.to] || d.to})`;
     } else if (l.action === 'update_player') {
       const parts = [];
@@ -4162,6 +4358,7 @@ async function boot() {
   initTabs();
   initStandingEvents();
   initAdminEvents();
+  initHistoryEvents();
   initAccountEvents();
   initTournamentEvents();
   initBoardEvents();

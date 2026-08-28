@@ -1,5 +1,5 @@
 import {
-  q, tx, body, methodGuard, requireAdmin, audit,
+  q, tx, body, methodGuard, requireAdmin, audit, ensureMatchVoid,
   normalizeMatch, parseHandle, hashPw, rowToPlayer, rowToMatch, rowToRequest,
 } from './_lib.js';
 import { syncSeason } from './_season.js';
@@ -10,6 +10,7 @@ export default async function handler(req, res) {
   if (!me) return;
 
   try {
+    await ensureMatchVoid();
     if (req.method === 'GET') return await exportAll(res);
     const { action } = body(req);
     if (action === 'import') return await importAll(req, res, me);
@@ -68,9 +69,11 @@ async function importAll(req, res, me) {
     for (const raw of (payload.matches || [])) {
       const m = normalizeMatch(raw);
       await c.query(
-        `INSERT INTO matches (winners, losers, ts, recorded_by, season) VALUES ($1,$2,$3,$4,$5)`,
+        `INSERT INTO matches (winners, losers, ts, recorded_by, season, voided_at, voided_by, void_reason)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
         [JSON.stringify(m.winners || []), JSON.stringify(m.losers || []),
-         m.ts || Date.now(), m.recordedBy || '이전 기록', m.season || null]
+         m.ts || Date.now(), m.recordedBy || '이전 기록', m.season || null,
+         m.voidedAt || null, m.voidedBy || null, m.voidReason || null]
       );
     }
 

@@ -237,10 +237,15 @@ async function setRole(req, res) {
 
 /* ---------- 계정 로그 ---------- */
 
-/** 계정을 만들고 · 고치고 · 지운 기록만 추려서 보여준다 */
+/**
+ * 계정을 만들고 · 고치고 · 지운 기록, 그리고 경기 기록을 취소한 기록.
+ * 취소는 남의 점수를 되돌리는 일이라 여기 함께 남긴다. 되돌리기까지 남아서
+ * 취소 → 되돌리기로 오간 흔적도 여기서만 온전히 보인다.
+ */
 const LOG_ACTIONS = [
   'approve_add', 'approve_remove', 'reject_request',
   'create_player', 'update_player', 'remove_player', 'set_role',
+  'void_match', 'restore_match',
 ];
 
 async function logs(req, res) {

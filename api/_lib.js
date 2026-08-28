@@ -235,7 +235,47 @@ export function rowToPlayer(r) {
 }
 
 export function rowToMatch(r) {
-  return { winners: r.winners, losers: r.losers, ts: Number(r.ts), recordedBy: r.recorded_by, season: r.season || null };
+  return {
+    id: r.id === undefined ? null : Number(r.id),
+    winners: r.winners,
+    losers: r.losers,
+    ts: Number(r.ts),
+    recordedBy: r.recorded_by,
+    season: r.season || null,
+    // 취소된 기록은 지우지 않고 남긴다. 화면에는 취소선으로 보인다.
+    voidedAt: r.voided_at == null ? null : Number(r.voided_at),
+    voidedBy: r.voided_by || null,
+    voidReason: r.void_reason || null,
+  };
+}
+
+/** 취소 사유 최대 길이 */
+export const MAX_REASON = 200;
+
+/**
+ * 취소 사유를 다듬는다. 사유 없이 남의 점수를 되돌릴 수는 없으므로 빈 값은 막는다.
+ */
+export function cleanReason(v) {
+  const s = String(v == null ? '' : v).trim().replace(/\s+/g, ' ');
+  if (!s) throw new Error('취소 사유를 적어주세요.');
+  if (s.length > MAX_REASON) throw new Error(`취소 사유는 ${MAX_REASON}자까지 쓸 수 있습니다.`);
+  return s;
+}
+
+/** 경기 취소 칸을 준비한다 (한 프로세스에 한 번) */
+let voidReady = false;
+export async function ensureMatchVoid() {
+  if (voidReady) return;
+  const has = await q(
+    `SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'matches' AND column_name = 'voided_at'`
+  );
+  if (!has.length) {
+    await q(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS voided_at BIGINT`);
+    await q(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS voided_by TEXT`);
+    await q(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS void_reason TEXT`);
+  }
+  voidReady = true;
 }
 
 export function rowToRequest(r) {

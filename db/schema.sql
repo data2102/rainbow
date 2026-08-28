@@ -27,7 +27,11 @@ CREATE TABLE IF NOT EXISTS matches (
   losers      JSONB NOT NULL,   -- ["handle", ...]
   ts          BIGINT NOT NULL,  -- epoch ms
   recorded_by TEXT,
-  season      TEXT              -- 속한 시즌 id. 시즌 제도 이전 기록은 NULL
+  season      TEXT,             -- 속한 시즌 id. 시즌 제도 이전 기록은 NULL
+  -- 중복 등록 등으로 취소된 기록. 지우지 않고 남겨 취소선으로 보여준다.
+  voided_at   BIGINT,           -- 취소 시각 (epoch ms). NULL 이면 살아있는 기록
+  voided_by   TEXT,             -- 취소한 사람
+  void_reason TEXT              -- 취소 사유
 );
 CREATE INDEX IF NOT EXISTS idx_matches_ts ON matches (ts DESC);
 CREATE INDEX IF NOT EXISTS idx_matches_season ON matches (season, ts DESC);

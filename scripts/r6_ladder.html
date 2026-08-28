@@ -637,6 +637,41 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .h-chip.l{ color:var(--danger-strong); background:var(--danger-bg); }
 .h-gain{ margin-left:var(--sp-1); opacity:.75; }
 
+/* 취소된 기록 — 지우지 않고 줄을 긋는다. 있었던 일은 남는다. */
+.history-table tr.h-void td{ opacity:.55; }
+.history-table tr.h-void .h-chip{ text-decoration:line-through; }
+.history-table tr.h-void .h-date,
+.history-table tr.h-void .h-time,
+.history-table tr.h-void .h-no-cell,
+.history-table tr.h-void td.h-size-cell{ text-decoration:line-through; }
+
+.history-table tr.h-why td{
+  padding-top:0; border-top:none;
+  font-size:var(--fs-footnote); color:var(--text-secondary);
+}
+.void-line{ display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-2); }
+.void-tag{
+  flex:none; padding:2px var(--sp-2); border-radius:var(--radius-sm);
+  background:var(--danger-bg); color:var(--danger-strong);
+  font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+}
+.void-why{ color:var(--text-primary); }
+.void-meta{ color:var(--text-tertiary); }
+.void-line .btn-mini{ margin-left:auto; flex:none; }
+
+@media (max-width:640px){
+  /* 기록과 취소 사유가 한 장의 카드로 보이도록 위아래를 붙인다 */
+  .history-table tbody tr.h-void{
+    margin-bottom:0; border-bottom:none;
+    border-bottom-left-radius:0; border-bottom-right-radius:0;
+  }
+  .history-table tbody tr.h-why{
+    border-top:none; padding-top:var(--sp-2);
+    border-top-left-radius:0; border-top-right-radius:0;
+  }
+  .void-line .btn-mini{ margin-left:0; }
+}
+
 @media (max-width:640px){
   .history-table thead{ display:none; }
   .history-table tbody tr{
@@ -1301,7 +1336,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
       <div class="panel hud-corner">
         <h2>계정 로그</h2>
         <div class="foot-note" style="margin-top:0;margin-bottom:12px;">
-          계정 추가 · 수정 · 삭제 · 가입 승인 · 권한 변경 기록입니다 · 최근 200건.
+          계정 추가 · 수정 · 삭제 · 가입 승인 · 권한 변경, 그리고 경기 기록 취소·되돌림 기록입니다 · 최근 200건.
         </div>
         <div class="table-wrap">
           <table id="acctLogTable" class="history-table">
@@ -1379,6 +1414,26 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
       </div>
       <div id="historyEmpty" class="log-empty">기록 없음</div>
     </div>
+
+      <div class="panel hud-corner" id="voidLogPanel" style="display:none;">
+        <h2>취소된 기록 · Voided</h2>
+        <div class="foot-note" style="margin-top:0;margin-bottom:10px;">중복 등록 등으로 취소한 기록입니다 ·
+          점수는 취소 즉시 되돌려집니다. 기록 자체는 지우지 않고 취소선으로 남겨둡니다.</div>
+        <div class="table-wrap">
+          <table id="voidLogTable" class="history-table">
+            <thead>
+              <tr>
+                <th class="h-when">취소일시</th>
+                <th class="h-no">기록</th>
+                <th>경기</th>
+                <th>사유</th>
+                <th class="h-by">처리자</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
 
       <div class="panel hud-corner">
         <h2>득점 규칙 · Rule</h2>
