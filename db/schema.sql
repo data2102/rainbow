@@ -124,12 +124,13 @@ CREATE TABLE IF NOT EXISTS tournament_matches (
 );
 CREATE INDEX IF NOT EXISTS idx_tmatches_ts ON tournament_matches (ts DESC);
 
--- 기능 개선 게시판. 누구나 글을 쓰고, 본인이 정한 4자리 비밀번호로
--- 수정·삭제한다. 관리자는 비밀번호 없이 삭제할 수 있다.
+-- 기능 개선 게시판. 로그인한 회원이 글을 쓰고, 글쓴이가 수정한다.
+-- 삭제는 글쓴이와 관리자가 할 수 있다.
+-- pw_hash 는 4자리 비밀번호로 글을 지키던 시절의 값이라 새 글에는 들어가지 않는다.
 CREATE TABLE IF NOT EXISTS posts (
   id         BIGSERIAL PRIMARY KEY,
   author     TEXT NOT NULL,
-  pw_hash    TEXT NOT NULL,
+  pw_hash    TEXT,
   body       TEXT NOT NULL,
   created_at BIGINT NOT NULL,
   updated_at BIGINT
@@ -141,7 +142,7 @@ CREATE TABLE IF NOT EXISTS post_comments (
   id         BIGSERIAL PRIMARY KEY,
   post_id    BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
   author     TEXT NOT NULL,
-  pw_hash    TEXT NOT NULL,
+  pw_hash    TEXT,
   body       TEXT NOT NULL,
   created_at BIGINT NOT NULL
 );

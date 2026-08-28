@@ -730,8 +730,18 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   border:1px solid var(--border); border-radius:var(--radius-md);
   background:var(--surface-sunken); padding:var(--sp-5); margin-bottom:var(--sp-5);
 }
-.post-form-row{ display:grid; grid-template-columns:2fr 1fr; gap:var(--sp-3); margin-bottom:var(--sp-3); }
-@media (max-width:520px){ .post-form-row{ grid-template-columns:1fr; } }
+.post-gate{
+  border:1px solid var(--border); border-radius:var(--radius-md);
+  background:var(--surface-sunken); padding:var(--sp-5); margin-bottom:var(--sp-5);
+  text-align:center; font-size:var(--fs-caption); color:var(--text-tertiary);
+}
+.post-gate .auth-btn{ margin-left:var(--sp-3); vertical-align:middle; }
+.post-me{
+  display:inline-block; margin-bottom:var(--sp-4);
+  font-size:var(--fs-caption); font-weight:var(--fw-medium);
+  color:var(--accent); background:var(--accent-bg);
+  padding:2px var(--sp-3); border-radius:var(--radius-pill);
+}
 
 .post-toolbar{
   display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3);
@@ -765,10 +775,8 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   font-family:inherit; font-size:var(--fs-caption); font-weight:var(--fw-medium); color:var(--accent);
 }
 .cmt-toggle:hover{ text-decoration:underline; }
-.cmt-form{ display:grid; grid-template-columns:1.4fr 1fr; gap:var(--sp-2); margin-top:var(--sp-3); }
-.cmt-form .cmt-text{ grid-column:1/-1; }
-.cmt-form .btn-mini{ grid-column:1/-1; justify-self:start; padding:var(--sp-2) var(--sp-5); }
-@media (max-width:520px){ .cmt-form{ grid-template-columns:1fr; } }
+.cmt-form{ display:grid; gap:var(--sp-2); margin-top:var(--sp-3); }
+.cmt-form .btn-mini{ justify-self:start; padding:var(--sp-2) var(--sp-5); }
 
 /* ---------- 토스트 / 모달 ---------- */
 .toast{
@@ -1273,20 +1281,17 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
       <h2>게시판 · 기능 개선</h2>
       <div class="foot-note" style="margin-top:0;margin-bottom:14px;">
         사이트에 넣었으면 하는 기능이나 고쳤으면 하는 점을 남겨주세요 ·
-        <b>비밀번호는 숫자 4자리</b>이며, 나중에 글을 수정하거나 지울 때 필요합니다.
+        글쓴이는 <b>로그인한 아이디</b>로 남고, 내가 쓴 글은 내가 수정·삭제할 수 있습니다.
       </div>
 
-      <div class="post-form">
-        <div class="post-form-row">
-          <div>
-            <label class="t-lab">ID *</label>
-            <input type="text" id="postAuthor" maxlength="20" autocomplete="off" placeholder="예: SNC_LeNa">
-          </div>
-          <div>
-            <label class="t-lab">비밀번호 * (숫자 4자리)</label>
-            <input type="password" id="postPw" maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="0000">
-          </div>
-        </div>
+      <div class="post-gate" id="postGate" style="display:none;">
+        로그인하면 글과 댓글을 남길 수 있습니다.
+        <button type="button" class="auth-btn" id="postLoginBtn">로그인</button>
+      </div>
+
+      <div class="post-form" id="postForm" style="display:none;">
+        <label class="t-lab">작성자</label>
+        <div class="post-me" id="postMe"></div>
         <label class="t-lab">내용 *</label>
         <textarea id="postBody" maxlength="1000" rows="4" placeholder="어떤 기능이 있었으면 좋겠는지 적어주세요."></textarea>
         <button class="btn" id="postSubmit">글 등록</button>

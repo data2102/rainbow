@@ -730,8 +730,18 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   border:1px solid var(--border); border-radius:var(--radius-md);
   background:var(--surface-sunken); padding:var(--sp-5); margin-bottom:var(--sp-5);
 }
-.post-form-row{ display:grid; grid-template-columns:2fr 1fr; gap:var(--sp-3); margin-bottom:var(--sp-3); }
-@media (max-width:520px){ .post-form-row{ grid-template-columns:1fr; } }
+.post-gate{
+  border:1px solid var(--border); border-radius:var(--radius-md);
+  background:var(--surface-sunken); padding:var(--sp-5); margin-bottom:var(--sp-5);
+  text-align:center; font-size:var(--fs-caption); color:var(--text-tertiary);
+}
+.post-gate .auth-btn{ margin-left:var(--sp-3); vertical-align:middle; }
+.post-me{
+  display:inline-block; margin-bottom:var(--sp-4);
+  font-size:var(--fs-caption); font-weight:var(--fw-medium);
+  color:var(--accent); background:var(--accent-bg);
+  padding:2px var(--sp-3); border-radius:var(--radius-pill);
+}
 
 .post-toolbar{
   display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3);
@@ -765,10 +775,8 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   font-family:inherit; font-size:var(--fs-caption); font-weight:var(--fw-medium); color:var(--accent);
 }
 .cmt-toggle:hover{ text-decoration:underline; }
-.cmt-form{ display:grid; grid-template-columns:1.4fr 1fr; gap:var(--sp-2); margin-top:var(--sp-3); }
-.cmt-form .cmt-text{ grid-column:1/-1; }
-.cmt-form .btn-mini{ grid-column:1/-1; justify-self:start; padding:var(--sp-2) var(--sp-5); }
-@media (max-width:520px){ .cmt-form{ grid-template-columns:1fr; } }
+.cmt-form{ display:grid; gap:var(--sp-2); margin-top:var(--sp-3); }
+.cmt-form .btn-mini{ justify-self:start; padding:var(--sp-2) var(--sp-5); }
 
 /* ---------- 토스트 / 모달 ---------- */
 .toast{
@@ -1273,20 +1281,17 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
       <h2>게시판 · 기능 개선</h2>
       <div class="foot-note" style="margin-top:0;margin-bottom:14px;">
         사이트에 넣었으면 하는 기능이나 고쳤으면 하는 점을 남겨주세요 ·
-        <b>비밀번호는 숫자 4자리</b>이며, 나중에 글을 수정하거나 지울 때 필요합니다.
+        글쓴이는 <b>로그인한 아이디</b>로 남고, 내가 쓴 글은 내가 수정·삭제할 수 있습니다.
       </div>
 
-      <div class="post-form">
-        <div class="post-form-row">
-          <div>
-            <label class="t-lab">ID *</label>
-            <input type="text" id="postAuthor" maxlength="20" autocomplete="off" placeholder="예: SNC_LeNa">
-          </div>
-          <div>
-            <label class="t-lab">비밀번호 * (숫자 4자리)</label>
-            <input type="password" id="postPw" maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="0000">
-          </div>
-        </div>
+      <div class="post-gate" id="postGate" style="display:none;">
+        로그인하면 글과 댓글을 남길 수 있습니다.
+        <button type="button" class="auth-btn" id="postLoginBtn">로그인</button>
+      </div>
+
+      <div class="post-form" id="postForm" style="display:none;">
+        <label class="t-lab">작성자</label>
+        <div class="post-me" id="postMe"></div>
         <label class="t-lab">내용 *</label>
         <textarea id="postBody" maxlength="1000" rows="4" placeholder="어떤 기능이 있었으면 좋겠는지 적어주세요."></textarea>
         <button class="btn" id="postSubmit">글 등록</button>
@@ -2208,6 +2213,12 @@ function initTournamentEvents() {
 
 /* ---------- 게시판 ---------- */
 
+/** 내가 쓴 글·댓글인가. 아이디는 로그인과 마찬가지로 대소문자를 가리지 않는다. */
+function isMine(row) {
+  return !!me && String(row.author).toLowerCase() === me.handle.toLowerCase();
+}
+
+
 function renderBoard() {
   const list = document.getElementById('postList');
   const count = document.getElementById('postCount');
@@ -2215,6 +2226,8 @@ function renderBoard() {
   if (!list || !count || !bar) return;
 
   bar.style.display = isAdmin() && posts.length ? 'flex' : 'none';
+  const meBox = document.getElementById('postMe');
+  if (meBox && me) meBox.textContent = me.handle;
   const checkAll = document.getElementById('postCheckAll');
   if (checkAll) checkAll.checked = false;
 
@@ -2233,8 +2246,8 @@ function renderBoard() {
         <span class="post-date">${formatDateTime(p.createdAt)}</span>
         ${p.updatedAt ? '<span class="post-edited">수정됨</span>' : ''}
         <span class="post-actions">
-          <button class="btn-mini btn-edit" data-edit="${p.id}">수정</button>
-          <button class="btn-mini btn-reject" data-del="${p.id}">삭제</button>
+          ${isMine(p) ? `<button class="btn-mini btn-edit" data-edit="${p.id}">수정</button>` : ''}
+          ${isMine(p) || isAdmin() ? `<button class="btn-mini btn-reject" data-del="${p.id}">삭제</button>` : ''}
         </span>
       </div>
       <div class="post-body">${esc(p.body)}</div>
@@ -2252,17 +2265,15 @@ function renderComments(post) {
         <span class="cmt-author">${esc(c.author)}</span>
         <span class="cmt-date">${formatDateTime(c.createdAt)}</span>
         <span class="cmt-actions">
-          <button class="btn-mini btn-reject" data-cdel="${c.id}">삭제</button>
+          ${isMine(c) || isAdmin() ? `<button class="btn-mini btn-reject" data-cdel="${c.id}">삭제</button>` : ''}
         </span>
       </div>
       <div class="cmt-body">${esc(c.body)}</div>
     </div>`).join('');
 
-  const form = open ? `
+  const form = open && me ? `
     <div class="cmt-form">
-      <input type="text" data-cauthor="${post.id}" maxlength="20" placeholder="ID">
-      <input type="password" data-cpw="${post.id}" maxlength="4" inputmode="numeric" placeholder="비밀번호 4자리">
-      <textarea class="cmt-text" data-cbody="${post.id}" maxlength="300" rows="2" placeholder="댓글을 입력하세요."></textarea>
+      <textarea class="cmt-text" data-cbody="${post.id}" maxlength="300" rows="2" placeholder="${esc(me.handle)} 님으로 댓글을 남깁니다."></textarea>
       <button class="btn-mini btn-approve" data-csubmit="${post.id}">댓글 등록</button>
     </div>` : '';
 
@@ -2274,16 +2285,11 @@ function renderComments(post) {
 }
 
 async function createComment(postId) {
-  const author = document.querySelector(`[data-cauthor="${postId}"]`).value.trim();
-  const password = document.querySelector(`[data-cpw="${postId}"]`).value;
   const body = document.querySelector(`[data-cbody="${postId}"]`).value.trim();
-
-  if (!author) return showToast('ID를 입력해주세요.');
-  if (!/^\d{4}$/.test(password)) return showToast('비밀번호는 숫자 4자리로 입력해주세요.');
   if (!body) return showToast('댓글 내용을 입력해주세요.');
 
   try {
-    await apiPost('/api/post', { action: 'comment', postId: Number(postId), author, password, body });
+    await apiPost('/api/post', { action: 'comment', postId: Number(postId), body });
     openCommentForm = null;
     await loadPosts();
     renderBoard();
@@ -2291,52 +2297,23 @@ async function createComment(postId) {
   } catch (e) { showToast(e.message); }
 }
 
-/** 댓글 삭제: 관리자는 비밀번호 없이, 그 외에는 비밀번호를 확인한다 */
-function deleteComment(id) {
-  if (isAdmin()) {
-    if (!confirm('이 댓글을 삭제할까요?')) return;
-    return submitCommentDelete(id, null).catch(e => showToast(e.message));
-  }
-  openModal(`
-    <h3>댓글 삭제</h3>
-    <label>비밀번호 (숫자 4자리)</label>
-    <input type="password" id="cdelPw" maxlength="4" inputmode="numeric" placeholder="0000">
-    <div class="modal-error" id="cdelErr"></div>
-    <button class="btn" id="cdelSubmit">삭제하기</button>
-    <button class="btn-ghost" style="width:100%;margin-top:8px;" onclick="closeModal()">취소</button>
-  `);
-  const err = document.getElementById('cdelErr');
-  document.getElementById('cdelSubmit').addEventListener('click', async () => {
-    const password = document.getElementById('cdelPw').value;
-    if (!/^\d{4}$/.test(password)) { err.textContent = '비밀번호는 숫자 4자리입니다.'; return; }
-    try {
-      await submitCommentDelete(id, password);
-      closeModal();
-    } catch (e) { err.textContent = e.message; }
-  });
-}
-
-async function submitCommentDelete(id, password) {
-  const payload = { action: 'removeComment', id: Number(id) };
-  if (password !== null) payload.password = password;
-  await apiPost('/api/post', payload);
-  await loadPosts();
-  renderBoard();
-  showToast('댓글을 삭제했습니다.');
+/** 댓글 삭제: 내가 쓴 댓글과 관리자만. 서버도 같이 막는다. */
+async function deleteComment(id) {
+  if (!confirm('이 댓글을 삭제할까요?')) return;
+  try {
+    await apiPost('/api/post', { action: 'removeComment', id: Number(id) });
+    await loadPosts();
+    renderBoard();
+    showToast('댓글을 삭제했습니다.');
+  } catch (e) { showToast(e.message); }
 }
 
 async function createPost() {
-  const author = document.getElementById('postAuthor').value.trim();
-  const password = document.getElementById('postPw').value;
   const body = document.getElementById('postBody').value.trim();
-
-  if (!author) return showToast('ID를 입력해주세요.');
-  if (!/^\d{4}$/.test(password)) return showToast('비밀번호는 숫자 4자리로 입력해주세요.');
   if (!body) return showToast('내용을 입력해주세요.');
 
   try {
-    await apiPost('/api/post', { action: 'create', author, password, body });
-    document.getElementById('postPw').value = '';
+    await apiPost('/api/post', { action: 'create', body });
     document.getElementById('postBody').value = '';
     await loadPosts();
     renderBoard();
@@ -2344,7 +2321,7 @@ async function createPost() {
   } catch (e) { showToast(e.message); }
 }
 
-/** 수정: 글쓴이만 가능하므로 관리자도 비밀번호를 입력해야 한다 */
+/** 수정: 글쓴이만 할 수 있다. 관리자에게도 삭제 권한만 있다. */
 function showEditModal(id) {
   const post = posts.find(p => p.id === Number(id));
   if (!post) return;
@@ -2352,8 +2329,6 @@ function showEditModal(id) {
     <h3>글 수정</h3>
     <label>내용</label>
     <textarea id="editBody" maxlength="1000" rows="5">${esc(post.body)}</textarea>
-    <label>비밀번호 (숫자 4자리)</label>
-    <input type="password" id="editPw" maxlength="4" inputmode="numeric" placeholder="0000">
     <div class="modal-error" id="editErr"></div>
     <button class="btn" id="editSubmit">수정하기</button>
     <button class="btn-ghost" style="width:100%;margin-top:8px;" onclick="closeModal()">취소</button>
@@ -2361,11 +2336,9 @@ function showEditModal(id) {
   const err = document.getElementById('editErr');
   document.getElementById('editSubmit').addEventListener('click', async () => {
     const body = document.getElementById('editBody').value.trim();
-    const password = document.getElementById('editPw').value;
     if (!body) { err.textContent = '내용을 입력해주세요.'; return; }
-    if (!/^\d{4}$/.test(password)) { err.textContent = '비밀번호는 숫자 4자리입니다.'; return; }
     try {
-      await apiPost('/api/post', { action: 'update', id: Number(id), password, body });
+      await apiPost('/api/post', { action: 'update', id: Number(id), body });
       closeModal();
       await loadPosts();
       renderBoard();
@@ -2374,38 +2347,15 @@ function showEditModal(id) {
   });
 }
 
-/** 삭제: 관리자는 비밀번호 없이, 그 외에는 비밀번호를 확인한다 */
-function deletePost(id) {
-  if (isAdmin()) {
-    if (!confirm('이 글을 삭제할까요?')) return;
-    return submitDelete(id, null);
-  }
-  openModal(`
-    <h3>글 삭제</h3>
-    <label>비밀번호 (숫자 4자리)</label>
-    <input type="password" id="delPw" maxlength="4" inputmode="numeric" placeholder="0000">
-    <div class="modal-error" id="delErr"></div>
-    <button class="btn" id="delSubmit">삭제하기</button>
-    <button class="btn-ghost" style="width:100%;margin-top:8px;" onclick="closeModal()">취소</button>
-  `);
-  const err = document.getElementById('delErr');
-  document.getElementById('delSubmit').addEventListener('click', async () => {
-    const password = document.getElementById('delPw').value;
-    if (!/^\d{4}$/.test(password)) { err.textContent = '비밀번호는 숫자 4자리입니다.'; return; }
-    try {
-      await submitDelete(id, password);
-      closeModal();
-    } catch (e) { err.textContent = e.message; }
-  });
-}
-
-async function submitDelete(id, password) {
-  const payload = { action: 'remove', id: Number(id) };
-  if (password !== null) payload.password = password;
-  await apiPost('/api/post', payload);
-  await loadPosts();
-  renderBoard();
-  showToast('글을 삭제했습니다.');
+/** 삭제: 내가 쓴 글과 관리자만. 서버도 같이 막는다. */
+async function deletePost(id) {
+  if (!confirm('이 글을 삭제할까요?\n\n달린 댓글도 함께 사라집니다.')) return;
+  try {
+    await apiPost('/api/post', { action: 'remove', id: Number(id) });
+    await loadPosts();
+    renderBoard();
+    showToast('글을 삭제했습니다.');
+  } catch (e) { showToast(e.message); }
 }
 
 async function deleteSelectedPosts() {
@@ -2441,6 +2391,7 @@ function initBoardEvents() {
     if (d.edit) showEditModal(d.edit);
     if (d.del) deletePost(d.del);
     if (d.ctoggle) {
+      if (!isLoggedIn()) { showLoginModal(); return; }
       openCommentForm = openCommentForm === Number(d.ctoggle) ? null : Number(d.ctoggle);
       renderBoard();
     }
@@ -2522,6 +2473,9 @@ function renderGates() {
   // ③ 리폿 — 로그인하면 승패를 기록할 수 있다
   set('reportGate', !isLoggedIn());
   set('reportBox', isLoggedIn());
+  // ⑥ 게시판 — 로그인해야 글을 쓴다
+  set('postGate', !isLoggedIn());
+  set('postForm', isLoggedIn());
   // 관리자 화면 — 관리자 이상만
   set('adminLocked', !isAdmin());
   set('adminAuthed', isAdmin());
@@ -3100,6 +3054,8 @@ function initAdminEvents() {
   if (lockedBtn) lockedBtn.addEventListener('click', showLoginModal);
   const reportBtn = document.getElementById('reportLoginBtn');
   if (reportBtn) reportBtn.addEventListener('click', showLoginModal);
+  const postBtn = document.getElementById('postLoginBtn');
+  if (postBtn) postBtn.addEventListener('click', showLoginModal);
   document.getElementById('historyRefreshBtn').addEventListener('click', async () => {
     await refreshAll();
     showToast('최신 기록을 불러왔습니다.');
