@@ -15,6 +15,7 @@ rem
 rem  하는 일
 rem   · RainbowSix.exe 를 방화벽에서 허용 (들어오는 것/나가는 것)
 rem   · UDP 2346(JOIN) 2347(ANNOUNCE) 2348(INFO) 열기
+rem   · 핑(ping) 응답 허용 — 런처가 접속 전에 길을 미리 터두는 데 씁니다
 rem
 rem  되돌리려면 이 파일 맨 아래 설명을 보세요.
 rem ============================================================
@@ -38,6 +39,7 @@ echo.
 rem 예전에 만든 규칙이 있으면 지우고 새로 만든다 (여러 번 실행해도 쌓이지 않게)
 netsh advfirewall firewall delete rule name="Rainbow Six (r6rank)" >nul 2>&1
 netsh advfirewall firewall delete rule name="Rainbow Six UDP (r6rank)" >nul 2>&1
+netsh advfirewall firewall delete rule name="Rainbow Six PING (r6rank)" >nul 2>&1
 
 if exist "%GAME%" (
     netsh advfirewall firewall add rule name="Rainbow Six (r6rank)" dir=in  action=allow program="%GAME%" enable=yes profile=any >nul
@@ -54,11 +56,17 @@ netsh advfirewall firewall add rule name="Rainbow Six UDP (r6rank)" dir=in  acti
 netsh advfirewall firewall add rule name="Rainbow Six UDP (r6rank)" dir=out action=allow protocol=UDP localport=2346-2348 enable=yes profile=any >nul
 echo   [O] UDP 2346 - 2348 열기
 
+rem 런처가 게임을 켜는 동안 방장에게 핑을 보내 Radmin 길을 미리 터둡니다.
+rem 핑이 막혀 있으면 그 예열이 안 되고, 게임이 직접 기다리게 됩니다.
+netsh advfirewall firewall add rule name="Rainbow Six PING (r6rank)" dir=in action=allow protocol=icmpv4:8,any enable=yes profile=any >nul
+echo   [O] 핑(ping) 응답 허용
+
 echo.
 echo   끝났습니다. 게임을 다시 켜서 접속해보세요.
 echo.
 echo   되돌리려면 이 창에 아래 두 줄을 붙여넣으면 됩니다.
 echo     netsh advfirewall firewall delete rule name="Rainbow Six (r6rank)"
 echo     netsh advfirewall firewall delete rule name="Rainbow Six UDP (r6rank)"
+echo     netsh advfirewall firewall delete rule name="Rainbow Six PING (r6rank)"
 echo.
 pause

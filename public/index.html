@@ -1703,7 +1703,23 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
             <li><a href="/r6firewall.bat" download>r6firewall.bat 내려받기</a></li>
             <li>오른쪽 클릭 → <b>관리자 권한으로 실행</b></li>
             <li><b>방장과 참가자 모두</b> 한 번씩 해야 효과가 있습니다</li>
+            <li>게임 허용 · UDP 세 포트 · 핑 응답, 이 세 가지를 엽니다</li>
           </ol>
+          <p><b>JOIN 누르고 5초쯤 멎는다면</b> 대개 한 번 시간초과가 났다가
+             다시 건 것입니다. 첫 패킷이 그냥 사라졌다는 뜻이라, 원인은 둘 중 하나입니다.</p>
+          <ol>
+            <li><b>포트가 막혀 있다</b> — 위 파일로 해결됩니다</li>
+            <li><b>Radmin 길이 아직 안 뚫려 있다</b> — Radmin VPN 의 길은
+                처음 말을 걸 때 만들어집니다. 게임이 그 첫 손님이 되면
+                게임이 그 시간을 다 기다립니다.
+                <b>런처가 이제 게임을 켜는 동안 미리 두드려 둡니다</b> —
+                <code>r6launch.ahk</code> 를 다시 내려받아 덮어써 주세요.</li>
+          </ol>
+          <p class="setup-warn"><b>직접 재보려면</b> 시작 › <code>cmd</code> 를 열고
+             <code>ping -n 10 방장주소</code> 를 쳐보세요
+             (예: <code>ping -n 10 26.131.188.239</code>).
+             <b>첫 줄만 느리고 나머지가 빠르면</b> 위 2번이 맞습니다.
+             <b>계속 느리거나 손실이 나면</b> Radmin 연결 자체를 봐야 합니다.</p>
           <p>그래도 느리면 <kbd>MULTIPLAYER OPTIONS</kbd> 에서
              <b>INTERNET / LAN</b> 을 바꿔가며 재보세요. Radmin 은 랜처럼 보이지만
              실제로는 인터넷을 타기 때문에, <b>INTERNET</b> 쪽이 더 나을 수 있습니다.

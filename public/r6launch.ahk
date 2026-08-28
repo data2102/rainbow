@@ -30,6 +30,10 @@ GamePath := "C:\Program Files (x86)\Red Storm Entertainment\Tom Clancy's Rainbow
 ; 접속 포트. MULTIPLAYER OPTIONS 의 JOIN PORT 와 같아야 합니다.
 JoinPort := "2346"
 
+; 참가자가 게임을 켜는 동안 방장에게 미리 핑을 보내 Radmin 길을 터둡니다.
+; (아래 "왜 이걸 하나" 설명 참고) 끄려면 false 로 바꾸세요.
+PingWarmup := true
+
 ; 기다리는 시간 (1000 = 1초)
 WaitMenu  := 12000   ; 게임 창이 뜬 뒤 메인 메뉴가 나올 때까지 (오프닝이 길면 늘리세요)
 JoinExtra := 8000    ; 참가자만 더 기다림 — 방장이 방을 다 만들 시간
@@ -109,8 +113,16 @@ if (alreadyRunning) {
     ExitApp
 }
 
+; 게임이 뜨는 동안 방장에게 가는 길을 미리 터둔다. 어차피 기다리는
+; 시간이라 공짜다 — 핑에 쓴 만큼 빼고 나머지만 잔다.
 Note("메인 메뉴를 기다리는 중...")
-Sleep WaitMenu
+t0 := A_TickCount
+if (mode = "join" && PingWarmup)
+    Warmup(address)
+rest := WaitMenu - (A_TickCount - t0)
+if (rest > 0)
+    Sleep rest
+
 if (mode = "join") {
     Note("방장이 방을 만들 때까지 잠시 더...")
     Sleep JoinExtra
@@ -163,6 +175,36 @@ ClickAt(XY_JOIN)
 
 ExitApp
 
+
+/**
+ * 방장에게 미리 핑을 보내 Radmin 터널을 깨워둔다.
+ *
+ * 왜 이걸 하나:
+ * Radmin VPN 의 길은 처음 말을 걸 때 만들어집니다. 게임이 그 첫 손님이 되면,
+ * 게임은 길이 뚫릴 때까지를 "상대가 응답 없음"으로 세다가 시간초과를 내고
+ * 다시 겁니다. JOIN 을 누르고 몇 초씩 멎는 대부분이 이것입니다.
+ * 게임이 켜지는 동안 우리가 먼저 두드려 두면, 게임의 첫 패킷은 이미
+ * 뚫린 길로 곧장 나갑니다.
+ *
+ * 다 실패해도 막지는 않습니다. 상대 방화벽이 핑만 막아둔 경우에도
+ * 게임은 붙기 때문입니다. 알려만 주고 지나갑니다.
+ */
+Warmup(ip) {
+    tmp := A_Temp "\r6ping.txt"
+    try FileDelete tmp
+    try RunWait A_ComSpec ' /c ping -n 4 -w 1000 ' ip ' > "' tmp '"', , "Hide"
+
+    out := ""
+    try out := FileRead(tmp)
+    try FileDelete tmp
+
+    if (out != "" && InStr(out, "100%")) {
+        ToolTip "방장(" ip ")에게서 응답이 없습니다.`n"
+              . "Radmin VPN 에 둘 다 들어와 있는지 확인해주세요.`n"
+              . "그래도 게임 접속은 시도합니다."
+        SetTimer () => ToolTip(), -4000
+    }
+}
 
 /** 게임 창에만 키를 보낸다 */
 Tap(key) {
