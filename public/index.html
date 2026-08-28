@@ -870,13 +870,42 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 }
 .room-run:empty{ display:none; }
 
-.room-seats{ display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-bottom:var(--sp-4); }
-.seat{
-  font-size:var(--fs-footnote); border-radius:var(--radius-pill);
-  padding:3px var(--sp-3); background:var(--surface-sunken); color:var(--text-secondary);
+/* 왼쪽 대화, 오른쪽 접속자 명단 */
+.room-main{
+  display:grid; grid-template-columns:minmax(0,1fr) 210px;
+  gap:var(--sp-4); align-items:start;
 }
-.seat.host{ background:var(--warning-bg); color:var(--warning-strong); font-weight:var(--fw-bold); }
-.seat.me{ background:var(--accent-bg); color:var(--accent-strong); font-weight:var(--fw-medium); }
+@media (max-width:720px){ .room-main{ grid-template-columns:minmax(0,1fr); } }
+.room-left{ min-width:0; }
+
+.room-side{
+  height:280px; display:flex; flex-direction:column; overflow:hidden;
+  border:1px solid var(--border); border-radius:var(--radius-md);
+  background:var(--surface-sunken);
+}
+@media (max-width:720px){ .room-side{ height:auto; max-height:220px; } }
+.side-h{
+  flex:none; padding:var(--sp-3) var(--sp-4);
+  border-bottom:1px solid var(--border);
+  font-size:var(--fs-footnote); font-weight:var(--fw-bold); color:var(--text-secondary);
+  display:flex; justify-content:space-between; gap:var(--sp-2);
+}
+.side-h span{ font-weight:var(--fw-regular); color:var(--text-tertiary); }
+.seat-list{ flex:1; overflow-y:auto; }
+.seat{
+  display:flex; align-items:center; gap:var(--sp-2);
+  padding:var(--sp-2) var(--sp-4); font-size:var(--fs-footnote);
+  color:var(--text-secondary); border-bottom:1px solid var(--border);
+}
+.seat:last-child{ border-bottom:none; }
+.seat-n{ flex:none; width:16px; color:var(--text-disabled); font-variant-numeric:tabular-nums; }
+.seat-id{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.seat-badge{
+  flex:none; margin-left:auto; font-size:11px; font-weight:var(--fw-bold);
+  border-radius:var(--radius-pill); padding:1px var(--sp-2);
+  background:var(--warning-bg); color:var(--warning-strong);
+}
+.seat.me .seat-id{ color:var(--accent); font-weight:var(--fw-medium); }
 
 .chat-log{
   height:280px; overflow-y:auto;
@@ -1454,14 +1483,20 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
         <div class="room-bar">
           <span class="room-bar-t" id="roomTitle"></span>
           <span class="room-tag" id="roomRole"></span>
-          <span class="room-tag alt" id="roomCount"></span>
           <span class="room-run" id="roomRun"></span>
         </div>
-        <div class="room-seats" id="roomSeats"></div>
-        <div class="chat-log" id="chatLog"></div>
-        <div class="chat-row">
-          <input type="text" id="chatInput" maxlength="200" autocomplete="off" placeholder="메시지를 입력하세요.">
-          <button class="btn-mini btn-approve" id="chatSend">보내기</button>
+        <div class="room-main">
+          <div class="room-left">
+            <div class="chat-log" id="chatLog"></div>
+            <div class="chat-row">
+              <input type="text" id="chatInput" maxlength="200" autocomplete="off" placeholder="메시지를 입력하세요.">
+              <button class="btn-mini btn-approve" id="chatSend">보내기</button>
+            </div>
+          </div>
+          <aside class="room-side">
+            <div class="side-h">접속자 <span id="roomCount"></span></div>
+            <div class="seat-list" id="roomSeats"></div>
+          </aside>
         </div>
         <div class="room-actions" id="roomActions"></div>
         <div class="foot-note" id="roomNote"></div>
@@ -3223,15 +3258,18 @@ function renderRoomView(r) {
   const run = document.getElementById('roomRun');
   if (title) title.textContent = `${r.room}번방`;
   if (role) role.textContent = host ? '방장' : '참가자';
-  if (count) count.textContent = `${r.members.length} / ${ROOM_CAPACITY}명`;
+  if (count) count.textContent = `${r.members.length} / ${ROOM_CAPACITY}`;
   if (run) run.textContent = r.running ? '실행 중' : '';
 
   const seats = document.getElementById('roomSeats');
   if (seats) {
-    seats.innerHTML = r.members.map((h, i) => {
-      const cls = i === 0 ? 'seat host' : (me && h === me.handle ? 'seat me' : 'seat');
-      return `<span class="${cls}">${esc(h)}${i === 0 ? ' · 방장' : ''}</span>`;
-    }).join('');
+    // 들어온 순서 그대로. 맨 위가 방장이다.
+    seats.innerHTML = r.members.map((h, i) => `
+      <div class="seat${me && h === me.handle ? ' me' : ''}">
+        <span class="seat-n">${i + 1}</span>
+        <span class="seat-id">${esc(h)}</span>
+        ${i === 0 ? '<span class="seat-badge">방장</span>' : ''}
+      </div>`).join('');
   }
 
   renderChatLog();

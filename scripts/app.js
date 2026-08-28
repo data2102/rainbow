@@ -1746,15 +1746,18 @@ function renderRoomView(r) {
   const run = document.getElementById('roomRun');
   if (title) title.textContent = `${r.room}번방`;
   if (role) role.textContent = host ? '방장' : '참가자';
-  if (count) count.textContent = `${r.members.length} / ${ROOM_CAPACITY}명`;
+  if (count) count.textContent = `${r.members.length} / ${ROOM_CAPACITY}`;
   if (run) run.textContent = r.running ? '실행 중' : '';
 
   const seats = document.getElementById('roomSeats');
   if (seats) {
-    seats.innerHTML = r.members.map((h, i) => {
-      const cls = i === 0 ? 'seat host' : (me && h === me.handle ? 'seat me' : 'seat');
-      return `<span class="${cls}">${esc(h)}${i === 0 ? ' · 방장' : ''}</span>`;
-    }).join('');
+    // 들어온 순서 그대로. 맨 위가 방장이다.
+    seats.innerHTML = r.members.map((h, i) => `
+      <div class="seat${me && h === me.handle ? ' me' : ''}">
+        <span class="seat-n">${i + 1}</span>
+        <span class="seat-id">${esc(h)}</span>
+        ${i === 0 ? '<span class="seat-badge">방장</span>' : ''}
+      </div>`).join('');
   }
 
   renderChatLog();
