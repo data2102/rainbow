@@ -30,6 +30,20 @@ GamePath := "C:\Program Files (x86)\Red Storm Entertainment\Tom Clancy's Rainbow
 ; 접속 포트. MULTIPLAYER OPTIONS 의 JOIN PORT 와 같아야 합니다.
 JoinPort := "2346"
 
+; ---------- 명령줄로 곧장 접속 (실험) ----------
+; Voobly 설치파일 안에서 찾은 방법입니다. 게임에 이런 스위치가 있다면
+; 메뉴를 하나도 거치지 않고 바로 방을 만들거나 붙습니다.
+;   방장  : RainbowSix.exe -server 2346
+;   참가자: RainbowSix.exe -client <방장IP> 2346
+;
+; true 로 바꾸고 한 번 돌려보세요.
+;   · 게임이 곧장 멀티플레이 화면으로 가면 성공입니다. 그대로 두세요.
+;   · 메인 메뉴에 그냥 서 있으면 이 게임 버전은 안 먹는 것이니
+;     다시 false 로 돌리면 지금까지 쓰던 방식(메뉴 자동 조작)으로 돌아갑니다.
+UseCmdLine := false
+HostArgs   := "-server 2346"
+JoinArgs   := "-client {ip} 2346"
+
 ; 참가자가 게임을 켜는 동안 방장에게 미리 핑을 보내 Radmin 길을 터둡니다.
 ; (아래 "왜 이걸 하나" 설명 참고) 끄려면 false 로 바꾸세요.
 PingWarmup := true
@@ -98,7 +112,12 @@ if (!alreadyRunning) {
         ExitApp
     }
     SplitPath GamePath, , &gameDir
-    Run '"' GamePath '"', gameDir
+    args := ""
+    if (UseCmdLine) {
+        args := (mode = "create") ? HostArgs : StrReplace(JoinArgs, "{ip}", address)
+        Note("명령줄로 실행: " args)
+    }
+    Run '"' GamePath '" ' args, gameDir
 }
 
 if !WinWait("ahk_exe RainbowSix.exe", , 60) {
@@ -112,6 +131,15 @@ WinWaitActive "ahk_exe RainbowSix.exe", , 15
 ; 게임을 망치므로 창만 앞으로 꺼내고 끝낸다.
 if (alreadyRunning) {
     Note("게임이 이미 켜져 있어 화면만 앞으로 꺼냈습니다")
+    ExitApp
+}
+
+; 명령줄이 먹혔다면 게임이 알아서 멀티플레이로 갔을 것이다. 그 위에 대고
+; 키를 누르면 오히려 화면을 망친다. 참가자만 길을 터두고 물러난다.
+if (UseCmdLine) {
+    if (mode = "join" && PingWarmup)
+        Warmup(address)
+    Note("명령줄로 맡겼습니다 — 메뉴는 건드리지 않습니다")
     ExitApp
 }
 

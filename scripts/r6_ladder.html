@@ -1826,6 +1826,31 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
       </details>
 
       <details class="setup">
+        <summary>실험 — 명령줄로 메뉴를 통째로 건너뛰기</summary>
+        <div class="setup-body">
+          <p>예전 Voobly 는 메뉴를 대신 눌러준 게 아니라 <b>게임을 켤 때 주소를 같이 넘겨</b>
+             곧장 붙였습니다. Voobly 설치 파일 안에 이 두 줄이 들어 있습니다.</p>
+          <ul class="opt-list">
+            <li><b>방장</b> <span><code>RainbowSix.exe -server 2346</code></span></li>
+            <li><b>참가자</b> <span><code>RainbowSix.exe -client 방장IP 2346</code></span></li>
+          </ul>
+          <p>이게 먹히면 <b>메뉴를 하나도 거치지 않고</b> 바로 붙습니다. 화면 크기도,
+             기다리는 시간도, 마우스 좌표도 다 필요 없어집니다.</p>
+          <p><b>30초면 확인됩니다.</b> 시작 › <code>cmd</code> 를 열고 아래를 붙여넣어 보세요.</p>
+          <ol>
+            <li><code>cd "C:\Program Files (x86)\Red Storm Entertainment\Tom Clancy's Rainbow Six"</code></li>
+            <li><code>RainbowSix.exe -server 2346</code></li>
+          </ol>
+          <p class="setup-warn">게임이 <b>곧장 멀티플레이 화면</b>으로 가면 성공입니다 —
+             <code>r6launch.ahk</code> 를 메모장으로 열어 <b>UseCmdLine</b> 을
+             <code>true</code> 로 바꾸면 런쳐도 이 방법을 씁니다.
+             <b>메인 메뉴에 그냥 서 있으면</b> 이 버전에는 없는 것이니
+             <code>false</code> 로 두시면 지금 쓰는 방식 그대로입니다.
+             어느 쪽이든 게임이 망가지지는 않습니다.</p>
+        </div>
+      </details>
+
+      <details class="setup">
         <summary>게임 안에서 맞춰둘 설정 — MULTIPLAYER OPTIONS</summary>
         <div class="setup-body">
           <p>게임 › <kbd>MULTIPLAYER</kbd> › <kbd>MULTIPLAYER OPTIONS</kbd> 에서 아래처럼 맞춰주세요.
