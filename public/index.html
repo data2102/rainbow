@@ -2745,6 +2745,22 @@ async function doChangePassword() {
 
 /* ---------- 계정 권한 · 로그 ---------- */
 
+/**
+ * 권한 칸.
+ * 관리자는 일반과 관리자 사이만 바꿀 수 있다. 마스터가 걸린 자리는
+ * 주는 것도 거두는 것도 마스터의 몫이라, 관리자에게는 이름표만 보여준다.
+ */
+function roleCell(a) {
+  const canPick = isMaster() || (isAdmin() && a.role !== 'master');
+  if (!canPick) {
+    return `<span class="role-tag ${esc(a.role)}">${esc(ROLE_LABEL[a.role] || '일반')}</span>`;
+  }
+  const options = isMaster() ? Object.keys(ROLE_LABEL) : ['member', 'admin'];
+  return `<select class="role-select" data-role="${esc(a.handle)}">${
+    options.map(r => `<option value="${r}"${r === a.role ? ' selected' : ''}>${ROLE_LABEL[r]}</option>`).join('')
+  }</select>`;
+}
+
 /** 자기 계정은 지울 수 없고, 마스터 계정은 마스터만 지울 수 있다 (서버도 같이 막는다) */
 function canDelete(a) {
   if (me && me.handle === a.handle) return false;
@@ -2761,8 +2777,8 @@ function renderAccounts() {
 
   note.innerHTML = '회원 정보를 추가·수정·삭제하고 권한을 정합니다 · 한 일은 아래 계정 로그에 남습니다'
     + (isMaster()
-      ? ' · <b>관리자·마스터 권한은 마스터만 줄 수 있습니다.</b>'
-      : ' · 권한 변경은 마스터만 할 수 있습니다.');
+      ? ' · <b>마스터 권한을 주고 거두는 것은 마스터만 할 수 있습니다.</b>'
+      : ' · 일반·관리자 권한은 바꿀 수 있고, <b>마스터 권한은 마스터만 주고 거둘 수 있습니다.</b>');
 
   const search = document.getElementById('roleSearch');
   const query = search ? search.value.trim().toLowerCase() : '';
@@ -2777,12 +2793,7 @@ function renderAccounts() {
     <td class="clan-tag">${esc(a.clan || '-')}</td>
     <td class="acct-email">${esc(a.email || '-')}</td>
     <td class="acct-record">${p ? `${p.point}점 · ${p.wins}승 ${p.losses}패` : '-'}</td>
-    <td>${isMaster()
-      ? `<select class="role-select" data-role="${esc(a.handle)}">${
-          Object.keys(ROLE_LABEL).map(r =>
-            `<option value="${r}"${r === a.role ? ' selected' : ''}>${ROLE_LABEL[r]}</option>`).join('')
-        }</select>`
-      : `<span class="role-tag ${esc(a.role)}">${esc(ROLE_LABEL[a.role] || '일반')}</span>`}</td>
+    <td>${roleCell(a)}</td>
     <td><span class="acct-actions">
       <button class="btn-mini btn-edit" data-aedit="${esc(a.handle)}">수정</button>
       ${canDelete(a) ? `<button class="btn-mini btn-reject" data-adel="${esc(a.handle)}">삭제</button>` : ''}

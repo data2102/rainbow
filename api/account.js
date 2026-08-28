@@ -1,6 +1,6 @@
 import {
   q, body, methodGuard, audit, hashPw, verifyPw, createSession,
-  currentUser, requireAdmin, requireMaster, ensureAccounts,
+  currentUser, requireAdmin, ensureAccounts,
   genReqId, parseHandle, cleanEmail, ROLES, ROLE_LABEL, TEMP_PASSWORD,
 } from './_lib.js';
 
@@ -199,10 +199,16 @@ async function list(req, res) {
   });
 }
 
-/** 권한 변경은 마스터만. 관리자를 세우고 내리는 일을 한 사람에게 모아둔다. */
+/**
+ * 권한 변경.
+ * 관리자는 일반과 관리자 사이를 오가게 할 수 있다.
+ * 마스터를 세우고 내리는 일만 마스터에게 남겨둔다. 관리자끼리 서로 마스터를
+ * 만들어 줄 수 있으면 마스터를 따로 둔 뜻이 없어진다.
+ */
 async function setRole(req, res) {
-  const me = await requireMaster(req, res);
-  if (!me) return;
+  const actor = await requireAdmin(req, res);
+  if (!actor) return;
+  const me = await currentUser(req);
   const { handle, role } = body(req);
   if (!ROLES.includes(role)) return res.status(400).json({ error: '없는 권한입니다.' });
 
@@ -210,6 +216,11 @@ async function setRole(req, res) {
   if (!rows.length) return res.status(404).json({ error: '없는 계정입니다: ' + handle });
   const before = rows[0].role || 'member';
   if (before === role) return res.status(200).json({ ok: true, handle, role });
+
+  // 마스터가 걸린 자리는 마스터만 건드린다. 주는 것도, 거두는 것도.
+  if ((before === 'master' || role === 'master') && me.role !== 'master') {
+    return res.status(403).json({ error: '마스터 권한은 마스터만 주고 거둘 수 있습니다.' });
+  }
 
   // 마스터가 하나도 남지 않으면 아무도 권한을 되돌릴 수 없게 된다
   if (before === 'master' && role !== 'master') {
@@ -220,7 +231,7 @@ async function setRole(req, res) {
   }
 
   await q(`UPDATE players SET role = $1 WHERE handle = $2`, [role, handle]);
-  await audit(me, 'set_role', { handle, from: before, to: role });
+  await audit(actor, 'set_role', { handle, from: before, to: role });
   res.status(200).json({ ok: true, handle, role });
 }
 

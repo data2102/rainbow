@@ -157,8 +157,6 @@ async function gate(req, res, need) {
 export function requireUser(req, res) { return gate(req, res, 'member'); }
 /** 관리자 이상 */
 export function requireAdmin(req, res) { return gate(req, res, 'admin'); }
-/** 마스터만 */
-export function requireMaster(req, res) { return gate(req, res, 'master'); }
 
 /** 누가 무엇을 했는지 남긴다. ts 는 audit_log 가 자동으로 찍는다. */
 export async function audit(adminId, action, detail) {
