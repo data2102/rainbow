@@ -3314,7 +3314,7 @@ async function launchGame(address) {
   if (address) await copyText(address);
   window.location.href = GAME_PROTOCOL;
   showToast(address
-    ? `접속 주소 ${address} 를 복사했습니다 · 게임에서 붙여넣어 접속하세요.`
+    ? `접속 주소 ${address} 복사됨 · 게임이 안 켜지면 조인하기를 눌러주세요.`
     : '게임을 실행합니다.');
 }
 
@@ -3416,7 +3416,11 @@ function renderVpnBar() {
   if (pw) pw.textContent = vpn.password || '';
 }
 
-/** 방장이 막 실행했다면 방에 있는 사람에게도 카운트다운을 보여준다 */
+/**
+ * 방장이 막 실행했다면 방에 있는 사람도 함께 세고, START 에 게임이 켜진다.
+ * 런쳐를 보고 있을 때만 움직인다 — 다른 페이지를 읽고 있는데 게임이
+ * 튀어나오면 놀랄 일이다. 그런 사람은 조인하기로 들어오면 된다.
+ */
 function maybePlayRoomCountdown() {
   const r = myRoomData();
   if (!r || !r.running || !r.startedAt) return;
@@ -3427,8 +3431,7 @@ function maybePlayRoomCountdown() {
   }
   const panel = document.getElementById('tab-launcher');
   if (!panel || !panel.classList.contains('active')) return;
-  // 알리기만 한다. 게임은 방장이 자기 화면에서, 참가자는 조인하기로 켠다.
-  playCountdown(r.startedAt, null);
+  playCountdown(r.startedAt, () => launchGame(r.address));
 }
 
 function renderLauncher() {
@@ -3528,10 +3531,10 @@ function renderRoomView(r) {
   if (note) {
     note.innerHTML = host
       ? 'Radmin VPN 에서 게임을 열고, 실행하기에 내 Radmin 주소(26.…)를 적어주세요.'
-        + ' 방에 있는 모두에게 그 주소가 뜨고 조인하기가 열립니다.'
+        + ' 방에 있는 모두가 함께 카운트다운을 보고 게임이 켜집니다.'
       : (r.running
-        ? '조인하기를 누르면 접속 주소가 복사되고 게임이 켜집니다. 게임에서 붙여넣어 들어가세요.'
-        : '방장이 실행하기를 누르면 조인하기 버튼이 열립니다.');
+        ? '방장이 실행하면 카운트다운 뒤 게임이 저절로 켜집니다 · 안 켜졌다면 조인하기를 눌러주세요.'
+        : '방장이 실행하기를 누르면 다 같이 카운트다운이 돌고 게임이 켜집니다.');
   }
 }
 
