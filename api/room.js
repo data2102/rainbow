@@ -14,6 +14,9 @@ export const ROOM_CAPACITY = 16;
 /** 이 시간 동안 아무 신호가 없으면 나간 것으로 본다 (브라우저를 그냥 닫는 경우) */
 const IDLE_MS = 3 * 60 * 1000;
 
+/** Radmin VPN 네트워크 이름. 화면 안내에 쓴다. */
+export const VPN_NETWORK = 'rainbowsix12345';
+
 const MAX_MSG = 200;
 /** 방마다 남겨두는 대화 수 */
 const KEEP_MSG = 120;
@@ -38,6 +41,10 @@ async function ensureTables() {
       started_at BIGINT,
       started_by TEXT
     )`);
+  // 방장의 Radmin 주소. 방을 연 사람이 어디에 있는지 알려주는 값이다.
+  await q(`ALTER TABLE room_state ADD COLUMN IF NOT EXISTS address TEXT`);
+  // 한 번 적은 주소는 계정에 남겨 다음부터 자동으로 채운다
+  await q(`ALTER TABLE players ADD COLUMN IF NOT EXISTS radmin_ip TEXT`);
   await q(`
     CREATE TABLE IF NOT EXISTS room_messages (
       id     BIGSERIAL PRIMARY KEY,
@@ -48,6 +55,25 @@ async function ensureTables() {
     )`);
   await q(`CREATE INDEX IF NOT EXISTS idx_room_msg ON room_messages (room, id)`);
   ensured = true;
+}
+
+/**
+ * 접속 주소. 26.131.188.239 처럼 IPv4 만 받고, 뒤에 :포트가 붙어도 된다.
+ * 이 값은 나중에 각자 컴퓨터에서 프로토콜 주소로 넘어가므로,
+ * 형식을 여기서 좁게 막아 엉뚱한 문자가 섞여 들어가지 못하게 한다.
+ */
+export function cleanAddress(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return null;
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?::(\d{1,5}))?$/.exec(s);
+  if (!m) throw new Error('접속 주소는 26.131.188.239 처럼 IP 형식으로 입력해주세요.');
+  for (let i = 1; i <= 4; i++) {
+    if (Number(m[i]) > 255) throw new Error('올바른 IP 주소가 아닙니다.');
+  }
+  if (m[5] && (Number(m[5]) < 1 || Number(m[5]) > 65535)) {
+    throw new Error('포트 번호가 올바르지 않습니다.');
+  }
+  return s;
 }
 
 function checkRoom(n) {
@@ -74,7 +100,7 @@ async function closeEmptyRooms() {
     DELETE FROM room_messages
      WHERE room NOT IN (SELECT DISTINCT room FROM room_members)`);
   await q(`
-    UPDATE room_state SET running = false, started_at = NULL, started_by = NULL
+    UPDATE room_state SET running = false, started_at = NULL, started_by = NULL, address = NULL
      WHERE room NOT IN (SELECT DISTINCT room FROM room_members)`);
 }
 
@@ -109,6 +135,7 @@ async function listRooms() {
       host: members[0] || null,
       running: !!(st && st.running),
       startedAt: st && st.started_at ? Number(st.started_at) : null,
+      address: st && st.address ? st.address : null,
     });
   }
   return rooms;
@@ -129,6 +156,8 @@ export default async function handler(req, res) {
 
       const rooms = await listRooms();
       const mine = me ? rooms.find(r => r.members.includes(me.handle)) : null;
+      // 접속 주소는 그 방에 들어와 있는 사람에게만 보인다
+      for (const r of rooms) if (r !== mine) r.address = null;
       let messages = [];
       if (mine) {
         const rows = await q(
@@ -140,11 +169,19 @@ export default async function handler(req, res) {
         }));
       }
 
+      // 방장이 지난번에 적어둔 주소를 미리 채워준다
+      let savedAddress = null;
+      if (me) {
+        const rows = await q(`SELECT radmin_ip FROM players WHERE handle = $1`, [me.handle]);
+        savedAddress = rows.length ? rows[0].radmin_ip : null;
+      }
+
       res.setHeader('Cache-Control', 'no-store');
       return res.status(200).json({
-        rooms, messages,
+        rooms, messages, savedAddress,
         myRoom: mine ? mine.room : null,
         capacity: ROOM_CAPACITY,
+        network: VPN_NETWORK,
       });
     }
 
@@ -252,11 +289,15 @@ async function say(req, res) {
 
 /**
  * 방장이 게임을 띄운다. 방에 있는 사람 모두에게 알리고, 조인하기 버튼이 열린다.
+ * 방장의 Radmin 주소를 함께 받아 방에 걸어둔다 — 나머지는 그 주소로 찾아 들어간다.
  * 실제로 게임을 켜는 것은 각자의 컴퓨터에서 일어난다 (app.js 의 launchGame 참고).
  */
 async function start(req, res) {
   const me = await requireUser(req, res);
   if (!me) return;
+
+  const address = cleanAddress(body(req).address);
+  if (!address) return res.status(400).json({ error: '접속 주소를 입력해주세요.' });
 
   const rows = await q(`SELECT room FROM room_members WHERE handle = $1`, [me]);
   if (!rows.length) return res.status(400).json({ error: '먼저 방에 들어가주세요.' });
@@ -271,10 +312,13 @@ async function start(req, res) {
 
   const now = Date.now();
   await q(
-    `INSERT INTO room_state (room, running, started_at, started_by) VALUES ($1, true, $2, $3)
-     ON CONFLICT (room) DO UPDATE SET running = true, started_at = $2, started_by = $3`,
-    [room, now, me]
+    `INSERT INTO room_state (room, running, started_at, started_by, address)
+     VALUES ($1, true, $2, $3, $4)
+     ON CONFLICT (room) DO UPDATE
+        SET running = true, started_at = $2, started_by = $3, address = $4`,
+    [room, now, me, address]
   );
-  await system(room, `${me} 님이 게임을 실행했습니다. 조인하기를 눌러주세요.`);
-  res.status(200).json({ ok: true, room, startedAt: now });
+  await q(`UPDATE players SET radmin_ip = $1 WHERE handle = $2`, [address, me]);
+  await system(room, `${me} 님이 게임을 실행했습니다 · 접속 주소 ${address}`);
+  res.status(200).json({ ok: true, room, startedAt: now, address });
 }

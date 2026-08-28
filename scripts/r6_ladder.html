@@ -921,6 +921,58 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .chat-row{ display:flex; gap:var(--sp-2); margin-top:var(--sp-3); }
 .chat-row .btn-mini{ flex:none; padding:var(--sp-2) var(--sp-5); }
 
+.vpn-bar{
+  display:flex; align-items:center; gap:var(--sp-3); flex-wrap:wrap;
+  border:1px solid var(--border); border-radius:var(--radius-md);
+  background:var(--surface-sunken); padding:var(--sp-3) var(--sp-4);
+  margin-bottom:var(--sp-3);
+}
+.vpn-k{ font-size:var(--fs-footnote); font-weight:var(--fw-bold); color:var(--text-secondary); }
+.vpn-v{
+  font-family:var(--font-mono); font-size:var(--fs-caption); font-weight:var(--fw-bold);
+  color:var(--accent-strong); background:var(--accent-bg);
+  border-radius:var(--radius-sm); padding:2px var(--sp-3);
+}
+.vpn-note{ font-size:var(--fs-footnote); color:var(--text-tertiary); }
+
+.setup{
+  border:1px solid var(--border); border-radius:var(--radius-md);
+  background:var(--surface-sunken); margin-bottom:var(--sp-5);
+}
+.setup > summary{
+  cursor:pointer; padding:var(--sp-3) var(--sp-4);
+  font-size:var(--fs-caption); font-weight:var(--fw-medium); color:var(--text-secondary);
+}
+.setup > summary:hover{ color:var(--accent); }
+.setup > summary:focus-visible{ outline:none; box-shadow:var(--shadow-focus); border-radius:var(--radius-md); }
+.setup-body{
+  padding:0 var(--sp-5) var(--sp-4); font-size:var(--fs-footnote);
+  color:var(--text-secondary); line-height:var(--lh-body);
+}
+.setup-body p{ margin:0 0 var(--sp-3); }
+.setup-body ol{ margin:0 0 var(--sp-3); padding-left:1.2em; }
+.setup-body li{ margin-bottom:var(--sp-1); }
+.setup-body a{ color:var(--accent); font-weight:var(--fw-medium); }
+.setup-body code{
+  font-family:var(--font-mono); font-size:var(--fs-footnote);
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius-sm); padding:1px 4px; word-break:break-all;
+}
+.setup-warn{ color:var(--text-tertiary); }
+
+.room-addr{
+  display:flex; align-items:center; gap:var(--sp-3); flex-wrap:wrap;
+  border:1px solid var(--success); border-radius:var(--radius-md);
+  background:var(--success-bg); padding:var(--sp-3) var(--sp-4);
+  margin-top:var(--sp-4);
+}
+.addr-k{ font-size:var(--fs-footnote); font-weight:var(--fw-bold); color:var(--success-strong); }
+.addr-v{
+  font-family:var(--font-mono); font-size:var(--fs-subhead); font-weight:var(--fw-bold);
+  color:var(--text-primary);
+}
+.room-addr .btn-mini{ margin-left:auto; }
+
 .room-actions{ display:flex; gap:var(--sp-3); margin-top:var(--sp-4); flex-wrap:wrap; }
 .room-actions .btn{ flex:1 1 160px; margin-top:0; }
 .room-actions .btn-ghost{ flex:1 1 160px; margin-top:0; }
@@ -1470,6 +1522,31 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
         방마다 <b>최대 16명</b>이고, <b>가장 먼저 들어온 사람이 방장</b>입니다.
       </div>
 
+      <div class="vpn-bar">
+        <span class="vpn-k">Radmin VPN 네트워크</span>
+        <code class="vpn-v" id="vpnName">rainbowsix12345</code>
+        <span class="vpn-note">먼저 Radmin VPN 으로 이 네트워크에 들어와 있어야 게임이 서로를 봅니다.</span>
+      </div>
+
+      <details class="setup">
+        <summary>처음 한 번만 — 게임 실행 등록하기</summary>
+        <div class="setup-body">
+          <p>아래 파일을 받아 <b>한 번만</b> 실행하면, 런쳐의 실행하기·조인하기 버튼이
+             바로 레인보우식스를 켭니다. 등록하지 않아도 방과 대화는 그대로 쓸 수 있고,
+             접속 주소는 복사됩니다.</p>
+          <ol>
+            <li><a href="/r6clan.reg" download>r6clan.reg 내려받기</a> — 메모장으로 열어보시면
+                내용이 다 보입니다. 게임 경로 한 줄이 전부입니다.</li>
+            <li>파일을 두 번 눌러 실행 → "예" → "확인"</li>
+            <li>게임이 다른 곳에 깔려 있으면, 메모장으로 열어 경로만 고친 뒤 실행하세요.</li>
+          </ol>
+          <p class="setup-warn">기본 경로는
+             <code>C:\Program Files (x86)\Red Storm Entertainment\Tom Clancy's Rainbow Six\RainbowSix.exe</code>
+             입니다. 버튼을 처음 누르면 브라우저가 "이 사이트가 앱을 열려고 합니다" 하고
+             한 번 묻습니다 — 허용해주세요.</p>
+        </div>
+      </details>
+
       <div class="lc-gate" id="lcGate" style="display:none;">
         로그인하면 방에 들어갈 수 있습니다.
         <button type="button" class="auth-btn" id="lcLoginBtn">로그인</button>
@@ -1497,6 +1574,11 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
             <div class="side-h">접속자 <span id="roomCount"></span></div>
             <div class="seat-list" id="roomSeats"></div>
           </aside>
+        </div>
+        <div class="room-addr" id="roomAddr" style="display:none;">
+          <span class="addr-k">접속 주소</span>
+          <code class="addr-v" id="addrValue"></code>
+          <button type="button" class="btn-mini btn-edit" id="addrCopy">복사</button>
         </div>
         <div class="room-actions" id="roomActions"></div>
         <div class="foot-note" id="roomNote"></div>

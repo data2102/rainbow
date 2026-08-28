@@ -21,6 +21,7 @@ let openCommentForm = null; // 댓글 입력창이 열린 글 id
 let rooms = [];             // 런쳐 방 8개
 let myRoom = null;          // 내가 들어가 있는 방 번호
 let roomMsgs = [];          // 그 방의 대화
+let savedAddress = null;    // 내가 지난번에 적어둔 Radmin 주소
 
 /* 대회 참가 팀. api/tournament.js 의 TEAMS 와 id 가 일치해야 합니다. */
 const TOURNAMENT_TEAMS = [
@@ -147,6 +148,7 @@ async function loadRooms() {
     rooms = d.rooms || [];
     myRoom = d.myRoom || null;
     roomMsgs = d.messages || [];
+    savedAddress = d.savedAddress || null;
   } catch { rooms = []; myRoom = null; roomMsgs = []; }
 }
 
@@ -1671,17 +1673,38 @@ function initAccountEvents() {
 /**
  * 게임 실행.
  * 웹 페이지는 남의 프로그램을 마음대로 켤 수 없다. 할 수 있는 것은 운영체제에
- * 등록된 주소(uplay://, steam:// 같은 것)로 넘겨주는 일뿐이다.
- * 그 주소가 정해지면 아래 한 줄만 채우면 버튼이 바로 게임을 띄운다.
+ * 등록된 주소로 넘겨주는 일뿐이다. r6clan:// 는 public/r6clan.reg 로 각자
+ * 컴퓨터에 한 번 등록해두는 약속이고, 등록해두지 않았으면 아무 일도
+ * 일어나지 않는다 — 그래서 주소 복사는 어느 쪽이든 늘 해준다.
  */
-const GAME_LAUNCH_URL = '';
+const GAME_PROTOCOL = 'r6clan://';
 
-function launchGame() {
-  if (!GAME_LAUNCH_URL) {
-    showToast('게임 연동은 준비 중입니다 · 실행 주소가 정해지면 이 버튼이 게임을 띄웁니다.');
-    return;
-  }
-  window.location.href = GAME_LAUNCH_URL;
+/** 접속 주소를 복사하고, 등록해둔 사람은 게임까지 띄운다 */
+async function launchGame(address) {
+  if (address) await copyText(address);
+  window.location.href = GAME_PROTOCOL;
+  showToast(address
+    ? `접속 주소 ${address} 를 복사했습니다 · 게임에서 붙여넣어 접속하세요.`
+    : '게임을 실행합니다.');
+}
+
+/** 클립보드. 막혀 있으면 옛 방식으로 한 번 더 시도한다. */
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch { /* 권한이 없거나 오래된 브라우저 */ }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    return true;
+  } catch { return false; }
 }
 
 const ROOM_CAPACITY = 16;
@@ -1762,10 +1785,18 @@ function renderRoomView(r) {
 
   renderChatLog();
 
+  // 방장이 올린 접속 주소
+  const addr = document.getElementById('roomAddr');
+  if (addr) {
+    addr.style.display = r.address ? 'flex' : 'none';
+    const v = document.getElementById('addrValue');
+    if (v) v.textContent = r.address || '';
+  }
+
   const actions = document.getElementById('roomActions');
   if (actions) {
     actions.innerHTML = host
-      ? `<button class="btn" id="roomStart">실행하기</button>
+      ? `<button class="btn" id="roomStart">${r.running ? '주소 바꾸고 다시 실행' : '실행하기'}</button>
          <button class="btn-ghost" id="roomLeave">나가기</button>`
       : `<button class="btn" id="roomJoin" ${r.running ? '' : 'disabled'}>조인하기</button>
          <button class="btn-ghost" id="roomLeave">나가기</button>`;
@@ -1773,20 +1804,41 @@ function renderRoomView(r) {
       const el = document.getElementById(id);
       if (el) el.addEventListener('click', fn);
     };
-    on('roomStart', startRoom);
-    on('roomJoin', launchGame);
+    on('roomStart', showStartModal);
+    on('roomJoin', () => launchGame(r.address));
     on('roomLeave', leaveRoom);
   }
 
   const note = document.getElementById('roomNote');
   if (note) {
     note.innerHTML = host
-      ? '실행하기를 누르면 방에 있는 모두에게 알리고 조인하기 버튼이 열립니다.'
-        + ' <b>게임을 켜는 연동은 준비 중입니다.</b>'
+      ? 'Radmin VPN 에서 게임을 열고, 실행하기에 내 Radmin 주소(26.…)를 적어주세요.'
+        + ' 방에 있는 모두에게 그 주소가 뜨고 조인하기가 열립니다.'
       : (r.running
-        ? '방장이 게임을 실행했습니다. 조인하기를 눌러주세요. <b>게임을 켜는 연동은 준비 중입니다.</b>'
+        ? '조인하기를 누르면 접속 주소가 복사되고 게임이 켜집니다. 게임에서 붙여넣어 들어가세요.'
         : '방장이 실행하기를 누르면 조인하기 버튼이 열립니다.');
   }
+}
+
+/** 방장이 자기 Radmin 주소를 적는 창 */
+function showStartModal() {
+  const here = myRoomData();
+  openModal(`
+    <button class="modal-x" onclick="closeModal()">✕</button>
+    <h3>게임 실행</h3>
+    <div class="foot-note" style="margin-top:0;">Radmin VPN 창에 보이는
+      <b>내 주소</b>를 적어주세요. 방에 있는 사람들이 이 주소로 찾아 들어갑니다.</div>
+    <label>내 Radmin 주소</label>
+    <input type="text" id="startAddr" maxlength="21" autocomplete="off"
+           placeholder="예: 26.131.188.239" value="${esc((here && here.address) || savedAddress || '')}">
+    <div class="modal-error" id="startErr"></div>
+    <button class="btn" id="startSubmit">실행하기</button>
+    <div class="foot-note">한 번 적어두면 다음부터 자동으로 채워집니다.</div>`);
+  const go = () => startRoom();
+  document.getElementById('startSubmit').addEventListener('click', go);
+  document.getElementById('startAddr').addEventListener('keydown', e => {
+    if (e.key === 'Enter') go();
+  });
 }
 
 /** 대화창. 새 말이 없으면 다시 그리지 않는다 (스크롤이 튀지 않도록) */
@@ -1831,12 +1883,20 @@ async function leaveRoom() {
 }
 
 async function startRoom() {
+  const input = document.getElementById('startAddr');
+  const err = document.getElementById('startErr');
+  const address = input ? input.value.trim() : '';
+  if (err) err.textContent = '';
   try {
-    await apiPost('/api/room', { action: 'start' });
+    await apiPost('/api/room', { action: 'start', address });
+    closeModal();
     await loadRooms();
     renderLauncher();
-    launchGame();
-  } catch (e) { showToast(e.message); }
+    launchGame(address);
+  } catch (e) {
+    if (err) err.textContent = e.message;
+    else showToast(e.message);
+  }
 }
 
 async function sendChat() {
@@ -1864,6 +1924,14 @@ function initLauncherEvents() {
 
   const login = document.getElementById('lcLoginBtn');
   if (login) login.addEventListener('click', showLoginModal);
+
+  const copy = document.getElementById('addrCopy');
+  if (copy) copy.addEventListener('click', async () => {
+    const v = document.getElementById('addrValue');
+    const text = v ? v.textContent : '';
+    if (!text) return;
+    showToast(await copyText(text) ? `${text} 복사했습니다.` : '복사하지 못했습니다. 주소를 직접 적어주세요.');
+  });
 
   const send = document.getElementById('chatSend');
   if (send) send.addEventListener('click', sendChat);

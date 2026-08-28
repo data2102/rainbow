@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS players (
   name        TEXT NOT NULL,
   email       TEXT,
   pw_hash     TEXT,
+  -- 런쳐에서 한 번 적어둔 Radmin VPN 주소 (다음부터 자동으로 채워진다)
+  radmin_ip   TEXT,
   role        TEXT NOT NULL DEFAULT 'member',
   point       INTEGER NOT NULL DEFAULT 0,
   wins        INTEGER NOT NULL DEFAULT 0,
@@ -165,7 +167,9 @@ CREATE TABLE IF NOT EXISTS room_state (
   room       INTEGER PRIMARY KEY,
   running    BOOLEAN NOT NULL DEFAULT false,
   started_at BIGINT,
-  started_by TEXT
+  started_by TEXT,
+  -- 방장의 Radmin VPN 주소. 방 사람들은 이 주소로 찾아 들어간다.
+  address    TEXT
 );
 
 -- 방 안의 대화. handle 이 비어 있으면 시스템 알림이다.
