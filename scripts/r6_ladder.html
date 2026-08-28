@@ -1750,10 +1750,10 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 
         <div class="dl-row">
           <span class="dl-n">2</span>
-          <a class="dl-a" href="/r6launch.ahk" download>r6launch.ahk</a>
+          <a class="dl-a" href="/r6launch.bat" download>r6launch.bat</a>
           <span class="dl-d"><code>C:\R6Clan\</code> 폴더를 만들어 그 안에 넣기 ·
-            <a href="https://www.autohotkey.com/" target="_blank" rel="noopener">AutoHotkey v2</a> 도 설치해야 합니다.
-            <b>이 경로가 아니면 동작하지 않습니다.</b></span>
+            <b>이 경로가 아니면 동작하지 않습니다.</b>
+            따로 설치할 프로그램은 없습니다.</span>
         </div>
 
         <div class="dl-row">
@@ -1792,36 +1792,30 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
       </details>
 
       <details class="setup">
-        <summary>더 나아가 — 멀티플레이 화면까지 자동으로 (선택)</summary>
+        <summary>더 나아가 — 로비까지 한 번에 (선택)</summary>
         <div class="setup-body">
           <p>위 기본 등록은 게임을 켜주는 데까지입니다. 여기까지 하면
-             <b>로비(멀티플레이 화면)까지 한 번에</b> 들어갑니다.
+             <b>메인 메뉴를 거치지 않고 로비로 곧장</b> 들어갑니다.
              <b>안 해도 게임은 켜집니다.</b></p>
           <ol>
-            <li><a href="https://www.autohotkey.com" target="_blank" rel="noopener noreferrer">AutoHotkey v2</a> 설치</li>
             <li><code>C:\R6Clan\</code> 폴더를 만들고
-                <a href="/r6launch.ahk" download>r6launch.ahk</a> 를 그 안에 넣기</li>
+                <a href="/r6launch.bat" download>r6launch.bat</a> 를 그 안에 넣기</li>
             <li><a href="/r6clan-auto.reg" download>r6clan-auto.reg</a> 를 받아 실행
-                (기본 등록을 덮어씁니다)</li>
+                → "예" → "확인"</li>
           </ol>
-          <p>메뉴는 <b>키보드로</b> 움직입니다 — 메인 메뉴에서 <kbd>↓</kbd> <kbd>Enter</kbd>,
-             서버 화면에서 방장은 <kbd>Enter</kbd>(CREATE GAME),
-             참가자는 <kbd>↓</kbd> <kbd>Enter</kbd>(MANUAL JOIN).
-             여기까지는 해상도와 상관없습니다.</p>
-          <p>MANUAL JOIN 창(HOST / PORT / JOIN)만은 키보드가 먹지 않아 마우스로 누릅니다.
-             <b>화면 비율까지 계산해서</b> 자리를 맞추므로 16:9 모니터에서 그림 좌우에
-             검은 띠가 생겨도 그만큼 빼고 누릅니다.</p>
-          <p>참가자가 목록(JOIN GAME)이 아니라 주소로 들어가는 이유는,
-             <b>여러 방이 동시에 열리면 목록에 방이 여러 개 뜨기 때문</b>입니다.
-             스크립트는 목록을 읽을 수 없어 엉뚱한 방에 들어갑니다.
-             주소로 곧장 붙으면 그럴 일이 없습니다.</p>
-          <p class="setup-warn">컴퓨터마다 게임이 뜨는 속도가 다릅니다. 메뉴가 뜨기도 전에 키가
-             나가면 <code>r6launch.ahk</code> 를 메모장으로 열어 위쪽의 <b>WaitMenu</b> 를
-             올리고(기본 6초), 메뉴가 뜬 뒤에도 한참 서 있으면 줄이세요.
-             <b>Debug</b> 를 <code>true</code> 로
-             두면 무엇을 누르는지, 마우스가 어디로 가는지 화면에 보여줍니다.
-             MANUAL JOIN 창의 칸을 못 누르면 <b>XY_HOST · XY_PORT · XY_JOIN</b> 값을 고치세요. 기본 등록으로 되돌리려면
-             <b>r6clan.reg</b> 를 다시 실행하면 됩니다.</p>
+          <p>이 배치 파일이 하는 일은 게임에 주소를 넘겨 켜는 것뿐입니다 —
+             방장은 <code>-server 2346</code>, 참가자는 <code>-client 방장IP 2346</code>.
+             메모장으로 열면 전부 보입니다.</p>
+          <p class="setup-warn">방장이 <b>내 Radmin 주소</b>를 적어두지 않으면
+             참가자는 어디로 붙을지 모릅니다. 위쪽 칸에 한 번만 적어두세요.
+             게임이 다른 곳에 깔려 있으면 <code>r6launch.bat</code> 을 메모장으로 열어
+             <b>GAME</b> 경로만 고치면 됩니다. 기본 등록으로 되돌리려면
+             <b>r6clan.reg</b> 를 다시 실행하세요.</p>
+          <p class="setup-warn">혹시 명령줄 방식이 안 되는 PC 가 있으면
+             <a href="/r6launch.ahk" download>r6launch.ahk</a> 와
+             <a href="https://www.autohotkey.com/" target="_blank" rel="noopener">AutoHotkey v2</a> 로
+             메뉴를 대신 눌러주는 옛 방식을 쓸 수 있습니다.
+             <code>r6clan-auto.reg</code> 를 메모장으로 열면 바꾸는 줄이 적혀 있습니다.</p>
         </div>
       </details>
 
