@@ -16,7 +16,8 @@ const seasonCache = {};     // 지난 달 상세 (id -> {players, matches})
 let attLogs = [];           // 보고 있는 달의 출퇴근 기록
 let attLoaded = null;       // 그 기록이 어느 달 것인지
 let playSlots = [];         // 고를 수 있는 시간대
-let playSchedule = [];      // [{handle, slot}] 접속 예상 시간
+let playSchedule = [];      // [{handle, slot}] 오늘의 접속 예상 시간
+let playToday = null;       // 그 예정이 어느 날짜 것인지
 let openCommentForm = null; // 댓글 입력창이 열린 글 id
 
 /* 대회 참가 팀. api/tournament.js 의 TEAMS 와 id 가 일치해야 합니다. */
@@ -136,6 +137,7 @@ async function loadAttendance(id) {
     attLogs = d.logs || [];
     if (d.slots) playSlots = d.slots;
     playSchedule = d.schedule || [];
+    playToday = d.day || null;
     attLoaded = target;
   } catch { attLogs = []; attLoaded = null; }
 }
@@ -542,6 +544,17 @@ function renderAll() {
 
 /* ---------- 접속 예상 시간 ---------- */
 
+const SCHEDULE_RESET_HOUR = 7;   // api/attendance.js 의 RESET_HOUR 와 같아야 한다
+
+/**
+ * 지금이 속한 "하루". 한국 시각 07:00 에 넘어간다.
+ * 서버와 계산이 같아야 하므로 보는 사람의 시간대와 무관하게 KST 로 센다.
+ */
+function playDay(ms = Date.now()) {
+  const d = new Date(ms + 9 * 3600000 - SCHEDULE_RESET_HOUR * 3600000);
+  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+}
+
 /** handle -> Set(시간대) */
 function scheduleMap() {
   const map = new Map();
@@ -604,6 +617,14 @@ function renderSlotBoard() {
 }
 
 function renderSchedule() {
+  const el = document.getElementById('slotDay');
+  if (el) {
+    const d = playToday || playDay();
+    const today = playDay();
+    el.innerHTML = d === today
+      ? `${esc(d)} 기준`
+      : `${esc(d)} 기준 <b>· 날짜가 바뀌었습니다. 새로고침하세요.</b>`;
+  }
   renderSlotSummary();
   renderSlotBoard();
 }
@@ -803,11 +824,16 @@ function initAttendanceEvents() {
     punchAttendance(btn.dataset.att, btn.dataset.handle);
   });
 
-  // 게임 중인 사람의 경과 시간을 1분마다 갱신한다
-  setInterval(() => {
-    if (panel.classList.contains('active') && attLogs.some(l => l.clockOut == null)) {
-      renderAttendanceBoard();
+  // 게임 중인 사람의 경과 시간을 1분마다 갱신한다.
+  // 07시를 넘겨 하루가 바뀌면 접속 예정도 새로 받아온다.
+  setInterval(async () => {
+    if (!panel.classList.contains('active')) return;
+    if (playToday && playToday !== playDay()) {
+      await loadAttendance();
+      renderAttendance();
+      return;
     }
+    if (attLogs.some(l => l.clockOut == null)) renderAttendanceBoard();
   }, 60000);
 }
 

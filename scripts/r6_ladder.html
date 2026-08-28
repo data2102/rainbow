@@ -407,6 +407,12 @@ tbody tr:hover td{ background:var(--surface-sunken); }
 .month-past:empty{ display:none; }
 
 /* ---------- 접속 예상 시간 ---------- */
+.slot-day{
+  font-size:var(--fs-footnote); font-weight:var(--fw-medium);
+  color:var(--text-secondary); background:var(--surface-sunken);
+  border:1px solid var(--border); border-radius:var(--radius-pill); padding:3px var(--sp-3);
+}
+.slot-day b{ color:var(--warning-strong); font-weight:var(--fw-bold); }
 .slot-summary{
   /* 좁은 화면에서도 두 칸은 들어오도록 최소 너비를 낮게 잡는다 */
   display:grid; grid-template-columns:repeat(auto-fit,minmax(132px,1fr)); gap:var(--sp-3);
@@ -1107,10 +1113,14 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   <!-- ATTENDANCE — 출퇴근 기록 -->
   <div class="tab-panel" id="tab-attendance">
     <div class="panel hud-corner">
-      <h2>접속 예상 시간</h2>
+      <div class="panel-head">
+        <h2>접속 예상 시간</h2>
+        <span class="slot-day" id="slotDay"></span>
+      </div>
       <div class="foot-note" style="margin-top:0;margin-bottom:14px;">
-        평소 들어오는 시간대를 체크해두면 누가 언제 접속하는지 서로 볼 수 있습니다 ·
-        아래에서 본인 아이디를 찾아 시간대를 누르세요 · 달이 바뀌어도 그대로 남습니다.
+        오늘 들어올 시간대를 체크해두면 누가 언제 접속하는지 서로 볼 수 있습니다 ·
+        아래에서 본인 아이디를 찾아 시간대를 누르세요 ·
+        <b>매일 아침 7시에 초기화</b>됩니다 (0시~7시 사이에는 전날 체크가 그대로 보입니다).
       </div>
       <div id="slotSummary" class="slot-summary"></div>
 

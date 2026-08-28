@@ -4,6 +4,22 @@ import { syncSeason } from './_season.js';
 /** 접속 예상 시간대. 화면(app.js)의 SLOTS 와 같아야 한다. */
 export const SLOTS = [8, 9, 10, 11, 12];
 
+const KST = 9 * 60 * 60 * 1000;
+/** 접속 예상 시간이 초기화되는 시각 (한국 시각) */
+export const RESET_HOUR = 7;
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+/**
+ * 그 시각이 속한 "하루". 한국 시각 07:00 에 넘어간다.
+ * 00:00~06:59 는 아직 전날이므로 전날 체크가 그대로 보인다.
+ * 화면(app.js)의 playDay 와 계산이 같아야 한다.
+ */
+export function playDay(ms = Date.now()) {
+  const d = new Date(ms + KST - RESET_HOUR * 60 * 60 * 1000);
+  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+}
+
 /**
  * 출퇴근 기록.
  * 한 번의 출근~퇴근이 한 줄이다. 퇴근 전이면 clock_out 이 비어 있다.
@@ -25,13 +41,27 @@ async function ensureTable() {
   // 한 사람이 동시에 두 번 출근 상태가 되는 것을 DB 차원에서 막는다
   await q(`CREATE UNIQUE INDEX IF NOT EXISTS idx_attendance_open
              ON attendance (handle) WHERE clock_out IS NULL`);
-  // 접속 예상 시간대. 기록이 아니라 예정이라 달이 바뀌어도 그대로 둔다.
+  // 접속 예상 시간대. 스케줄은 매일 달라지므로 하루 단위로 쌓는다.
   await q(`
     CREATE TABLE IF NOT EXISTS play_schedule (
+      day    TEXT NOT NULL,
       handle TEXT NOT NULL,
       slot   INTEGER NOT NULL,
-      PRIMARY KEY (handle, slot)
+      PRIMARY KEY (day, handle, slot)
     )`);
+  // 하루 단위로 바뀌기 전에 만들어진 테이블을 옮긴다.
+  // 남아 있던 체크는 오늘 것으로 살려둔다.
+  const has = await q(
+    `SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'play_schedule' AND column_name = 'day'`
+  );
+  if (!has.length) {
+    await q(`ALTER TABLE play_schedule ADD COLUMN day TEXT`);
+    await q(`UPDATE play_schedule SET day = $1 WHERE day IS NULL`, [playDay()]);
+    await q(`ALTER TABLE play_schedule ALTER COLUMN day SET NOT NULL`);
+    await q(`ALTER TABLE play_schedule DROP CONSTRAINT IF EXISTS play_schedule_pkey`);
+    await q(`ALTER TABLE play_schedule ADD PRIMARY KEY (day, handle, slot)`);
+  }
   ensured = true;
 }
 
@@ -53,16 +83,19 @@ export default async function handler(req, res) {
 
     if (req.method === 'GET') {
       const id = (req.query && req.query.season) || (season ? season.id : null);
-      const [rows, slots] = await Promise.all([
+      const day = playDay();
+      const [rows, picks] = await Promise.all([
         id ? q(`SELECT * FROM attendance WHERE season = $1 ORDER BY clock_in ASC`, [id]) : [],
-        q(`SELECT handle, slot FROM play_schedule ORDER BY handle, slot`),
+        q(`SELECT handle, slot FROM play_schedule WHERE day = $1 ORDER BY handle, slot`, [day]),
       ]);
       res.setHeader('Cache-Control', 'no-store');
       return res.status(200).json({
         season: id,
         logs: rows.map(rowToLog),
         slots: SLOTS,
-        schedule: slots.map(r => ({ handle: r.handle, slot: r.slot })),
+        day,
+        resetHour: RESET_HOUR,
+        schedule: picks.map(r => ({ handle: r.handle, slot: r.slot })),
       });
     }
 
@@ -122,15 +155,17 @@ async function setSchedule(res, handle, slots) {
     ? [...new Set(slots.map(Number))].filter(n => SLOTS.includes(n))
     : [];
 
+  const day = playDay();
   await tx(async (c) => {
     const { rows } = await c.query(`SELECT handle FROM players WHERE handle = $1`, [handle]);
     if (!rows.length) throw new Error('명단에 없는 선수입니다: ' + handle);
-    await c.query(`DELETE FROM play_schedule WHERE handle = $1`, [handle]);
+    await c.query(`DELETE FROM play_schedule WHERE day = $1 AND handle = $2`, [day, handle]);
     for (const slot of picked) {
-      await c.query(`INSERT INTO play_schedule (handle, slot) VALUES ($1,$2)`, [handle, slot]);
+      await c.query(`INSERT INTO play_schedule (day, handle, slot) VALUES ($1,$2,$3)`,
+        [day, handle, slot]);
     }
   });
-  res.status(200).json({ ok: true, handle, slots: picked });
+  res.status(200).json({ ok: true, day, handle, slots: picked });
 }
 
 /** 잘못 찍힌 기록 지우기 — 관리자만 */

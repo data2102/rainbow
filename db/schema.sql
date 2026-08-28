@@ -60,11 +60,13 @@ CREATE INDEX IF NOT EXISTS idx_attendance_season ON attendance (season, clock_in
 CREATE UNIQUE INDEX IF NOT EXISTS idx_attendance_open
   ON attendance (handle) WHERE clock_out IS NULL;
 
--- 접속 예상 시간대. 기록이 아니라 예정이라 달이 바뀌어도 그대로 둔다.
+-- 접속 예상 시간대. 스케줄은 매일 달라지므로 하루 단위로 쌓는다.
+-- 하루는 한국 시각 07:00 에 넘어간다 (00:00~06:59 는 아직 전날).
 CREATE TABLE IF NOT EXISTS play_schedule (
+  day    TEXT NOT NULL,      -- 'YYYY-MM-DD' (07시 기준)
   handle TEXT NOT NULL,
   slot   INTEGER NOT NULL,   -- 8~12 (8시대 ~ 12시대)
-  PRIMARY KEY (handle, slot)
+  PRIMARY KEY (day, handle, slot)
 );
 
 CREATE TABLE IF NOT EXISTS admins (
