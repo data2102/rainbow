@@ -18,6 +18,9 @@ let playSlots = [];         // 고를 수 있는 시간대
 let playSchedule = [];      // [{handle, slot}] 오늘의 접속 예상 시간
 let playToday = null;       // 그 예정이 어느 날짜 것인지
 let openCommentForm = null; // 댓글 입력창이 열린 글 id
+let rooms = [];             // 런쳐 방 8개
+let myRoom = null;          // 내가 들어가 있는 방 번호
+let roomMsgs = [];          // 그 방의 대화
 
 /* 대회 참가 팀. api/tournament.js 의 TEAMS 와 id 가 일치해야 합니다. */
 const TOURNAMENT_TEAMS = [
@@ -135,6 +138,16 @@ async function loadAttendance() {
     playSchedule = d.schedule || [];
     playToday = d.day || null;
   } catch { playSchedule = []; playToday = null; }
+}
+
+/** 런쳐 방 현황. 이 요청 자체가 "아직 있다"는 신호가 된다. */
+async function loadRooms() {
+  try {
+    const d = await apiGet('/api/room');
+    rooms = d.rooms || [];
+    myRoom = d.myRoom || null;
+    roomMsgs = d.messages || [];
+  } catch { rooms = []; myRoom = null; roomMsgs = []; }
 }
 
 async function loadPosts() {
@@ -452,6 +465,7 @@ function renderAll() {
   renderTournament();
   renderBoard();
   renderAttendance();
+  renderLauncher();
   renderMonthPickers();
 }
 
@@ -1302,6 +1316,8 @@ async function doLogout() {
   me = null;
   accounts = [];
   acctLogs = [];
+  myRoom = null;
+  roomMsgs = [];
   renderAuthBar();
   renderAll();
   showToast('로그아웃되었습니다.');
@@ -1650,6 +1666,206 @@ function initAccountEvents() {
   if (add) add.addEventListener('click', showAcctAddModal);
 }
 
+/* ---------- 런쳐 ---------- */
+
+/**
+ * 게임 실행.
+ * 웹 페이지는 남의 프로그램을 마음대로 켤 수 없다. 할 수 있는 것은 운영체제에
+ * 등록된 주소(uplay://, steam:// 같은 것)로 넘겨주는 일뿐이다.
+ * 그 주소가 정해지면 아래 한 줄만 채우면 버튼이 바로 게임을 띄운다.
+ */
+const GAME_LAUNCH_URL = '';
+
+function launchGame() {
+  if (!GAME_LAUNCH_URL) {
+    showToast('게임 연동은 준비 중입니다 · 실행 주소가 정해지면 이 버튼이 게임을 띄웁니다.');
+    return;
+  }
+  window.location.href = GAME_LAUNCH_URL;
+}
+
+const ROOM_CAPACITY = 16;
+
+function myRoomData() {
+  return myRoom ? rooms.find(r => r.room === myRoom) || null : null;
+}
+
+function isHost(r) {
+  return !!(r && me && r.host === me.handle);
+}
+
+function renderLauncher() {
+  const gate = document.getElementById('lcGate');
+  const grid = document.getElementById('lcRooms');
+  const view = document.getElementById('lcRoom');
+  if (!gate || !grid || !view) return;
+
+  const here = myRoomData();
+  gate.style.display = isLoggedIn() ? 'none' : 'block';
+  grid.style.display = isLoggedIn() && !here ? 'block' : 'none';
+  view.style.display = here ? 'block' : 'none';
+
+  if (isLoggedIn() && !here) renderRoomGrid();
+  if (here) renderRoomView(here);
+}
+
+function renderRoomGrid() {
+  const box = document.getElementById('roomGrid');
+  if (!box) return;
+  box.innerHTML = rooms.map(r => {
+    const full = r.members.length >= ROOM_CAPACITY;
+    return `<button type="button" class="room-card" data-room="${r.room}" ${full ? 'disabled' : ''}>
+      <span class="room-card-h">
+        <span class="room-no">${r.room}번방</span>
+        ${r.running ? '<span class="room-live">실행 중</span>' : ''}
+        <span class="room-n">${r.members.length} / ${ROOM_CAPACITY}</span>
+      </span>
+      <span class="room-host">${r.host
+        ? `방장 <b>${esc(r.host)}</b>`
+        : (full ? '정원이 찼습니다' : '비어 있음 · 먼저 들어가면 방장')}</span>
+    </button>`;
+  }).join('');
+}
+
+function renderRoomView(r) {
+  const host = isHost(r);
+  const title = document.getElementById('roomTitle');
+  const role = document.getElementById('roomRole');
+  const count = document.getElementById('roomCount');
+  const run = document.getElementById('roomRun');
+  if (title) title.textContent = `${r.room}번방`;
+  if (role) role.textContent = host ? '방장' : '참가자';
+  if (count) count.textContent = `${r.members.length} / ${ROOM_CAPACITY}명`;
+  if (run) run.textContent = r.running ? '실행 중' : '';
+
+  const seats = document.getElementById('roomSeats');
+  if (seats) {
+    seats.innerHTML = r.members.map((h, i) => {
+      const cls = i === 0 ? 'seat host' : (me && h === me.handle ? 'seat me' : 'seat');
+      return `<span class="${cls}">${esc(h)}${i === 0 ? ' · 방장' : ''}</span>`;
+    }).join('');
+  }
+
+  renderChatLog();
+
+  const actions = document.getElementById('roomActions');
+  if (actions) {
+    actions.innerHTML = host
+      ? `<button class="btn" id="roomStart">실행하기</button>
+         <button class="btn-ghost" id="roomLeave">나가기</button>`
+      : `<button class="btn" id="roomJoin" ${r.running ? '' : 'disabled'}>조인하기</button>
+         <button class="btn-ghost" id="roomLeave">나가기</button>`;
+    const on = (id, fn) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('click', fn);
+    };
+    on('roomStart', startRoom);
+    on('roomJoin', launchGame);
+    on('roomLeave', leaveRoom);
+  }
+
+  const note = document.getElementById('roomNote');
+  if (note) {
+    note.innerHTML = host
+      ? '실행하기를 누르면 방에 있는 모두에게 알리고 조인하기 버튼이 열립니다.'
+        + ' <b>게임을 켜는 연동은 준비 중입니다.</b>'
+      : (r.running
+        ? '방장이 게임을 실행했습니다. 조인하기를 눌러주세요. <b>게임을 켜는 연동은 준비 중입니다.</b>'
+        : '방장이 실행하기를 누르면 조인하기 버튼이 열립니다.');
+  }
+}
+
+/** 대화창. 새 말이 없으면 다시 그리지 않는다 (스크롤이 튀지 않도록) */
+function renderChatLog() {
+  const box = document.getElementById('chatLog');
+  if (!box) return;
+  const last = roomMsgs.length ? roomMsgs[roomMsgs.length - 1].id : 0;
+  if (box.dataset.last === String(last) && box.childElementCount) return;
+  box.dataset.last = String(last);
+
+  box.innerHTML = roomMsgs.map(m => {
+    if (!m.handle) return `<div class="chat-line chat-sys">· ${esc(m.body)}</div>`;
+    const mine = me && m.handle === me.handle;
+    return `<div class="chat-line">
+      <span class="chat-who${mine ? ' me' : ''}">${esc(m.handle)}</span>${esc(m.body)}
+      <span class="chat-t">${hhmm(m.ts)}</span>
+    </div>`;
+  }).join('') || '<div class="chat-line chat-sys">· 아직 대화가 없습니다.</div>';
+  box.scrollTop = box.scrollHeight;
+}
+
+function hhmm(ts) {
+  const d = new Date(ts);
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+async function enterRoom(room) {
+  if (!isLoggedIn()) { showLoginModal(); return; }
+  try {
+    await apiPost('/api/room', { action: 'enter', room });
+    await loadRooms();
+    renderLauncher();
+  } catch (e) { showToast(e.message); }
+}
+
+async function leaveRoom() {
+  try {
+    await apiPost('/api/room', { action: 'leave' });
+    await loadRooms();
+    renderLauncher();
+  } catch (e) { showToast(e.message); }
+}
+
+async function startRoom() {
+  try {
+    await apiPost('/api/room', { action: 'start' });
+    await loadRooms();
+    renderLauncher();
+    launchGame();
+  } catch (e) { showToast(e.message); }
+}
+
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  try {
+    await apiPost('/api/room', { action: 'say', body: text });
+    await loadRooms();
+    renderLauncher();
+  } catch (e) {
+    input.value = text;
+    showToast(e.message);
+  }
+}
+
+function initLauncherEvents() {
+  const grid = document.getElementById('roomGrid');
+  if (grid) grid.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-room]');
+    if (btn) enterRoom(Number(btn.dataset.room));
+  });
+
+  const login = document.getElementById('lcLoginBtn');
+  if (login) login.addEventListener('click', showLoginModal);
+
+  const send = document.getElementById('chatSend');
+  if (send) send.addEventListener('click', sendChat);
+  const input = document.getElementById('chatInput');
+  if (input) input.addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
+
+  // 런쳐를 보고 있는 동안만 계속 받아온다. 이 요청이 자리를 지키는 신호도 된다.
+  const panel = document.getElementById('tab-launcher');
+  if (!panel) return;
+  setInterval(async () => {
+    if (!panel.classList.contains('active') || !isLoggedIn()) return;
+    await loadRooms();
+    renderLauncher();
+  }, 3000);
+}
+
 /* ---------- 경기 기록 ---------- */
 
 async function recordTeamMatch(winners, losers) {
@@ -1721,6 +1937,7 @@ function activateTab(name) {
   }
   if (name === 'history') refreshAll();
   if (name === 'attendance') { loadAttendance().then(renderAttendance); }
+  if (name === 'launcher') { loadRooms().then(renderLauncher); }
 }
 
 function initTabs() {
@@ -1804,6 +2021,7 @@ async function refreshAll() {
   await loadAttendance();
   await loadTournament();
   await loadPosts();
+  await loadRooms();
   await loadAccounts();
   renderAll();
 }
@@ -1822,6 +2040,7 @@ async function boot() {
   initTournamentEvents();
   initBoardEvents();
   initScheduleEvents();
+  initLauncherEvents();
   initMonthPickers();
   renderAuthBar();
   try {

@@ -147,3 +147,33 @@ CREATE TABLE IF NOT EXISTS post_comments (
   created_at BIGINT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_comments_post ON post_comments (post_id, created_at);
+
+-- 런쳐. 1~8번방, 방마다 최대 16명.
+-- 방장은 따로 두지 않는다. 그 방에 가장 먼저 들어온 사람이 방장이고,
+-- 나가면 다음 사람에게 저절로 넘어간다.
+CREATE TABLE IF NOT EXISTS room_members (
+  room      INTEGER NOT NULL,
+  handle    TEXT NOT NULL,
+  joined_at BIGINT NOT NULL,
+  last_seen BIGINT NOT NULL,
+  PRIMARY KEY (room, handle)
+);
+-- 한 사람이 두 방에 동시에 있을 수는 없다
+CREATE UNIQUE INDEX IF NOT EXISTS idx_room_one ON room_members (handle);
+
+CREATE TABLE IF NOT EXISTS room_state (
+  room       INTEGER PRIMARY KEY,
+  running    BOOLEAN NOT NULL DEFAULT false,
+  started_at BIGINT,
+  started_by TEXT
+);
+
+-- 방 안의 대화. handle 이 비어 있으면 시스템 알림이다.
+CREATE TABLE IF NOT EXISTS room_messages (
+  id     BIGSERIAL PRIMARY KEY,
+  room   INTEGER NOT NULL,
+  handle TEXT,
+  body   TEXT NOT NULL,
+  ts     BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_room_msg ON room_messages (room, id);

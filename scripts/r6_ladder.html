@@ -778,6 +778,90 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .cmt-form{ display:grid; gap:var(--sp-2); margin-top:var(--sp-3); }
 .cmt-form .btn-mini{ justify-self:start; padding:var(--sp-2) var(--sp-5); }
 
+/* ---------- 런쳐 ---------- */
+.lc-wip{
+  font-size:var(--fs-footnote); font-weight:var(--fw-medium);
+  color:var(--warning-strong); background:var(--warning-bg);
+  border-radius:var(--radius-pill); padding:3px var(--sp-3);
+}
+.lc-gate{
+  border:1px solid var(--border); border-radius:var(--radius-md);
+  background:var(--surface-sunken); padding:var(--sp-5);
+  text-align:center; font-size:var(--fs-caption); color:var(--text-tertiary);
+}
+.lc-gate .auth-btn{ margin-left:var(--sp-3); vertical-align:middle; }
+
+.room-grid{
+  display:grid; gap:var(--sp-3);
+  grid-template-columns:repeat(4,1fr);
+}
+@media (max-width:900px){ .room-grid{ grid-template-columns:repeat(2,1fr); } }
+.room-card{
+  display:flex; flex-direction:column; gap:var(--sp-2); text-align:left;
+  border:1px solid var(--border-strong); border-radius:var(--radius-md);
+  background:var(--surface-sunken); padding:var(--sp-4);
+  font-family:inherit; color:var(--text-primary); cursor:pointer;
+  transition:border-color var(--dur-fast) var(--ease-standard);
+}
+.room-card:hover{ border-color:var(--accent); }
+.room-card:focus-visible{ outline:none; box-shadow:var(--shadow-focus); }
+.room-card:disabled{ cursor:not-allowed; opacity:.55; }
+.room-card.mine{ border-color:var(--accent); background:var(--accent-bg); }
+.room-card-h{ display:flex; align-items:center; gap:var(--sp-2); }
+.room-no{ font-size:var(--fs-subhead); font-weight:var(--fw-bold); }
+.room-n{ margin-left:auto; font-size:var(--fs-footnote); color:var(--text-tertiary); }
+.room-host{ font-size:var(--fs-footnote); color:var(--text-secondary); }
+.room-host b{ font-weight:var(--fw-medium); }
+.room-live{
+  font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+  color:var(--success-strong); background:var(--success-bg);
+  border-radius:var(--radius-pill); padding:1px var(--sp-2);
+}
+
+.room-bar{
+  display:flex; align-items:center; gap:var(--sp-3); flex-wrap:wrap;
+  margin-bottom:var(--sp-4);
+}
+.room-bar-t{ font-size:var(--fs-heading); font-weight:var(--fw-bold); }
+.room-tag{
+  font-size:var(--fs-footnote); font-weight:var(--fw-medium);
+  color:var(--accent); background:var(--accent-bg);
+  border-radius:var(--radius-pill); padding:2px var(--sp-3);
+}
+.room-tag.alt{ color:var(--text-secondary); background:var(--surface-sunken); }
+.room-run{
+  font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+  color:var(--success-strong); background:var(--success-bg);
+  border-radius:var(--radius-pill); padding:2px var(--sp-3);
+}
+.room-run:empty{ display:none; }
+
+.room-seats{ display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-bottom:var(--sp-4); }
+.seat{
+  font-size:var(--fs-footnote); border-radius:var(--radius-pill);
+  padding:3px var(--sp-3); background:var(--surface-sunken); color:var(--text-secondary);
+}
+.seat.host{ background:var(--warning-bg); color:var(--warning-strong); font-weight:var(--fw-bold); }
+.seat.me{ background:var(--accent-bg); color:var(--accent-strong); font-weight:var(--fw-medium); }
+
+.chat-log{
+  height:280px; overflow-y:auto;
+  border:1px solid var(--border); border-radius:var(--radius-md);
+  background:var(--surface-sunken); padding:var(--sp-4);
+  display:flex; flex-direction:column; gap:var(--sp-2);
+}
+.chat-line{ font-size:var(--fs-caption); line-height:var(--lh-body); word-break:break-word; }
+.chat-who{ font-weight:var(--fw-medium); margin-right:var(--sp-2); }
+.chat-who.me{ color:var(--accent); }
+.chat-t{ font-size:var(--fs-footnote); color:var(--text-disabled); margin-left:var(--sp-2); }
+.chat-sys{ font-size:var(--fs-footnote); color:var(--text-tertiary); font-style:normal; }
+.chat-row{ display:flex; gap:var(--sp-2); margin-top:var(--sp-3); }
+.chat-row .btn-mini{ flex:none; padding:var(--sp-2) var(--sp-5); }
+
+.room-actions{ display:flex; gap:var(--sp-3); margin-top:var(--sp-4); flex-wrap:wrap; }
+.room-actions .btn{ flex:1 1 160px; margin-top:0; }
+.room-actions .btn-ghost{ flex:1 1 160px; margin-top:0; }
+
 /* ---------- 토스트 / 모달 ---------- */
 .toast{
   position:fixed; bottom:var(--sp-6); right:var(--sp-6);
@@ -883,6 +967,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
     <button class="tab-btn" data-tab="attendance">④ 출석</button>
     <button class="tab-btn" data-tab="tournament">⑤ 대회</button>
     <button class="tab-btn" data-tab="board">⑥ 게시판</button>
+    <button class="tab-btn" data-tab="launcher">⑦ 런쳐(준비중)</button>
   </nav>
 
   <!-- STANDING -->
@@ -1307,6 +1392,46 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 
       <div class="foot-note" id="postCount" style="margin-bottom:6px;"></div>
       <div id="postList"></div>
+    </div>
+  </div>
+
+  <!-- LAUNCHER -->
+  <div class="tab-panel" id="tab-launcher">
+    <div class="panel hud-corner">
+      <div class="panel-head">
+        <h2>런쳐 · Launcher</h2>
+        <span class="lc-wip">준비중</span>
+      </div>
+      <div class="foot-note" style="margin-top:0;margin-bottom:14px;">
+        방에 모여 이야기를 나누고, 다 모이면 방장이 게임을 실행합니다 ·
+        방마다 <b>최대 16명</b>이고, <b>가장 먼저 들어온 사람이 방장</b>입니다.
+      </div>
+
+      <div class="lc-gate" id="lcGate" style="display:none;">
+        로그인하면 방에 들어갈 수 있습니다.
+        <button type="button" class="auth-btn" id="lcLoginBtn">로그인</button>
+      </div>
+
+      <div id="lcRooms" style="display:none;">
+        <div class="room-grid" id="roomGrid"></div>
+      </div>
+
+      <div id="lcRoom" style="display:none;">
+        <div class="room-bar">
+          <span class="room-bar-t" id="roomTitle"></span>
+          <span class="room-tag" id="roomRole"></span>
+          <span class="room-tag alt" id="roomCount"></span>
+          <span class="room-run" id="roomRun"></span>
+        </div>
+        <div class="room-seats" id="roomSeats"></div>
+        <div class="chat-log" id="chatLog"></div>
+        <div class="chat-row">
+          <input type="text" id="chatInput" maxlength="200" autocomplete="off" placeholder="메시지를 입력하세요.">
+          <button class="btn-mini btn-approve" id="chatSend">보내기</button>
+        </div>
+        <div class="room-actions" id="roomActions"></div>
+        <div class="foot-note" id="roomNote"></div>
+      </div>
     </div>
   </div>
 </div>
