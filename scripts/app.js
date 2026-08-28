@@ -18,7 +18,8 @@ let attLoaded = null;       // 그 기록이 어느 달 것인지
 let playSlots = [];         // 고를 수 있는 시간대
 let playSchedule = [];      // [{handle, slot}] 오늘의 접속 예상 시간
 let playToday = null;       // 그 예정이 어느 날짜 것인지
-let meHandle = null;        // 출석 페이지에서 고른 내 아이디
+let meSchedule = null;      // 접속 예상 시간에서 고른 내 아이디
+let meAtt = null;           // 출퇴근에서 고른 내 아이디 (따로 관리)
 let openCommentForm = null; // 댓글 입력창이 열린 글 id
 
 /* 대회 참가 팀. api/tournament.js 의 TEAMS 와 id 가 일치해야 합니다. */
@@ -598,21 +599,14 @@ function renderSlotMine() {
   const el = document.getElementById('slotMine');
   if (!el) return;
 
-  if (!meHandle) {
-    el.innerHTML = '<div class="mine"><span class="mine-none">'
-      + '위에서 내 아이디를 고르면 시간대를 체크할 수 있습니다.</span></div>';
+  if (!meSchedule) {
+    el.innerHTML = '<span class="mine-none">아이디를 고르면 시간대를 체크할 수 있습니다.</span>';
     return;
   }
-  const on = scheduleMap().get(meHandle) || new Set();
-  el.innerHTML = `<div class="mine">
-    <span class="mine-k">내 시간대</span>
-    <span class="mine-id">${esc(meHandle)}</span>
-    <span class="mine-right">
-      <span class="slot-chips">${playSlots.map(slot =>
-        `<button type="button" class="slot-chip${on.has(slot) ? ' on' : ''}"
-          data-slot="${slot}" aria-pressed="${on.has(slot)}">${slot}</button>`).join('')}</span>
-    </span>
-  </div>`;
+  const on = scheduleMap().get(meSchedule) || new Set();
+  el.innerHTML = `<span class="slot-chips">${playSlots.map(slot =>
+    `<button type="button" class="slot-chip${on.has(slot) ? ' on' : ''}"
+      data-slot="${slot}" aria-pressed="${on.has(slot)}">${slot}</button>`).join('')}</span>`;
 }
 
 function renderSchedule() {
@@ -654,7 +648,7 @@ function initScheduleEvents() {
   const el = document.getElementById('slotMine');
   if (el) el.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-slot]');
-    if (btn && meHandle) toggleSlot(meHandle, Number(btn.dataset.slot));
+    if (btn && meSchedule) toggleSlot(meSchedule, Number(btn.dataset.slot));
   });
 }
 
@@ -739,28 +733,22 @@ function renderAttMine() {
   const el = document.getElementById('attMine');
   if (!el) return;
 
-  if (!meHandle) {
-    el.innerHTML = '<div class="mine"><span class="mine-none">'
-      + '맨 위에서 내 아이디를 고르면 출근·퇴근을 찍을 수 있습니다.</span></div>';
+  if (!isLiveView()) {
+    el.innerHTML = '<span class="mine-none">'
+      + '지난 달 기록은 보기만 됩니다. 출근·퇴근은 이번 달에서 찍어주세요.</span>';
     return;
   }
-  if (!isLiveView()) {
-    el.innerHTML = '<div class="mine"><span class="mine-none">'
-      + '지난 달 기록은 보기만 됩니다. 출근·퇴근은 이번 달에서 찍어주세요.</span></div>';
+  if (!meAtt) {
+    el.innerHTML = '<span class="mine-none">아이디를 고르면 출근·퇴근을 찍을 수 있습니다.</span>';
     return;
   }
 
-  const on = attLogs.find(l => l.handle === meHandle && l.clockOut == null);
-  el.innerHTML = `<div class="mine">
-    <span class="mine-id">${esc(meHandle)}</span>
-    <span class="mine-state">${on
+  const on = attLogs.find(l => l.handle === meAtt && l.clockOut == null);
+  el.innerHTML = `<span class="mine-state">${on
       ? `${formatClock(on.clockIn)} 출근 · ${formatDuration(Date.now() - on.clockIn)}째`
       : '퇴근 상태'}</span>
-    <span class="mine-right">
-      <button type="button" class="att-btn ${on ? 'out' : 'in'}"
-        data-att="${on ? 'out' : 'in'}">${on ? '퇴근' : '출근'}</button>
-    </span>
-  </div>`;
+    <button type="button" class="att-btn ${on ? 'out' : 'in'}"
+      data-att="${on ? 'out' : 'in'}">${on ? '퇴근' : '출근'}</button>`;
 }
 
 function renderAttendance() {
@@ -826,39 +814,56 @@ async function deleteAttendance(id) {
 
 /* ---------- 내 아이디 ---------- */
 
-const ME_KEY = 'r6-me';
+/* 접속 예상 시간과 출퇴근은 서로 다른 사람을 고를 수 있다 */
+const ME_KEYS = { schedule: 'r6-me-schedule', att: 'r6-me-att' };
+const ME_LEGACY_KEY = 'r6-me';   // 하나로 쓰던 시절의 값
 
-/** 출석 페이지에서 쓰는 "나". 한 번 고르면 이 브라우저에 남는다. */
 function loadMe() {
-  try { meHandle = localStorage.getItem(ME_KEY) || null; } catch { meHandle = null; }
+  let legacy = null;
+  try { legacy = localStorage.getItem(ME_LEGACY_KEY); } catch { /* noop */ }
+  try { meSchedule = localStorage.getItem(ME_KEYS.schedule) || legacy || null; } catch { meSchedule = legacy; }
+  try { meAtt = localStorage.getItem(ME_KEYS.att) || legacy || null; } catch { meAtt = legacy; }
+}
+
+function meOf(which) { return which === 'att' ? meAtt : meSchedule; }
+
+/** 선택 상자를 명단으로 채운다. 명단에서 빠진 아이디가 남아 있으면 놓아준다. */
+function fillMeSelect(id, which) {
+  const sel = document.getElementById(id);
+  if (!sel) return;
+  let cur = meOf(which);
+  if (cur && !players.some(p => p.handle === cur)) {
+    cur = null;
+    if (which === 'att') meAtt = null; else meSchedule = null;
+  }
+  sel.innerHTML = '<option value="">아이디 선택</option>'
+    + players.map(p => `<option value="${esc(p.handle)}">${esc(p.handle)}</option>`).join('');
+  sel.value = cur || '';
 }
 
 function renderMePicker() {
-  const sel = document.getElementById('meSelect');
-  if (!sel) return;
-  // 명단에서 빠진 아이디가 저장돼 있으면 놓아준다
-  if (meHandle && !players.some(p => p.handle === meHandle)) meHandle = null;
-
-  sel.innerHTML = '<option value="">선택하세요</option>'
-    + players.map(p => `<option value="${esc(p.handle)}"`
-      + `${p.handle === meHandle ? ' selected' : ''}>${esc(p.handle)}</option>`).join('');
-  sel.value = meHandle || '';
+  fillMeSelect('meSchedule', 'schedule');
+  fillMeSelect('meAtt', 'att');
 }
 
-function setMe(handle) {
-  meHandle = handle || null;
+function setMe(which, handle) {
+  const value = handle || null;
+  if (which === 'att') meAtt = value; else meSchedule = value;
   try {
-    if (meHandle) localStorage.setItem(ME_KEY, meHandle);
-    else localStorage.removeItem(ME_KEY);
+    if (value) localStorage.setItem(ME_KEYS[which], value);
+    else localStorage.removeItem(ME_KEYS[which]);
   } catch { /* 사생활 보호 모드 등 */ }
-  renderSchedule();
-  renderAttMine();
+
+  if (which === 'att') renderAttMine();
+  else renderSlotMine();
 }
 
 function initAttendanceEvents() {
   loadMe();
-  const sel = document.getElementById('meSelect');
-  if (sel) sel.addEventListener('change', () => setMe(sel.value));
+  for (const [id, which] of [['meSchedule', 'schedule'], ['meAtt', 'att']]) {
+    const sel = document.getElementById(id);
+    if (sel) sel.addEventListener('change', () => setMe(which, sel.value));
+  }
 
   const panel = document.getElementById('tab-attendance');
   if (!panel) return;
@@ -866,7 +871,7 @@ function initAttendanceEvents() {
     const btn = e.target.closest('[data-att], [data-attdel]');
     if (!btn) return;
     if (btn.dataset.attdel) return deleteAttendance(btn.dataset.attdel);
-    if (meHandle) punchAttendance(btn.dataset.att, meHandle);
+    if (meAtt) punchAttendance(btn.dataset.att, meAtt);
   });
 
   // 게임 중인 사람의 경과 시간을 1분마다 갱신한다.
