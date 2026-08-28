@@ -526,93 +526,39 @@ function renderAll() {
 /* ---------- 월 선택(달력) ---------- */
 
 /**
- * 시즌 id('2026-09')를 달력의 연·월로 바꾼다.
- * 첫 시즌은 8월 27일에 시작하지만 9월에 끝나므로 달력에서는 9월 한 칸으로만 잡는다.
- * (8월 기록은 9월에 합산되어 있다)
+ * 고를 수 있는 달 목록. 첫 시즌은 8월 27일에 시작하지만 9월에 끝나므로
+ * "2026년 9월" 하나로만 보여준다. (8월 기록은 9월에 합산되어 있다)
  */
-function seasonYearMonth(s) {
-  const d = new Date(s.endsAt - 1 + 9 * 60 * 60 * 1000);
-  return { y: d.getUTCFullYear(), m: d.getUTCMonth() + 1 };
-}
-
-/** 고를 수 있는 달: 'YYYY-M' -> 시즌 */
-function monthMap() {
-  const map = new Map();
-  const list = seasons.length ? seasons : (season ? [season] : []);
-  for (const s of list) {
-    const { y, m } = seasonYearMonth(s);
-    map.set(`${y}-${m}`, s);
-  }
-  return map;
-}
-
-/** 버튼에 적히는 글자 (2026.09) */
-function monthBtnText(s) {
-  if (!s) return '-';
-  const { y, m } = seasonYearMonth(s);
-  return `${y}.${pad2(m)}`;
+function monthOptions() {
+  const list = seasons.length
+    ? [...seasons]
+    : (season ? [season] : []);
+  list.sort((a, b) => b.startsAt - a.startsAt);
+  return list.map(s => {
+    const d = new Date(s.endsAt - 1 + 9 * 60 * 60 * 1000);
+    const y = d.getUTCFullYear();
+    const m = d.getUTCMonth() + 1;
+    const live = season && s.id === season.id;
+    return { id: s.id, text: `${y}년 ${m}월` + (live ? ' (진행 중)' : '') };
+  });
 }
 
 function renderMonthPickers() {
-  const cur = viewSeason();
-  const text = monthBtnText(cur);
-  document.querySelectorAll('.month-btn .month-btn-t').forEach(el => { el.textContent = text; });
+  const opts = monthOptions();
+  const selected = viewSeasonId || (season ? season.id : (opts[0] ? opts[0].id : ''));
+  const html = opts.map(o =>
+    `<option value="${esc(o.id)}"${o.id === selected ? ' selected' : ''}>${esc(o.text)}</option>`
+  ).join('');
 
+  document.querySelectorAll('.month-select').forEach(sel => {
+    sel.innerHTML = html || '<option value="">기록 없음</option>';
+    sel.value = selected;
+    sel.disabled = opts.length <= 1;
+  });
+
+  const cur = viewSeason();
   const badge = isLiveView() ? '' : (cur ? `지난 기록 · ${esc(cur.label)}` : '지난 기록');
   document.querySelectorAll('.month-past').forEach(el => { el.innerHTML = badge; });
-}
-
-/* 달력 창에서 넘겨 보고 있는 연도 */
-let ymYear = null;
-
-function openMonthPicker() {
-  const cur = viewSeason();
-  ymYear = cur ? seasonYearMonth(cur).y : new Date().getFullYear();
-  drawMonthPicker();
-}
-
-function drawMonthPicker() {
-  const map = monthMap();
-  const years = [...map.values()].map(s => seasonYearMonth(s).y);
-  const minY = years.length ? Math.min(...years) : ymYear;
-  const maxY = years.length ? Math.max(...years) : ymYear;
-
-  const cur = viewSeason();
-  const sel = cur ? seasonYearMonth(cur) : null;
-
-  const arrow = (dir) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <path d="${dir < 0 ? 'M15 5l-7 7 7 7' : 'M9 5l7 7-7 7'}"></path></svg>`;
-
-  const cells = [];
-  for (let m = 1; m <= 12; m++) {
-    const s = map.get(`${ymYear}-${m}`);
-    const on = sel && sel.y === ymYear && sel.m === m;
-    cells.push(`<button type="button" class="ym-cell${on ? ' on' : ''}"
-      ${s ? `data-ym="${esc(s.id)}"` : 'disabled'}>${m}월</button>`);
-  }
-
-  openModal(`
-    <button class="modal-x" onclick="closeModal()" aria-label="닫기">✕</button>
-    <h3 class="ym-title">년월선택</h3>
-    <div class="ym-head">
-      <button type="button" class="ym-nav" data-ymy="${ymYear - 1}"
-        ${ymYear - 1 < minY ? 'disabled' : ''} aria-label="이전 해">${arrow(-1)}</button>
-      <span class="ym-year">${ymYear}년</span>
-      <button type="button" class="ym-nav" data-ymy="${ymYear + 1}"
-        ${ymYear + 1 > maxY ? 'disabled' : ''} aria-label="다음 해">${arrow(1)}</button>
-    </div>
-    <div class="ym-grid">${cells.join('')}</div>
-    <div class="ym-note">기록이 있는 달만 고를 수 있습니다 ·
-      2026년 9월은 <b>8월 27일부터</b>의 기록을 함께 담고 있습니다.</div>
-  `);
-
-  document.querySelectorAll('[data-ymy]').forEach(b => {
-    b.addEventListener('click', () => { ymYear = Number(b.dataset.ymy); drawMonthPicker(); });
-  });
-  document.querySelectorAll('[data-ym]').forEach(b => {
-    b.addEventListener('click', () => { closeModal(); selectMonth(b.dataset.ym); });
-  });
 }
 
 /** 달을 바꾸면 1~4페이지가 모두 그 달 기준으로 다시 그려진다 */
@@ -632,8 +578,8 @@ async function selectMonth(id) {
 }
 
 function initMonthPickers() {
-  document.querySelectorAll('.month-btn').forEach(btn => {
-    btn.addEventListener('click', openMonthPicker);
+  document.querySelectorAll('.month-select').forEach(sel => {
+    sel.addEventListener('change', () => selectMonth(sel.value));
   });
 }
 
