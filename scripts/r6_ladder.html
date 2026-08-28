@@ -485,34 +485,6 @@ tbody tr:hover td{ background:var(--surface-sunken); }
 }
 .slot-chip:focus-visible{ outline:none; box-shadow:var(--shadow-focus); }
 
-/* ---------- 월간 결산 ---------- */
-.season-now{
-  display:flex; flex-wrap:wrap; gap:var(--sp-4) var(--sp-8); align-items:baseline;
-  background:var(--accent-bg); border-radius:var(--radius-md);
-  padding:var(--sp-4) var(--sp-5); margin-bottom:var(--sp-6);
-}
-.season-now-k{
-  display:block; font-size:var(--fs-footnote); color:var(--text-secondary);
-  margin-bottom:2px;
-}
-.season-now-v{ font-size:var(--fs-subhead); font-weight:var(--fw-bold); color:var(--text-primary); }
-.season-now-v.em{ color:var(--accent-strong); }
-
-.season-card{ margin-bottom:var(--sp-8); }
-.season-card:last-child{ margin-bottom:0; }
-.season-head{
-  display:flex; flex-wrap:wrap; align-items:baseline; gap:var(--sp-3);
-  border-bottom:1px solid var(--border-strong); padding-bottom:var(--sp-3);
-  margin-bottom:var(--sp-3);
-}
-.season-title{ font-size:var(--fs-heading); font-weight:var(--fw-bold); letter-spacing:var(--ls-tight); }
-.season-range{ font-size:var(--fs-footnote); color:var(--text-tertiary); }
-.season-count{
-  margin-left:auto; font-size:var(--fs-footnote); color:var(--text-secondary);
-  background:var(--surface-sunken); border-radius:var(--radius-pill); padding:2px var(--sp-3);
-}
-.season-empty{ font-size:var(--fs-caption); color:var(--text-tertiary); padding:var(--sp-5) 0; }
-
 .search-row{ display:flex; gap:var(--sp-3); margin-bottom:var(--sp-4); flex-wrap:wrap; }
 input[type=text],input[type=password],input[type=search],select,textarea{
   background:var(--surface); border:1px solid var(--border-strong);
@@ -895,10 +867,9 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
     <button class="tab-btn" data-tab="mostpoint">② 상세순위</button>
     <button class="tab-btn" data-tab="history">③ 경기기록</button>
     <button class="tab-btn" data-tab="attendance">④ 출석</button>
-    <button class="tab-btn" data-tab="season">⑤ 월간기록</button>
-    <button class="tab-btn" data-tab="tournament">⑥ 대회</button>
-    <button class="tab-btn" data-tab="board">⑦ 게시판</button>
-    <button class="tab-btn" data-tab="admin">⑧ 관리자</button>
+    <button class="tab-btn" data-tab="tournament">⑤ 대회</button>
+    <button class="tab-btn" data-tab="board">⑥ 게시판</button>
+    <button class="tab-btn" data-tab="admin">⑦ 관리자</button>
   </nav>
 
   <!-- STANDING -->
@@ -1114,23 +1085,6 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
         <select id="meSchedule" class="me-select" aria-label="접속 예상 시간에 쓸 내 아이디"></select>
         <span class="mine-right" id="slotMine"></span>
       </div>
-    </div>
-  </div>
-
-  <!-- MONTHLY — 시즌(월) 단위 결산 -->
-  <div class="tab-panel" id="tab-season">
-    <div class="panel hud-corner">
-      <div class="panel-head">
-        <h2>월간 결산 · Monthly</h2>
-        <select class="month-select" aria-label="조회할 월 선택"></select>
-      </div>
-      <div class="foot-note" style="margin-top:0;margin-bottom:14px;">
-        기록은 매월 1일 00시(한국 시각)에 초기화되고, 마감된 달의 순위는 그대로 남습니다 ·
-        위 달력에서 달을 고르면 1~4페이지가 모두 그 달 기준으로 바뀝니다 ·
-        첫 시즌만 <b>2026년 8월 27일 ~ 9월 30일</b>을 한 달로 잡아 8월 기록은 9월에 합산됩니다.
-      </div>
-      <div id="seasonNow"></div>
-      <div id="seasonList"></div>
     </div>
   </div>
 

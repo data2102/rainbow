@@ -10,7 +10,6 @@ let tMatches = [];          // 대회 경기 기록
 let posts = [];             // 게시판 글
 let season = null;          // 진행 중인 시즌
 let seasons = [];           // 시즌 목록(진행 중 + 마감)
-let seasonTop = 10;         // 월간 결산 표에 보여줄 등수
 let viewSeasonId = null;    // 화면에서 보고 있는 달. null 이면 진행 중인 달
 const seasonCache = {};     // 지난 달 상세 (id -> {players, matches})
 let playSlots = [];         // 고를 수 있는 시간대
@@ -95,7 +94,6 @@ async function loadSeasons() {
     const d = await apiGet('/api/season');
     season = d.current || season;
     seasons = d.seasons || [];
-    if (d.top) seasonTop = d.top;
   } catch { seasons = []; }
 }
 
@@ -535,7 +533,6 @@ function renderAll() {
   renderBoard();
   renderAttendance();
   renderMonthPickers();
-  renderSeasons();
 }
 
 /* ---------- 접속 예상 시간 ---------- */
@@ -750,86 +747,12 @@ async function selectMonth(id) {
   renderTop5();
   renderClanTop();
   renderHistory();
-  renderSeasons();
 }
 
 function initMonthPickers() {
   document.querySelectorAll('.month-select').forEach(sel => {
     sel.addEventListener('change', () => selectMonth(sel.value));
   });
-}
-
-/* ---------- 월간 결산 (MONTHLY) ---------- */
-
-/** epoch ms 를 한국 시각 기준 'YYYY-MM-DD' 로 */
-function formatKstDate(ts) {
-  const d = new Date(ts + 9 * 60 * 60 * 1000);
-  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
-}
-
-/** 시즌이 끝나는 시각은 다음 시즌의 시작이므로, 표기는 하루 앞당긴다 */
-function seasonRange(s) {
-  return `${formatKstDate(s.startsAt)} ~ ${formatKstDate(s.endsAt - 1)}`;
-}
-
-function seasonRatio(r) {
-  const total = r.wins + r.losses;
-  return total === 0 ? 0 : Math.round((r.wins / total) * 1000) / 10;
-}
-
-function seasonTable(rows) {
-  if (!rows.length) return '<div class="season-empty">경기 기록이 없습니다.</div>';
-  return `<div class="table-wrap"><table>
-    <thead><tr><th>Rank</th><th>ID</th><th>Clan</th><th>Win</th><th>Loss</th><th>Ratio</th></tr></thead>
-    <tbody>${rows.map(r => `
-      <tr><td class="rank-cell ${medalClass(r.rank)}">${r.rank}</td>
-      <td>${esc(r.handle)}</td><td class="clan-tag">${esc(r.clan)}</td>
-      <td class="win-txt">${r.wins}</td><td class="loss-txt">${r.losses}</td>
-      <td>${seasonRatio(r)}%</td></tr>`).join('')}</tbody>
-  </table></div>`;
-}
-
-function renderSeasons() {
-  const nowEl = document.getElementById('seasonNow');
-  const listEl = document.getElementById('seasonList');
-  if (!nowEl || !listEl) return;
-
-  const s = viewSeason();
-  if (!s) { nowEl.innerHTML = ''; listEl.innerHTML = '<div class="season-empty">기록이 없습니다.</div>'; return; }
-
-  const live = isLiveView();
-  const games = viewMatches().length;
-  const left = Math.max(0, Math.ceil((s.endsAt - Date.now()) / 86400000));
-
-  nowEl.innerHTML = `<div class="season-now">
-    <div><span class="season-now-k">${live ? '진행 중' : '마감'}</span>
-         <span class="season-now-v em">${esc(s.label)}</span></div>
-    <div><span class="season-now-k">기간</span><span class="season-now-v">${seasonRange(s)}</span></div>
-    ${live
-      ? `<div><span class="season-now-k">남은 기간</span><span class="season-now-v">${left}일</span></div>`
-      : ''}
-    <div><span class="season-now-k">경기</span><span class="season-now-v">${games}건</span></div>
-  </div>`;
-
-  // 요약의 등수는 STANDING 과 반드시 같아야 한다.
-  // 마감된 달은 저장해 둔 등수를 그대로 쓰고, 진행 중인 달만 여기서 매긴다.
-  const played = viewPlayers().filter(p => p.wins + p.losses > 0);
-  const ranked = (live
-    ? [...played]
-        .sort((a, b) => b.point - a.point || b.wins - a.wins
-          || (a.handle < b.handle ? -1 : a.handle > b.handle ? 1 : 0))
-        .map((p, i) => ({ ...p, rank: i + 1 }))
-    : played)
-    .slice(0, seasonTop);
-
-  listEl.innerHTML = `<div class="season-card">
-    <div class="season-head">
-      <span class="season-title">${esc(s.label)} 요약</span>
-      <span class="season-range">상위 ${seasonTop}위</span>
-      <span class="season-count">${live ? '진행 중 · 실시간' : '마감된 기록'}</span>
-    </div>
-    ${seasonTable(ranked)}
-  </div>`;
 }
 
 /* ---------- 대회 (TOURNAMENT) ---------- */
@@ -1636,7 +1559,6 @@ function activateTab(name) {
   }
   if (name === 'history') refreshAll();
   if (name === 'attendance') { loadAttendance().then(renderAttendance); }
-  if (name === 'season') { loadSeasons().then(() => { renderMonthPickers(); renderSeasons(); }); }
 }
 
 function initTabs() {
