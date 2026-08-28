@@ -1883,6 +1883,26 @@ function renderRoomView(r) {
     if (v) v.textContent = r.address || '';
   }
 
+  // 게임이 켜진 뒤 로비까지 가는 길. 방장과 참가자가 누르는 곳이 다르다.
+  const steps = document.getElementById('roomSteps');
+  if (steps) {
+    steps.style.display = r.running ? 'block' : 'none';
+    steps.innerHTML = host
+      ? `<div class="room-steps-h">게임이 켜지면 — 방 만들기</div>
+         <ol>
+           <li><kbd>MULTIPLAYER</kbd></li>
+           <li><kbd>CREATE GAME</kbd></li>
+           <li>맵과 인원을 정하고 사람들이 다 들어오면 <kbd>START MISSION</kbd></li>
+         </ol>`
+      : `<div class="room-steps-h">게임이 켜지면 — 방장에게 들어가기</div>
+         <ol>
+           <li><kbd>MULTIPLAYER</kbd></li>
+           <li><kbd>MANUAL JOIN</kbd></li>
+           <li>주소 칸에 <kbd>Ctrl</kbd> + <kbd>V</kbd> — 조인하기를 누를 때 복사해뒀습니다
+               ${r.address ? `(<b>${esc(r.address)}</b>)` : ''}</li>
+         </ol>`;
+  }
+
   const actions = document.getElementById('roomActions');
   if (actions) {
     actions.innerHTML = host

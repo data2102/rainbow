@@ -979,6 +979,27 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 }
 .room-addr .btn-mini{ margin-left:auto; }
 
+/* 게임이 켜진 뒤 어디를 눌러야 하는지 — 로비까지 가는 길 */
+.room-steps{
+  margin-top:var(--sp-3); border:1px solid var(--border); border-radius:var(--radius-md);
+  background:var(--surface-sunken); padding:var(--sp-4) var(--sp-5);
+}
+.room-steps-h{
+  font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+  color:var(--text-secondary); margin-bottom:var(--sp-2);
+}
+.room-steps ol{ margin:0; padding-left:1.3em; }
+.room-steps li{
+  font-size:var(--fs-caption); color:var(--text-secondary);
+  line-height:var(--lh-body); margin-bottom:2px;
+}
+.room-steps kbd{
+  font-family:var(--font-mono); font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+  color:var(--text-primary); background:var(--surface);
+  border:1px solid var(--border-strong); border-bottom-width:2px;
+  border-radius:var(--radius-sm); padding:1px var(--sp-2);
+}
+
 .room-actions{ display:flex; gap:var(--sp-3); margin-top:var(--sp-4); flex-wrap:wrap; }
 .room-actions .btn{ flex:1 1 160px; margin-top:0; }
 .room-actions .btn-ghost{ flex:1 1 160px; margin-top:0; }
@@ -1618,6 +1639,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
           <code class="addr-v" id="addrValue"></code>
           <button type="button" class="btn-mini btn-edit" id="addrCopy">복사</button>
         </div>
+        <div class="room-steps" id="roomSteps" style="display:none;"></div>
         <div class="room-actions" id="roomActions"></div>
         <div class="foot-note" id="roomNote"></div>
       </div>

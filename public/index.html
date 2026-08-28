@@ -979,6 +979,27 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 }
 .room-addr .btn-mini{ margin-left:auto; }
 
+/* 게임이 켜진 뒤 어디를 눌러야 하는지 — 로비까지 가는 길 */
+.room-steps{
+  margin-top:var(--sp-3); border:1px solid var(--border); border-radius:var(--radius-md);
+  background:var(--surface-sunken); padding:var(--sp-4) var(--sp-5);
+}
+.room-steps-h{
+  font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+  color:var(--text-secondary); margin-bottom:var(--sp-2);
+}
+.room-steps ol{ margin:0; padding-left:1.3em; }
+.room-steps li{
+  font-size:var(--fs-caption); color:var(--text-secondary);
+  line-height:var(--lh-body); margin-bottom:2px;
+}
+.room-steps kbd{
+  font-family:var(--font-mono); font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+  color:var(--text-primary); background:var(--surface);
+  border:1px solid var(--border-strong); border-bottom-width:2px;
+  border-radius:var(--radius-sm); padding:1px var(--sp-2);
+}
+
 .room-actions{ display:flex; gap:var(--sp-3); margin-top:var(--sp-4); flex-wrap:wrap; }
 .room-actions .btn{ flex:1 1 160px; margin-top:0; }
 .room-actions .btn-ghost{ flex:1 1 160px; margin-top:0; }
@@ -1618,6 +1639,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
           <code class="addr-v" id="addrValue"></code>
           <button type="button" class="btn-mini btn-edit" id="addrCopy">복사</button>
         </div>
+        <div class="room-steps" id="roomSteps" style="display:none;"></div>
         <div class="room-actions" id="roomActions"></div>
         <div class="foot-note" id="roomNote"></div>
       </div>
@@ -3514,6 +3536,26 @@ function renderRoomView(r) {
     addr.style.display = r.address ? 'flex' : 'none';
     const v = document.getElementById('addrValue');
     if (v) v.textContent = r.address || '';
+  }
+
+  // 게임이 켜진 뒤 로비까지 가는 길. 방장과 참가자가 누르는 곳이 다르다.
+  const steps = document.getElementById('roomSteps');
+  if (steps) {
+    steps.style.display = r.running ? 'block' : 'none';
+    steps.innerHTML = host
+      ? `<div class="room-steps-h">게임이 켜지면 — 방 만들기</div>
+         <ol>
+           <li><kbd>MULTIPLAYER</kbd></li>
+           <li><kbd>CREATE GAME</kbd></li>
+           <li>맵과 인원을 정하고 사람들이 다 들어오면 <kbd>START MISSION</kbd></li>
+         </ol>`
+      : `<div class="room-steps-h">게임이 켜지면 — 방장에게 들어가기</div>
+         <ol>
+           <li><kbd>MULTIPLAYER</kbd></li>
+           <li><kbd>MANUAL JOIN</kbd></li>
+           <li>주소 칸에 <kbd>Ctrl</kbd> + <kbd>V</kbd> — 조인하기를 누를 때 복사해뒀습니다
+               ${r.address ? `(<b>${esc(r.address)}</b>)` : ''}</li>
+         </ol>`;
   }
 
   const actions = document.getElementById('roomActions');
