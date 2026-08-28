@@ -357,30 +357,6 @@ function renderChecklists() {
   if (submit) submit.disabled = !(getChecked('winList').length > 0 && getChecked('loseList').length > 0);
 }
 
-function matchLine(m) {
-  const winners = m.winners || [];
-  const losers = m.losers || [];
-  return {
-    win: winners.map(w => `${esc(w.handle)}(+${w.gained !== undefined ? w.gained : '-'})`).join(', '),
-    lose: losers.map(esc).join(', '),
-    wc: winners.length, lc: losers.length,
-  };
-}
-
-function renderLog() {
-  const box = document.getElementById('logBody');
-  if (!box) return;
-  if (!matches.length) { box.innerHTML = '<div class="log-empty">기록 없음</div>'; return; }
-  box.innerHTML = [...matches].slice(-8).reverse().map(m => {
-    const l = matchLine(m);
-    return `<div class="log-row" style="flex-direction:column;align-items:flex-start;gap:4px;">
-      <div><span class="win-txt">WIN(${l.wc})</span> ${l.win}</div>
-      <div><span class="loss-txt">LOSE(${l.lc})</span> ${l.lose}</div>
-      <div class="log-meta">등록자 : ${esc(m.recordedBy || '-')} · 등록일시 : ${formatDateTime(m.ts)}</div>
-    </div>`;
-  }).join('');
-}
-
 function renderHistory() {
   const tbody = document.querySelector('#historyTable tbody');
   const wrap = document.getElementById('historyTableWrap');
@@ -450,7 +426,6 @@ function renderAll() {
   renderTop5();
   renderClanTop();
   renderChecklists();
-  renderLog();
   renderHistory();
   renderPending();
   renderAccounts();
