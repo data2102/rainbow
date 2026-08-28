@@ -13,13 +13,10 @@ let seasons = [];           // 시즌 목록(진행 중 + 마감)
 let seasonTop = 10;         // 월간 결산 표에 보여줄 등수
 let viewSeasonId = null;    // 화면에서 보고 있는 달. null 이면 진행 중인 달
 const seasonCache = {};     // 지난 달 상세 (id -> {players, matches})
-let attLogs = [];           // 보고 있는 달의 출퇴근 기록
-let attLoaded = null;       // 그 기록이 어느 달 것인지
 let playSlots = [];         // 고를 수 있는 시간대
 let playSchedule = [];      // [{handle, slot}] 오늘의 접속 예상 시간
 let playToday = null;       // 그 예정이 어느 날짜 것인지
 let meSchedule = null;      // 접속 예상 시간에서 고른 내 아이디
-let meAtt = null;           // 출퇴근에서 고른 내 아이디 (따로 관리)
 let openCommentForm = null; // 댓글 입력창이 열린 글 id
 
 /* 대회 참가 팀. api/tournament.js 의 TEAMS 와 id 가 일치해야 합니다. */
@@ -131,17 +128,14 @@ function viewSeason() {
   return seasons.find(s => s.id === viewSeasonId) || null;
 }
 
-async function loadAttendance(id) {
-  const target = id || (viewSeason() ? viewSeason().id : null);
-  if (!target) { attLogs = []; attLoaded = null; return; }
+/** 오늘의 접속 예정을 받아온다 */
+async function loadAttendance() {
   try {
-    const d = await apiGet('/api/attendance?season=' + encodeURIComponent(target));
-    attLogs = d.logs || [];
+    const d = await apiGet('/api/attendance');
     if (d.slots) playSlots = d.slots;
     playSchedule = d.schedule || [];
     playToday = d.day || null;
-    attLoaded = target;
-  } catch { attLogs = []; attLoaded = null; }
+  } catch { playSchedule = []; playToday = null; }
 }
 
 async function loadPosts() {
@@ -645,246 +639,64 @@ async function toggleSlot(handle, slot) {
 }
 
 function initScheduleEvents() {
+  loadMe();
+
+  const sel = document.getElementById('meSchedule');
+  if (sel) sel.addEventListener('change', () => setMe(sel.value));
+
   const el = document.getElementById('slotMine');
   if (el) el.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-slot]');
     if (btn && meSchedule) toggleSlot(meSchedule, Number(btn.dataset.slot));
   });
-}
 
-/* ---------- 출퇴근 (ATTENDANCE) ---------- */
-
-const ATT_TOP = 5;          // 출근·게임시간 표에 보여줄 인원
-
-/** 밀리초를 '3시간 20분' 처럼 읽히게 */
-function formatDuration(ms) {
-  if (!ms || ms < 0) ms = 0;
-  const min = Math.floor(ms / 60000);
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  if (!h) return `${m}분`;
-  return m ? `${h}시간 ${m}분` : `${h}시간`;
-}
-
-function formatClock(ts) {
-  const d = new Date(ts);
-  return `${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-}
-
-/**
- * 아직 퇴근을 안 찍었으면 지금까지를 센다.
- * 지난 달을 보고 있을 때는 그 달이 끝난 시각에서 멈춘다.
- */
-function logDuration(log) {
-  const s = viewSeason();
-  const end = log.clockOut != null ? log.clockOut
-    : Math.min(Date.now(), s ? s.endsAt : Date.now());
-  return Math.max(0, end - log.clockIn);
-}
-
-/** 사람별로 출근 횟수와 게임시간을 합산한다 */
-function attendanceTotals() {
-  const map = new Map();
-  for (const log of attLogs) {
-    if (!map.has(log.handle)) map.set(log.handle, { handle: log.handle, count: 0, ms: 0 });
-    const t = map.get(log.handle);
-    t.count++;
-    t.ms += logDuration(log);
-  }
-  for (const t of map.values()) {
-    const p = findPlayer(t.handle);
-    t.clan = p ? p.clan : '-';
-  }
-  return [...map.values()];
-}
-
-function attendanceRows(bodyId, list, timeFirst) {
-  const el = document.getElementById(bodyId);
-  if (!el) return;
-  el.innerHTML = list.map((t, i) => `<tr>
-    <td class="rank-cell ${medalClass(i + 1)}">${i + 1}</td>
-    <td>${esc(t.handle)}</td>
-    <td class="clan-tag">${esc(t.clan)}</td>
-    ${timeFirst
-      ? `<td class="att-dur">${formatDuration(t.ms)}</td><td>${t.count}회</td>`
-      : `<td>${t.count}회</td><td class="att-dur">${formatDuration(t.ms)}</td>`}
-  </tr>`).join('') || '<tr><td colspan="5" class="log-empty">기록 없음</td></tr>';
-}
-
-/** 출근/퇴근 버튼 판 — STANDING 에 있는 회원 전원 */
-/** 지금 게임 중인 사람들 */
-function renderAttNow() {
-  const el = document.getElementById('attNow');
-  if (!el) return;
-
-  const open = attLogs.filter(l => l.clockOut == null)
-    .sort((a, b) => a.clockIn - b.clockIn);
-  el.innerHTML = `<div class="now-box${open.length ? ' on' : ''}">
-    <span class="now-k">지금 게임 중 ${open.length}명</span>
-    <span class="now-names">${open.length
-      ? open.map(l => `<span class="now-name">${esc(l.handle)}`
-          + `<b>${formatDuration(Date.now() - l.clockIn)}</b></span>`).join('')
-      : '<span class="mine-none">아직 없습니다.</span>'}</span>
-  </div>`;
-}
-
-/** 내가 고른 아이디의 출근/퇴근 버튼 한 줄 */
-function renderAttMine() {
-  const el = document.getElementById('attMine');
-  if (!el) return;
-
-  if (!isLiveView()) {
-    el.innerHTML = '<span class="mine-none">'
-      + '지난 달 기록은 보기만 됩니다. 출근·퇴근은 이번 달에서 찍어주세요.</span>';
-    return;
-  }
-  if (!meAtt) {
-    el.innerHTML = '<span class="mine-none">아이디를 고르면 출근·퇴근을 찍을 수 있습니다.</span>';
-    return;
-  }
-
-  const on = attLogs.find(l => l.handle === meAtt && l.clockOut == null);
-  el.innerHTML = `<span class="mine-state">${on
-      ? `${formatClock(on.clockIn)} 출근 · ${formatDuration(Date.now() - on.clockIn)}째`
-      : '퇴근 상태'}</span>
-    <button type="button" class="att-btn ${on ? 'out' : 'in'}"
-      data-att="${on ? 'out' : 'in'}">${on ? '퇴근' : '출근'}</button>`;
-}
-
-function renderAttendance() {
-  renderMePicker();
-  renderSchedule();
-  renderAttNow();
-  renderAttMine();
-
-  // 기록 목록 (최근 것이 위로)
-  const tbody = document.querySelector('#attLogTable tbody');
-  const empty = document.getElementById('attLogEmpty');
-  const wrap = document.getElementById('attLogWrap');
-  if (tbody && empty && wrap) {
-    const rows = [...attLogs].reverse();
-    wrap.style.display = rows.length ? '' : 'none';
-    empty.style.display = rows.length ? 'none' : 'block';
-    tbody.innerHTML = rows.map((log, i) => `<tr>
-      <td class="h-no-cell h-inline" data-l="기록">#${rows.length - i}</td>
-      <td class="h-inline" data-l="ID">${esc(log.handle)}</td>
-      <td class="h-inline" data-l="출근">${formatClock(log.clockIn)}</td>
-      <td class="h-inline" data-l="퇴근">${log.clockOut != null
-        ? formatClock(log.clockOut) : '<span class="att-live">게임 중</span>'}</td>
-      <td class="h-inline att-dur" data-l="시간">${formatDuration(logDuration(log))}</td>
-      <td class="h-by-cell">${currentAdmin
-        ? `<button class="btn-mini btn-reject" data-attdel="${log.id}">삭제</button>` : ''}</td>
-    </tr>`).join('');
-  }
-
-  // 아래 두 표. 두 표 모두 동점이면 출근 횟수가 많은 쪽을 위로 둔다.
-  const totals = attendanceTotals();
-  attendanceRows('attCountBody', [...totals]
-    .sort((a, b) => b.count - a.count || b.ms - a.ms || a.handle.localeCompare(b.handle))
-    .slice(0, ATT_TOP), false);
-  attendanceRows('attTimeBody', [...totals]
-    .sort((a, b) => b.ms - a.ms || b.count - a.count || a.handle.localeCompare(b.handle))
-    .slice(0, ATT_TOP), true);
-
-  const note = document.getElementById('attNote');
-  if (note) {
-    note.innerHTML = '동점이면 <b>출근 횟수</b>가 많은 회원이 위로 갑니다 · '
-      + '퇴근을 누르지 않은 기록은 지금까지의 시간으로 계산하고, 달이 바뀌면 그 달 마지막 시각에서 멈춥니다.';
-  }
-}
-
-async function punchAttendance(action, handle) {
-  try {
-    await apiPost('/api/attendance', { action, handle });
-    await loadAttendance();
-    renderAttendance();
-    showToast(`${handle} · ${action === 'in' ? '출근' : '퇴근'} 기록했습니다.`);
-  } catch (e) { showToast(e.message); }
-}
-
-async function deleteAttendance(id) {
-  if (!confirm('이 출퇴근 기록을 지울까요?')) return;
-  try {
-    await apiPost('/api/attendance', { action: 'remove', id: Number(id) });
-    await loadAttendance();
-    renderAttendance();
-    showToast('기록을 삭제했습니다.');
-  } catch (e) { showToast(e.message); }
-}
-
-/* ---------- 내 아이디 ---------- */
-
-/* 접속 예상 시간과 출퇴근은 서로 다른 사람을 고를 수 있다 */
-const ME_KEYS = { schedule: 'r6-me-schedule', att: 'r6-me-att' };
-const ME_LEGACY_KEY = 'r6-me';   // 하나로 쓰던 시절의 값
-
-function loadMe() {
-  let legacy = null;
-  try { legacy = localStorage.getItem(ME_LEGACY_KEY); } catch { /* noop */ }
-  try { meSchedule = localStorage.getItem(ME_KEYS.schedule) || legacy || null; } catch { meSchedule = legacy; }
-  try { meAtt = localStorage.getItem(ME_KEYS.att) || legacy || null; } catch { meAtt = legacy; }
-}
-
-function meOf(which) { return which === 'att' ? meAtt : meSchedule; }
-
-/** 선택 상자를 명단으로 채운다. 명단에서 빠진 아이디가 남아 있으면 놓아준다. */
-function fillMeSelect(id, which) {
-  const sel = document.getElementById(id);
-  if (!sel) return;
-  let cur = meOf(which);
-  if (cur && !players.some(p => p.handle === cur)) {
-    cur = null;
-    if (which === 'att') meAtt = null; else meSchedule = null;
-  }
-  sel.innerHTML = '<option value="">아이디 선택</option>'
-    + players.map(p => `<option value="${esc(p.handle)}">${esc(p.handle)}</option>`).join('');
-  sel.value = cur || '';
-}
-
-function renderMePicker() {
-  fillMeSelect('meSchedule', 'schedule');
-  fillMeSelect('meAtt', 'att');
-}
-
-function setMe(which, handle) {
-  const value = handle || null;
-  if (which === 'att') meAtt = value; else meSchedule = value;
-  try {
-    if (value) localStorage.setItem(ME_KEYS[which], value);
-    else localStorage.removeItem(ME_KEYS[which]);
-  } catch { /* 사생활 보호 모드 등 */ }
-
-  if (which === 'att') renderAttMine();
-  else renderSlotMine();
-}
-
-function initAttendanceEvents() {
-  loadMe();
-  for (const [id, which] of [['meSchedule', 'schedule'], ['meAtt', 'att']]) {
-    const sel = document.getElementById(id);
-    if (sel) sel.addEventListener('change', () => setMe(which, sel.value));
-  }
-
+  // 07시를 넘겨 페이지를 켜둔 채로 두면 하루가 바뀐 것을 알아채고 다시 받아온다
   const panel = document.getElementById('tab-attendance');
   if (!panel) return;
-  panel.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-att], [data-attdel]');
-    if (!btn) return;
-    if (btn.dataset.attdel) return deleteAttendance(btn.dataset.attdel);
-    if (meAtt) punchAttendance(btn.dataset.att, meAtt);
-  });
-
-  // 게임 중인 사람의 경과 시간을 1분마다 갱신한다.
-  // 07시를 넘겨 하루가 바뀌면 접속 예정도 새로 받아온다.
   setInterval(async () => {
     if (!panel.classList.contains('active')) return;
     if (playToday && playToday !== playDay()) {
       await loadAttendance();
       renderAttendance();
-      return;
     }
-    if (attLogs.some(l => l.clockOut == null)) { renderAttNow(); renderAttMine(); }
   }, 60000);
+}
+
+/* ---------- 내 아이디 ---------- */
+
+/* 접속 예상 시간에서 쓰는 "나". 한 번 고르면 이 브라우저에 남는다. */
+const ME_KEY = 'r6-me-schedule';
+const ME_LEGACY_KEY = 'r6-me';   // 페이지 전체에서 하나로 쓰던 시절의 값
+
+function loadMe() {
+  try {
+    meSchedule = localStorage.getItem(ME_KEY) || localStorage.getItem(ME_LEGACY_KEY) || null;
+  } catch { meSchedule = null; }
+}
+
+/** 선택 상자를 명단으로 채운다. 명단에서 빠진 아이디가 남아 있으면 놓아준다. */
+function renderMePicker() {
+  const sel = document.getElementById('meSchedule');
+  if (!sel) return;
+  if (meSchedule && !players.some(p => p.handle === meSchedule)) meSchedule = null;
+
+  sel.innerHTML = '<option value="">아이디 선택</option>'
+    + players.map(p => `<option value="${esc(p.handle)}">${esc(p.handle)}</option>`).join('');
+  sel.value = meSchedule || '';
+}
+
+function setMe(handle) {
+  meSchedule = handle || null;
+  try {
+    if (meSchedule) localStorage.setItem(ME_KEY, meSchedule);
+    else localStorage.removeItem(ME_KEY);
+  } catch { /* 사생활 보호 모드 등 */ }
+  renderSlotMine();
+}
+
+function renderAttendance() {
+  renderMePicker();
+  renderSchedule();
 }
 
 /* ---------- 월 선택(달력) ---------- */
@@ -933,13 +745,11 @@ async function selectMonth(id) {
     try { await loadSeasonDetail(id); }
     catch (e) { showToast(e.message); viewSeasonId = null; }
   }
-  await loadAttendance(id);
   renderMonthPickers();
   renderStanding();
   renderTop5();
   renderClanTop();
   renderHistory();
-  renderAttendance();
   renderSeasons();
 }
 
@@ -1932,7 +1742,6 @@ async function boot() {
   initAdminEvents();
   initTournamentEvents();
   initBoardEvents();
-  initAttendanceEvents();
   initScheduleEvents();
   initMonthPickers();
   renderAuthBar();

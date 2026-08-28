@@ -65,7 +65,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_attendance_open
 CREATE TABLE IF NOT EXISTS play_schedule (
   day    TEXT NOT NULL,      -- 'YYYY-MM-DD' (07시 기준)
   handle TEXT NOT NULL,
-  slot   INTEGER NOT NULL,   -- 6~12 (6시대 ~ 12시대)
+  slot   INTEGER NOT NULL,   -- 6,7,8,9,10,11,12,1 (6시대 ~ 1시대)
   PRIMARY KEY (day, handle, slot)
 );
 

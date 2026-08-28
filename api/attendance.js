@@ -1,8 +1,11 @@
 import { q, tx, body, methodGuard, currentAdmin, audit } from './_lib.js';
 import { syncSeason } from './_season.js';
 
-/** 접속 예상 시간대. 화면(app.js)의 SLOTS 와 같아야 한다. */
-export const SLOTS = [6, 7, 8, 9, 10, 11, 12];
+/**
+ * 접속 예상 시간대. 12시 다음이 1시이므로 숫자 순서가 아니라 이 순서대로 보여준다.
+ * 화면(app.js)은 서버가 준 이 목록을 그대로 그린다.
+ */
+export const SLOTS = [6, 7, 8, 9, 10, 11, 12, 1];
 
 const KST = 9 * 60 * 60 * 1000;
 /** 접속 예상 시간이 초기화되는 시각 (한국 시각) */
