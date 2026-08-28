@@ -22,6 +22,7 @@ let rooms = [];             // 런쳐 방 8개
 let myRoom = null;          // 내가 들어가 있는 방 번호
 let roomMsgs = [];          // 그 방의 대화
 let savedAddress = null;    // 내가 지난번에 적어둔 Radmin 주소
+let vpn = { network: '', password: null };  // Radmin 네트워크 안내 (비밀번호는 로그인해야 온다)
 
 /* 대회 참가 팀. api/tournament.js 의 TEAMS 와 id 가 일치해야 합니다. */
 const TOURNAMENT_TEAMS = [
@@ -149,6 +150,7 @@ async function loadRooms() {
     myRoom = d.myRoom || null;
     roomMsgs = d.messages || [];
     savedAddress = d.savedAddress || null;
+    vpn = { network: d.network || '', password: d.networkPw || null };
   } catch { rooms = []; myRoom = null; roomMsgs = []; }
 }
 
@@ -1717,7 +1719,18 @@ function isHost(r) {
   return !!(r && me && r.host === me.handle);
 }
 
+/** Radmin 네트워크 안내. 비밀번호는 로그인한 사람에게만 보인다. */
+function renderVpnBar() {
+  const name = document.getElementById('vpnName');
+  const wrap = document.getElementById('vpnPwWrap');
+  const pw = document.getElementById('vpnPw');
+  if (name) name.textContent = vpn.network;
+  if (wrap) wrap.style.display = vpn.password ? 'inline-flex' : 'none';
+  if (pw) pw.textContent = vpn.password || '';
+}
+
 function renderLauncher() {
+  renderVpnBar();
   const gate = document.getElementById('lcGate');
   const grid = document.getElementById('lcRooms');
   const view = document.getElementById('lcRoom');

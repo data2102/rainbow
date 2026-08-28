@@ -933,6 +933,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   color:var(--accent-strong); background:var(--accent-bg);
   border-radius:var(--radius-sm); padding:2px var(--sp-3);
 }
+.vpn-pw{ display:inline-flex; align-items:center; gap:var(--sp-3); }
 .vpn-note{ font-size:var(--fs-footnote); color:var(--text-tertiary); }
 
 .setup{
@@ -1524,7 +1525,11 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 
       <div class="vpn-bar">
         <span class="vpn-k">Radmin VPN 네트워크</span>
-        <code class="vpn-v" id="vpnName">rainbowsix12345</code>
+        <code class="vpn-v" id="vpnName"></code>
+        <span class="vpn-pw" id="vpnPwWrap" style="display:none;">
+          <span class="vpn-k">비밀번호</span>
+          <code class="vpn-v" id="vpnPw"></code>
+        </span>
         <span class="vpn-note">먼저 Radmin VPN 으로 이 네트워크에 들어와 있어야 게임이 서로를 봅니다.</span>
       </div>
 

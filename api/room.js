@@ -14,8 +14,13 @@ export const ROOM_CAPACITY = 16;
 /** 이 시간 동안 아무 신호가 없으면 나간 것으로 본다 (브라우저를 그냥 닫는 경우) */
 const IDLE_MS = 3 * 60 * 1000;
 
-/** Radmin VPN 네트워크 이름. 화면 안내에 쓴다. */
+/**
+ * Radmin VPN 네트워크. 회원들이 여기 모여야 게임이 서로를 본다.
+ * 이름은 누구에게나 보여주고, 비밀번호는 로그인한 사람에게만 내려보낸다.
+ * 사이트가 이 값으로 무엇을 하지는 않는다 — 회원이 Radmin 창에 직접 적는 안내일 뿐이다.
+ */
 export const VPN_NETWORK = 'rainbowsix12345';
+export const VPN_PASSWORD = '111111';
 
 const MAX_MSG = 200;
 /** 방마다 남겨두는 대화 수 */
@@ -182,6 +187,7 @@ export default async function handler(req, res) {
         myRoom: mine ? mine.room : null,
         capacity: ROOM_CAPACITY,
         network: VPN_NETWORK,
+        networkPw: me ? VPN_PASSWORD : null,
       });
     }
 
