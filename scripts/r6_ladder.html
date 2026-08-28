@@ -1003,6 +1003,45 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 }
 .vpn-note{ font-size:var(--fs-footnote); color:var(--text-tertiary); }
 
+/* 설치 파일 세 개 — 접어두면 못 찾으므로 늘 펴둔다 */
+.dl-box{
+  border:1px solid var(--border-strong); border-radius:var(--radius-md);
+  background:var(--surface-sunken); padding:var(--sp-4);
+  margin-bottom:var(--sp-4);
+}
+.dl-h{
+  font-size:var(--fs-caption); font-weight:var(--fw-bold);
+  color:var(--text-primary); margin-bottom:var(--sp-1);
+}
+.dl-sub{ font-size:var(--fs-footnote); color:var(--text-tertiary); margin-bottom:var(--sp-4); }
+.dl-row{
+  display:flex; align-items:baseline; gap:var(--sp-3);
+  padding:var(--sp-3) 0; border-top:1px solid var(--border);
+  font-size:var(--fs-footnote); flex-wrap:wrap;
+}
+.dl-row:first-of-type{ border-top:none; }
+.dl-n{
+  flex:none; width:20px; height:20px; border-radius:50%;
+  background:var(--accent); color:var(--on-accent);
+  font-size:11px; font-weight:var(--fw-bold);
+  display:inline-flex; align-items:center; justify-content:center;
+  align-self:center;
+}
+.dl-a{
+  flex:none; font-family:var(--font-mono); font-size:var(--fs-footnote);
+  font-weight:var(--fw-bold); color:var(--accent-strong);
+  background:var(--accent-bg); border-radius:var(--radius-sm);
+  padding:3px var(--sp-3); text-decoration:none; white-space:nowrap;
+}
+.dl-a:hover{ text-decoration:underline; }
+.dl-d{ color:var(--text-secondary); min-width:0; }
+.dl-d a{ color:var(--accent); font-weight:var(--fw-medium); }
+.dl-d b{ color:var(--text-primary); font-weight:var(--fw-medium); }
+.dl-foot{
+  font-size:var(--fs-footnote); color:var(--text-tertiary);
+  margin-top:var(--sp-3); padding-top:var(--sp-3); border-top:1px solid var(--border);
+}
+
 .setup{
   border:1px solid var(--border); border-radius:var(--radius-md);
   background:var(--surface-sunken); margin-bottom:var(--sp-5);
@@ -1696,6 +1735,36 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
         <code class="vpn-v" id="myIpValue"></code>
         <button type="button" class="btn-mini btn-edit" id="myIpEdit">수정</button>
         <span class="vpn-note">한 번만 적어두면 됩니다 · 방장이 되면 사람들이 이 주소로 찾아옵니다.</span>
+      </div>
+
+      <div class="dl-box">
+        <div class="dl-h">처음 한 번만 — 설치 파일 3개</div>
+        <div class="dl-sub">방장·참가자 <b>모두</b> 세 개 다 해야 합니다 · 한 번 해두면 다음부터는 그냥 들어가기만 하면 됩니다.</div>
+
+        <div class="dl-row">
+          <span class="dl-n">1</span>
+          <a class="dl-a" href="/r6clan-auto.reg" download>r6clan-auto.reg</a>
+          <span class="dl-d">두 번 눌러 실행 → "예" → "확인" ·
+            사이트 버튼이 게임을 켤 수 있게 하고, <b>관리자 권한 실행</b>까지 걸어둡니다.</span>
+        </div>
+
+        <div class="dl-row">
+          <span class="dl-n">2</span>
+          <a class="dl-a" href="/r6launch.ahk" download>r6launch.ahk</a>
+          <span class="dl-d"><code>C:\R6Clan\</code> 폴더를 만들어 그 안에 넣기 ·
+            <a href="https://www.autohotkey.com/" target="_blank" rel="noopener">AutoHotkey v2</a> 도 설치해야 합니다.
+            <b>이 경로가 아니면 동작하지 않습니다.</b></span>
+        </div>
+
+        <div class="dl-row">
+          <span class="dl-n">3</span>
+          <a class="dl-a" href="/r6firewall.bat" download>r6firewall.bat</a>
+          <span class="dl-d">오른쪽 클릭 → <b>관리자 권한으로 실행</b> ·
+            UDP 2346·2347·2348 과 핑을 엽니다. 안 열면 접속이 느립니다.</span>
+        </div>
+
+        <div class="dl-foot">셋 다 메모장으로 열면 무엇을 하는지 다 보입니다 ·
+          자세한 설명과 되돌리는 방법은 아래 안내를 펼쳐보세요.</div>
       </div>
 
       <details class="setup">
