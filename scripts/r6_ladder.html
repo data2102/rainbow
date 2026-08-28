@@ -968,6 +968,35 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   background:var(--warning-bg); color:var(--warning-strong);
 }
 .seat.me .seat-id{ color:var(--accent); font-weight:var(--fw-medium); }
+.seat.pick{ cursor:context-menu; }
+.seat.pick:hover{ background:var(--surface); }
+.seat-hint{
+  flex:none; padding:var(--sp-2) var(--sp-4);
+  border-top:1px solid var(--border);
+  font-size:11px; color:var(--text-tertiary);
+}
+
+/* 명단에서 오른쪽 클릭했을 때 뜨는 작은 메뉴 */
+.ctx{
+  position:fixed; z-index:120; min-width:150px;
+  border:1px solid var(--border-strong); border-radius:var(--radius-md);
+  background:var(--surface); padding:var(--sp-1);
+  box-shadow:0 8px 24px rgba(0,0,0,.18);
+}
+.ctx-h{
+  padding:var(--sp-2) var(--sp-3); font-size:11px;
+  color:var(--text-tertiary); border-bottom:1px solid var(--border);
+  margin-bottom:var(--sp-1); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.ctx button{
+  display:block; width:100%; text-align:left;
+  padding:var(--sp-3); border:none; background:none; cursor:pointer;
+  font:inherit; font-size:var(--fs-footnote); color:var(--text-primary);
+  border-radius:var(--radius-sm);
+}
+.ctx button:hover{ background:var(--surface-sunken); }
+.ctx button.ctx-danger{ color:var(--danger-strong); }
+.ctx button.ctx-danger:hover{ background:var(--danger-bg); }
 
 .chat-log{
   height:280px; overflow-y:auto;
@@ -1811,11 +1840,6 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
              게임이 다른 곳에 깔려 있으면 <code>r6launch.bat</code> 을 메모장으로 열어
              <b>GAME</b> 경로만 고치면 됩니다. 기본 등록으로 되돌리려면
              <b>r6clan.reg</b> 를 다시 실행하세요.</p>
-          <p class="setup-warn">혹시 명령줄 방식이 안 되는 PC 가 있으면
-             <a href="/r6launch.ahk" download>r6launch.ahk</a> 와
-             <a href="https://www.autohotkey.com/" target="_blank" rel="noopener">AutoHotkey v2</a> 로
-             메뉴를 대신 눌러주는 옛 방식을 쓸 수 있습니다.
-             <code>r6clan-auto.reg</code> 를 메모장으로 열면 바꾸는 줄이 적혀 있습니다.</p>
         </div>
       </details>
 
@@ -1836,10 +1860,8 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
             <li><code>cd "C:\Program Files (x86)\Red Storm Entertainment\Tom Clancy's Rainbow Six"</code></li>
             <li><code>RainbowSix.exe -server 2346</code></li>
           </ol>
-          <p class="setup-warn">혹시 이 방식이 안 되는 PC 가 있으면
-             <code>r6launch.ahk</code> 를 메모장으로 열어 <b>UseCmdLine</b> 을
-             <code>false</code> 로 바꾸세요. 메뉴를 대신 눌러주는 옛 방식으로 돌아갑니다.
-             그때 쓰는 설정(대기 시간·마우스 좌표)도 파일에 그대로 남겨두었습니다.</p>
+          <p class="setup-warn">이 스위치는 설명서에 없습니다. Voobly 설치 파일 안에
+             적혀 있던 것을 찾아낸 것이고, 실제로 되는 것을 확인했습니다.</p>
         </div>
       </details>
 
@@ -1886,8 +1908,8 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
             <li><b>Radmin 길이 아직 안 뚫려 있다</b> — Radmin VPN 의 길은
                 처음 말을 걸 때 만들어집니다. 게임이 그 첫 손님이 되면
                 게임이 그 시간을 다 기다립니다.
-                <b>런처가 이제 게임을 켜는 동안 미리 두드려 둡니다</b> —
-                <code>r6launch.ahk</code> 를 다시 내려받아 덮어써 주세요.</li>
+                <b>런처가 게임을 켜기 전에 미리 두드려 둡니다</b> —
+                <code>r6launch.bat</code> 이 하는 일입니다.</li>
           </ol>
           <p class="setup-warn"><b>직접 재보려면</b> 시작 › <code>cmd</code> 를 열고
              <code>ping -n 10 방장주소</code> 를 쳐보세요
@@ -1929,6 +1951,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
           <aside class="room-side">
             <div class="side-h">접속자 <span id="roomCount"></span></div>
             <div class="seat-list" id="roomSeats"></div>
+            <div class="seat-hint" id="seatHint" style="display:none;">이름을 오른쪽 클릭 — 방장 넘기기 · 강퇴</div>
           </aside>
         </div>
         <div class="room-addr" id="roomAddr" style="display:none;">
@@ -1945,6 +1968,13 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 </div>
 <div class="toast" id="toast"></div>
 <div class="cd" id="countdown" aria-hidden="true"><div class="cd-n" id="countdownN"></div></div>
+
+<!-- 방장이 명단의 이름을 오른쪽 클릭했을 때 -->
+<div class="ctx" id="seatMenu" hidden>
+  <div class="ctx-h" id="seatMenuWho"></div>
+  <button type="button" data-do="host">방장 권한 주기</button>
+  <button type="button" data-do="kick" class="ctx-danger">강퇴하기</button>
+</div>
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal-box" id="modalContent"></div>
 </div>

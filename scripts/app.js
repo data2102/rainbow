@@ -22,6 +22,8 @@ let rooms = [];             // 런쳐 방 8개
 let myRoom = null;          // 내가 들어가 있는 방 번호
 let roomMsgs = [];          // 그 방의 대화
 let savedAddress = null;    // 내가 지난번에 적어둔 Radmin 주소
+let serverSkew = 0;         // 서버 시계 - 내 시계 (카운트다운을 맞추는 데 쓴다)
+let leavingOnPurpose = false;  // 내가 눌러서 나가는 중인가 (강퇴와 구분하려고)
 let vpn = { network: '', password: null };  // Radmin 네트워크 안내 (비밀번호는 로그인해야 온다)
 
 /* 대회 참가 팀. api/tournament.js 의 TEAMS 와 id 가 일치해야 합니다. */
@@ -144,14 +146,23 @@ async function loadAttendance() {
 
 /** 런쳐 방 현황. 이 요청 자체가 "아직 있다"는 신호가 된다. */
 async function loadRooms() {
+  const before = myRoom;
   try {
     const d = await apiGet('/api/room');
+    // 사람마다 컴퓨터 시계가 조금씩 다르다. 그 차이를 재두어야 방장이 누른
+    // 시각으로 세는 카운트다운이 모두에게 같은 숫자로 보인다.
+    if (d.now) serverSkew = d.now - Date.now();
     rooms = d.rooms || [];
     myRoom = d.myRoom || null;
     roomMsgs = d.messages || [];
     savedAddress = d.savedAddress || null;
     vpn = { network: d.network || '', password: d.networkPw || null };
   } catch { rooms = []; myRoom = null; roomMsgs = []; }
+
+  // 내가 누르지 않았는데 방에서 빠졌다면 알려준다
+  if (before && !myRoom && !leavingOnPurpose) {
+    showToast('방에서 나가게 되었습니다 · 강퇴되었거나 연결이 오래 끊겼습니다.');
+  }
 }
 
 async function loadPosts() {
@@ -1942,8 +1953,12 @@ function playCountdown(startedAt, onGo) {
     if (onGo) onGo();
   };
 
+  // 방장이 누른 시각은 서버 시계로 찍혀 온다. 내 시계와의 차이를 빼야
+  // 3 에서 멈춰 서 있는 일이 없다.
+  const deadline = startedAt - serverSkew + CD_MS;
+
   const tick = () => {
-    const left = Math.ceil((startedAt + CD_MS - Date.now()) / 1000);
+    const left = Math.ceil((deadline - Date.now()) / 1000);
     if (left > 0) {
       paint(String(Math.min(left, CD_MS / 1000)), false);
     } else {
@@ -1987,7 +2002,7 @@ function maybePlayRoomCountdown() {
   const r = myRoomData();
   if (!r || !r.running || !r.startedAt) return;
   if (r.startedAt === cdPlayedAt) return;                 // 이미 본 출발
-  if (Date.now() - r.startedAt > CD_MS + 2000) {          // 지나간 출발
+  if (Date.now() + serverSkew - r.startedAt > CD_MS + 2000) {   // 지나간 출발
     cdPlayedAt = r.startedAt;
     return;
   }
@@ -2102,13 +2117,28 @@ function renderRoomView(r) {
   const seats = document.getElementById('roomSeats');
   if (seats) {
     // 들어온 순서 그대로. 맨 위가 방장이다.
-    seats.innerHTML = r.members.map((h, i) => `
-      <div class="seat${me && h === me.handle ? ' me' : ''}">
+    const canManage = host;
+    seats.innerHTML = r.members.map((h, i) => {
+      const mine = me && h === me.handle;
+      const clickable = canManage && !mine;
+      return `<div class="seat${mine ? ' me' : ''}${clickable ? ' pick' : ''}"
+                   data-h="${esc(h)}"${clickable ? ' title="오른쪽 클릭 — 방장 넘기기 · 강퇴"' : ''}>
         <span class="seat-n">${i + 1}</span>
         <span class="seat-id">${esc(h)}</span>
         ${i === 0 ? '<span class="seat-badge">방장</span>' : ''}
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }
+
+  // 명단은 2초마다 다시 그려진다. 열려 있는 메뉴까지 매번 닫아버리면 누를 새가
+  // 없다. 그 사람이 방에서 빠졌거나 내가 방장이 아니게 됐을 때만 닫는다.
+  const menu = document.getElementById('seatMenu');
+  if (menu && !menu.hidden && (!host || !r.members.includes(menu.dataset.handle))) {
+    closeSeatMenu();
+  }
+
+  const hint = document.getElementById('seatHint');
+  if (hint) hint.style.display = (host && r.members.length > 1) ? '' : 'none';
 
   renderChatLog();
 
@@ -2120,30 +2150,26 @@ function renderRoomView(r) {
     if (v) v.textContent = r.address || '';
   }
 
-  // 게임이 켜진 뒤 로비까지 가는 길. 방장과 참가자가 누르는 곳이 다르다.
+  // 게임이 켜진 뒤. 설치를 마쳤으면 메뉴를 거치지 않고 곧장 로비로 들어간다.
   const steps = document.getElementById('roomSteps');
   if (steps) {
     steps.style.display = r.running ? 'block' : 'none';
     steps.innerHTML = host
-      ? `<div class="room-steps-h">게임이 켜지면 — 방 만들기</div>
+      ? `<div class="room-steps-h">게임이 켜지면 — 로비에서 기다리세요</div>
          <ol>
-           <li><kbd>MULTIPLAYER</kbd></li>
-           <li><kbd>CREATE GAME</kbd></li>
-           <li>맵과 인원을 정하고 사람들이 다 들어오면 <kbd>START MISSION</kbd></li>
+           <li>사람들이 다 들어오면 맵과 인원을 정하고 <kbd>START MISSION</kbd></li>
          </ol>
-         <div class="steps-alt">여러 방이 함께 열리므로 <b>SERVER NAME 에 방 번호를</b>
-           넣어두세요 (예: <code>${r.room}번방 ${esc(r.host || '')}</code>).
-           목록에 그 이름이 뜹니다.</div>`
+         <div class="steps-alt">설치를 마쳤으면 <b>메인 메뉴를 거치지 않고 바로 로비</b>로
+           들어갑니다. 메인 메뉴에 그냥 서 있다면 위 설치 안내를 다시 확인해주세요.</div>`
       : `<div class="room-steps-h">게임이 켜지면 — ${esc(r.host || '방장')} 님 방으로</div>
          <ol>
-           <li><kbd>MULTIPLAYER</kbd></li>
-           <li><kbd>MANUAL JOIN</kbd></li>
-           <li>${r.address
-             ? `<b>${esc(r.address)}</b> 를 넣고 접속 (조인하기를 누르면 복사됩니다)`
-             : '방장의 Radmin 주소를 넣고 접속'}</li>
+           <li>자동으로 붙습니다. 로비에 들어가면 방장이 시작할 때까지 기다리세요.</li>
          </ol>
-         <div class="steps-alt"><kbd>JOIN GAME</kbd> 목록으로 들어가도 되지만,
-           <b>다른 방도 함께 뜹니다</b> — 방 번호를 보고 골라주세요.</div>`;
+         <div class="steps-alt">${r.address
+           ? `혹시 못 붙으면 <kbd>MULTIPLAYER</kbd> › <kbd>MANUAL JOIN</kbd> 에
+              <b>${esc(r.address)}</b> · 포트 <b>2346</b> 을 직접 넣으세요
+              (조인하기를 누르면 주소가 복사됩니다).`
+           : '방장이 아직 Radmin 주소를 적지 않아 자동으로 붙지 못할 수 있습니다.'}</div>`;
   }
 
   const actions = document.getElementById('roomActions');
@@ -2165,10 +2191,10 @@ function renderRoomView(r) {
   const note = document.getElementById('roomNote');
   if (note) {
     note.innerHTML = host
-      ? 'Radmin VPN 에서 게임을 열고, 실행하기에 내 Radmin 주소(26.…)를 적어주세요.'
+      ? 'Radmin VPN 에 들어와 있어야 하고, 실행하기에 내 Radmin 주소(26.…)가 필요합니다.'
         + ' 방에 있는 모두가 함께 카운트다운을 보고 게임이 켜집니다.'
       : (r.running
-        ? '게임이 켜졌으면 MANUAL JOIN 에 위 주소를 넣어 들어가세요 · 안 켜졌다면 조인하기.'
+        ? '게임이 안 켜졌다면 조인하기를 눌러주세요.'
         : '방장이 실행하기를 누르면 다 같이 카운트다운이 돌고 게임이 켜집니다.');
   }
 }
@@ -2239,11 +2265,102 @@ async function enterRoom(room) {
 }
 
 async function leaveRoom() {
+  leavingOnPurpose = true;
   try {
     await apiPost('/api/room', { action: 'leave' });
     await loadRooms();
     renderLauncher();
   } catch (e) { showToast(e.message); }
+  finally { leavingOnPurpose = false; }
+}
+
+/* ---------- 방장이 명단에서 하는 일 ---------- */
+
+/**
+ * 명단의 이름을 오른쪽 클릭하면 뜨는 작은 메뉴.
+ * 방장에게만, 자기 자신이 아닌 사람에게만 열린다.
+ * 오른쪽 버튼이 없는 휴대폰을 위해 그냥 눌러도 열리게 해두었다.
+ */
+let seatMenuOpenedAt = 0;
+
+function openSeatMenu(handle, x, y) {
+  const box = document.getElementById('seatMenu');
+  if (!box) return;
+  const who = document.getElementById('seatMenuWho');
+  if (who) who.textContent = handle;
+  box.dataset.handle = handle;
+  box.hidden = false;
+  seatMenuOpenedAt = Date.now();
+
+  // 화면 밖으로 나가지 않게 안쪽으로 당긴다
+  const w = box.offsetWidth, h = box.offsetHeight;
+  box.style.left = Math.min(x, window.innerWidth - w - 8) + 'px';
+  box.style.top = Math.min(y, window.innerHeight - h - 8) + 'px';
+}
+
+function closeSeatMenu() {
+  const box = document.getElementById('seatMenu');
+  if (box) box.hidden = true;
+}
+
+async function giveHostTo(handle) {
+  closeSeatMenu();
+  if (!confirm(`${handle} 님에게 방장을 넘길까요?\n\n실행하기 버튼도 그 사람에게 넘어갑니다.`)) return;
+  try {
+    await apiPost('/api/room', { action: 'giveHost', handle });
+    await loadRooms();
+    renderLauncher();
+    showToast(`${handle} 님이 방장이 되었습니다.`);
+  } catch (e) { showToast(e.message); }
+}
+
+async function kickMember(handle) {
+  closeSeatMenu();
+  if (!confirm(`${handle} 님을 방에서 내보낼까요?\n\n다시 들어오는 것을 막지는 않습니다.`)) return;
+  try {
+    await apiPost('/api/room', { action: 'kick', handle });
+    await loadRooms();
+    renderLauncher();
+    showToast(`${handle} 님을 내보냈습니다.`);
+  } catch (e) { showToast(e.message); }
+}
+
+function initSeatMenu() {
+  const box = document.getElementById('seatMenu');
+  const seats = document.getElementById('roomSeats');
+  if (!box || !seats) return;
+
+  const open = (e) => {
+    const seat = e.target.closest('.seat');
+    if (!seat || !seat.dataset.h) return;
+    const r = myRoomData();
+    if (!isHost(r)) return;                       // 방장만
+    if (me && seat.dataset.h === me.handle) return;  // 자기 자신은 빼고
+    e.preventDefault();
+    openSeatMenu(seat.dataset.h, e.clientX, e.clientY);
+  };
+  seats.addEventListener('contextmenu', open);
+  seats.addEventListener('click', open);
+
+  box.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-do]');
+    if (!btn) return;
+    const handle = box.dataset.handle;
+    if (btn.dataset.do === 'host') giveHostTo(handle);
+    else kickMember(handle);
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!box.hidden && !box.contains(e.target) && !e.target.closest('.seat')) closeSeatMenu();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSeatMenu(); });
+  window.addEventListener('resize', closeSeatMenu);
+  // 화면이 움직이면 닫는다. 다만 열자마자 오는 스크롤은 무시한다 —
+  // 이름이 화면 밖에 있었으면 브라우저가 먼저 끌어올리는데, 그 스크롤이
+  // 방금 연 메뉴를 도로 닫아버린다.
+  window.addEventListener('scroll', () => {
+    if (Date.now() - seatMenuOpenedAt > 300) closeSeatMenu();
+  }, true);
 }
 
 async function startRoom(known) {
@@ -2259,11 +2376,12 @@ async function startRoom(known) {
   }
   try {
     const d = await apiPost('/api/room', { action: 'start', address });
+    if (d.now) serverSkew = d.now - Date.now();
     closeModal();
     savedAddress = address || savedAddress;
     await loadRooms();
     renderLauncher();
-    // 5·4·3·2·1 을 세고 게임을 띄운다. 방에 있는 사람들도 같은 시각에 맞춰 함께 센다.
+    // 3·2·1 을 세고 게임을 띄운다. 방에 있는 사람들도 같은 시각에 맞춰 함께 센다.
     playCountdown(d.startedAt || Date.now(), () => launchGame(address, 'create'));
   } catch (e) {
     if (err) err.textContent = e.message;
@@ -2500,6 +2618,7 @@ async function boot() {
   initBoardEvents();
   initScheduleEvents();
   initLauncherEvents();
+  initSeatMenu();
   initMonthPickers();
   renderAuthBar();
   try {

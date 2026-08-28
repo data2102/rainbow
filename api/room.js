@@ -183,6 +183,9 @@ export default async function handler(req, res) {
 
       res.setHeader('Cache-Control', 'no-store');
       return res.status(200).json({
+        // 카운트다운은 방장이 누른 시각을 기준으로 센다. 사람마다 컴퓨터 시계가
+        // 조금씩 달라서, 서버 시각을 같이 보내 그 차이를 화면에서 보정한다.
+        now: Date.now(),
         rooms, messages, savedAddress,
         myRoom: mine ? mine.room : null,
         capacity: ROOM_CAPACITY,
@@ -198,6 +201,8 @@ export default async function handler(req, res) {
       case 'say':   return await say(req, res);
       case 'start': return await start(req, res);
       case 'setIp': return await setIp(req, res);
+      case 'giveHost': return await giveHost(req, res);
+      case 'kick':     return await kick(req, res);
       default:      return res.status(400).json({ error: '알 수 없는 요청입니다.' });
     }
   } catch (e) {
@@ -301,6 +306,76 @@ async function setIp(req, res) {
   res.status(200).json({ ok: true, address });
 }
 
+/* ---------- 방장이 하는 일 ---------- */
+
+/**
+ * 방장만 할 수 있는 일을 하기 전에 확인한다.
+ * 내가 방장인지, 상대가 이 방에 있는지 본 뒤 방 번호를 돌려준다.
+ * 방을 잠그고 보므로 두 사람이 동시에 눌러도 뒤엉키지 않는다.
+ */
+async function asHost(c, me, target) {
+  const { rows: mine } = await c.query(`SELECT room FROM room_members WHERE handle = $1`, [me]);
+  if (!mine.length) throw new Error('먼저 방에 들어가주세요.');
+  const room = mine[0].room;
+  await c.query(`SELECT pg_advisory_xact_lock($1, $2)`, [77_001, room]);
+
+  const { rows } = await c.query(
+    `SELECT handle, joined_at FROM room_members WHERE room = $1 ORDER BY joined_at, handle`, [room]
+  );
+  if (!rows.length || rows[0].handle !== me) throw new Error('방장만 할 수 있습니다.');
+  if (target === me) throw new Error('자기 자신에게는 할 수 없습니다.');
+  const t = rows.find(r => r.handle === target);
+  if (!t) throw new Error('그 사람은 이 방에 없습니다.');
+  return { room, first: rows[0], target: t };
+}
+
+function readTarget(req) {
+  const h = String(body(req).handle || '').trim();
+  if (!h) throw new Error('누구인지 알 수 없습니다.');
+  return h;
+}
+
+/**
+ * 방장 넘기기.
+ *
+ * 방장은 따로 저장하지 않는다. "먼저 들어온 사람"이 방장이다. 그래서 넘길 때도
+ * 상대의 들어온 시각을 맨 앞으로 당긴다. 이러면 방장이 나갔을 때 다음 사람에게
+ * 저절로 넘어가는 규칙이 그대로 살아 있고, 넘겨준 사람이 바로 다음 차례가 된다.
+ */
+async function giveHost(req, res) {
+  const me = await requireUser(req, res);
+  if (!me) return;
+  const target = readTarget(req);
+
+  const out = await tx(async (c) => {
+    const { room, first } = await asHost(c, me, target);
+    await c.query(
+      `UPDATE room_members SET joined_at = $1 WHERE room = $2 AND handle = $3`,
+      [Number(first.joined_at) - 1, room, target]
+    );
+    return { room };
+  });
+
+  await system(out.room, `${target} 님이 방장이 되었습니다. (${me} 님이 넘겨줌)`);
+  res.status(200).json({ ok: true });
+}
+
+/** 방에서 내보내기. 다시 들어오는 것을 막지는 않는다. */
+async function kick(req, res) {
+  const me = await requireUser(req, res);
+  if (!me) return;
+  const target = readTarget(req);
+
+  const out = await tx(async (c) => {
+    const { room } = await asHost(c, me, target);
+    await c.query(`DELETE FROM room_members WHERE room = $1 AND handle = $2`, [room, target]);
+    return { room };
+  });
+
+  await system(out.room, `${target} 님을 방장이 내보냈습니다.`);
+  res.status(200).json({ ok: true });
+}
+
 /* ---------- 실행 ---------- */
 
 /**
@@ -339,5 +414,5 @@ async function start(req, res) {
   await system(room, address
     ? `${me} 님이 게임을 실행했습니다 · 접속 주소 ${address}`
     : `${me} 님이 게임을 실행했습니다. JOIN GAME 목록에서 찾아 들어가세요.`);
-  res.status(200).json({ ok: true, room, startedAt: now, address });
+  res.status(200).json({ ok: true, room, startedAt: now, now, address });
 }
