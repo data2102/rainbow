@@ -416,8 +416,28 @@ function renderPending() {
   }).join('');
 
   box.querySelectorAll('button[data-action]').forEach(btn => {
-    btn.addEventListener('click', () => handleRequestAction(btn.dataset.id, btn.dataset.action));
+    btn.addEventListener('click', () => handleRequestAction(btn));
   });
+}
+
+/**
+ * 가입·삭제 요청을 승인하거나 거절한다.
+ * 처리가 끝날 때까지 그 줄의 두 버튼을 함께 잠근다. 두 번 눌러도 한 번만 간다.
+ */
+async function handleRequestAction(btn) {
+  const row = btn.closest('.req-row') || btn.parentElement;
+  const buttons = row ? [...row.querySelectorAll('button')] : [btn];
+  buttons.forEach(b => { b.disabled = true; });
+
+  const { id, action } = btn.dataset;
+  try {
+    await apiPost('/api/request', { action, id });
+    await refreshAll();
+    showToast(action === 'approve' ? '요청을 승인했습니다.' : '요청을 거절했습니다.');
+  } catch (e) {
+    showToast(e.message);
+    buttons.forEach(b => { b.disabled = false; });
+  }
 }
 
 function renderAll() {
