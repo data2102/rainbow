@@ -22,7 +22,6 @@ let rooms = [];             // 런쳐 방 8개
 let myRoom = null;          // 내가 들어가 있는 방 번호
 let roomMsgs = [];          // 그 방의 대화
 let savedAddress = null;    // 내가 지난번에 적어둔 Radmin 주소
-let serverSkew = 0;         // 서버 시계 - 내 시계 (카운트다운을 맞추는 데 쓴다)
 let leavingOnPurpose = false;  // 내가 눌러서 나가는 중인가 (강퇴와 구분하려고)
 let vpn = { network: '', password: null };  // Radmin 네트워크 안내 (비밀번호는 로그인해야 온다)
 
@@ -149,9 +148,6 @@ async function loadRooms() {
   const before = myRoom;
   try {
     const d = await apiGet('/api/room');
-    // 사람마다 컴퓨터 시계가 조금씩 다르다. 그 차이를 재두어야 방장이 누른
-    // 시각으로 세는 카운트다운이 모두에게 같은 숫자로 보인다.
-    if (d.now) serverSkew = d.now - Date.now();
     rooms = d.rooms || [];
     myRoom = d.myRoom || null;
     roomMsgs = d.messages || [];
@@ -1953,12 +1949,8 @@ function playCountdown(startedAt, onGo) {
     if (onGo) onGo();
   };
 
-  // 방장이 누른 시각은 서버 시계로 찍혀 온다. 내 시계와의 차이를 빼야
-  // 3 에서 멈춰 서 있는 일이 없다.
-  const deadline = startedAt - serverSkew + CD_MS;
-
   const tick = () => {
-    const left = Math.ceil((deadline - Date.now()) / 1000);
+    const left = Math.ceil((startedAt + CD_MS - Date.now()) / 1000);
     if (left > 0) {
       paint(String(Math.min(left, CD_MS / 1000)), false);
     } else {
@@ -2002,7 +1994,7 @@ function maybePlayRoomCountdown() {
   const r = myRoomData();
   if (!r || !r.running || !r.startedAt) return;
   if (r.startedAt === cdPlayedAt) return;                 // 이미 본 출발
-  if (Date.now() + serverSkew - r.startedAt > CD_MS + 2000) {   // 지나간 출발
+  if (Date.now() - r.startedAt > CD_MS + 2000) {          // 지나간 출발
     cdPlayedAt = r.startedAt;
     return;
   }
@@ -2376,7 +2368,6 @@ async function startRoom(known) {
   }
   try {
     const d = await apiPost('/api/room', { action: 'start', address });
-    if (d.now) serverSkew = d.now - Date.now();
     closeModal();
     savedAddress = address || savedAddress;
     await loadRooms();

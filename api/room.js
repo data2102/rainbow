@@ -183,9 +183,6 @@ export default async function handler(req, res) {
 
       res.setHeader('Cache-Control', 'no-store');
       return res.status(200).json({
-        // 카운트다운은 방장이 누른 시각을 기준으로 센다. 사람마다 컴퓨터 시계가
-        // 조금씩 달라서, 서버 시각을 같이 보내 그 차이를 화면에서 보정한다.
-        now: Date.now(),
         rooms, messages, savedAddress,
         myRoom: mine ? mine.room : null,
         capacity: ROOM_CAPACITY,
@@ -414,5 +411,5 @@ async function start(req, res) {
   await system(room, address
     ? `${me} 님이 게임을 실행했습니다 · 접속 주소 ${address}`
     : `${me} 님이 게임을 실행했습니다. JOIN GAME 목록에서 찾아 들어가세요.`);
-  res.status(200).json({ ok: true, room, startedAt: now, now, address });
+  res.status(200).json({ ok: true, room, startedAt: now, address });
 }
