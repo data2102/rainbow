@@ -1264,7 +1264,7 @@ function renderGates() {
   // ③ 리폿 — 로그인하면 승패를 기록할 수 있다
   set('reportGate', !isLoggedIn());
   set('reportBox', isLoggedIn());
-  // ⑦ 관리자 — 관리자 이상만
+  // 관리자 화면 — 관리자 이상만
   set('adminLocked', !isAdmin());
   set('adminAuthed', isAdmin());
 
