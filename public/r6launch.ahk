@@ -30,17 +30,17 @@ GamePath := "C:\Program Files (x86)\Red Storm Entertainment\Tom Clancy's Rainbow
 ; 접속 포트. MULTIPLAYER OPTIONS 의 JOIN PORT 와 같아야 합니다.
 JoinPort := "2346"
 
-; ---------- 명령줄로 곧장 접속 (실험) ----------
-; Voobly 설치파일 안에서 찾은 방법입니다. 게임에 이런 스위치가 있다면
-; 메뉴를 하나도 거치지 않고 바로 방을 만들거나 붙습니다.
+; ---------- 명령줄로 곧장 접속 ----------
+; 예전 Voobly 가 쓰던 방법입니다. 게임을 켤 때 주소를 같이 넘기면
+; 메뉴를 하나도 거치지 않고 바로 로비로 들어갑니다.
 ;   방장  : RainbowSix.exe -server 2346
 ;   참가자: RainbowSix.exe -client <방장IP> 2346
 ;
-; true 로 바꾸고 한 번 돌려보세요.
-;   · 게임이 곧장 멀티플레이 화면으로 가면 성공입니다. 그대로 두세요.
-;   · 메인 메뉴에 그냥 서 있으면 이 게임 버전은 안 먹는 것이니
-;     다시 false 로 돌리면 지금까지 쓰던 방식(메뉴 자동 조작)으로 돌아갑니다.
-UseCmdLine := false
+; 이게 켜져 있으면 아래의 대기 시간·마우스 좌표는 하나도 쓰지 않습니다.
+; 화면 크기가 사람마다 달라도 상관없습니다.
+; 혹시 안 되는 PC 가 있으면 여기만 false 로 바꾸면 옛 방식(메뉴 자동 조작)으로
+; 돌아갑니다. 그 아래 설정들은 그때를 위해 남겨둔 것입니다.
+UseCmdLine := true
 HostArgs   := "-server 2346"
 JoinArgs   := "-client {ip} 2346"
 
@@ -52,7 +52,7 @@ PingWarmup := true
 ; 느린 PC 에서 키가 허공에 나가면 WaitMenu 부터 올리세요. 반대로 메뉴가 뜬 뒤에도
 ; 한참 서 있으면 줄이세요. 여기만 고치면 됩니다.
 WaitMenu  := 6000    ; 게임 창이 뜬 뒤 메인 메뉴가 나올 때까지
-JoinExtra := 6000    ; 참가자만 더 기다림 — 방장이 방을 다 만들 시간
+JoinExtra := 6000    ; 참가자만 더 기다림 — 방장이 방을 다 만들 시간 (양쪽 방식 공통)
 WaitStep  := 700     ; 키 하나 누른 뒤
 WaitPage  := 2000    ; 화면이 통째로 바뀔 때까지
 
@@ -69,8 +69,10 @@ XY_JOIN := [322, 296]    ; JOIN 버튼
 
 ; ---------- 관리자 권한으로 다시 뜬다 ----------
 ; 게임을 관리자로 켜면, 같은 권한이 아닌 프로그램은 그 창에 키도 마우스도
-; 보낼 수 없습니다(윈도우가 막습니다).
-if !A_IsAdmin {
+; 보낼 수 없습니다(윈도우가 막습니다). 그래서 키를 보낼 때만 승격합니다.
+; 명령줄로 맡길 때는 키를 보내지 않으므로 승격이 필요 없습니다.
+; (게임 자체는 레지스트리에 걸어둔 표시 때문에 어차피 관리자로 뜹니다)
+if (!UseCmdLine && !A_IsAdmin) {
     arg := (A_Args.Length > 0) ? A_Args[1] : ""
     try Run '*RunAs "' A_AhkPath '" "' A_ScriptFullPath '" "' arg '"'
     ExitApp
@@ -115,6 +117,18 @@ if (!alreadyRunning) {
     args := ""
     if (UseCmdLine) {
         args := (mode = "create") ? HostArgs : StrReplace(JoinArgs, "{ip}", address)
+        if (mode = "join") {
+            ; 명령줄로 붙으면 게임이 켜지자마자 곧바로 두드린다. 방장 게임도
+            ; 이제 막 켜지는 중이라, 너무 빨리 가면 아직 아무도 없다.
+            ; 기다리는 김에 Radmin 길도 함께 터둔다 — 어차피 비는 시간이다.
+            Note("방장이 자리를 잡을 때까지 기다리는 중...")
+            t0 := A_TickCount
+            if (PingWarmup)
+                Warmup(address, 2)
+            rest := JoinExtra - (A_TickCount - t0)
+            if (rest > 0)
+                Sleep rest
+        }
         Note("명령줄로 실행: " args)
     }
     Run '"' GamePath '" ' args, gameDir
@@ -134,11 +148,9 @@ if (alreadyRunning) {
     ExitApp
 }
 
-; 명령줄이 먹혔다면 게임이 알아서 멀티플레이로 갔을 것이다. 그 위에 대고
-; 키를 누르면 오히려 화면을 망친다. 참가자만 길을 터두고 물러난다.
+; 명령줄로 켰으면 게임이 알아서 로비로 갔을 것이다. 그 위에 대고 키를
+; 누르면 오히려 화면을 망친다. 창만 앞으로 꺼내고 물러난다.
 if (UseCmdLine) {
-    if (mode = "join" && PingWarmup)
-        Warmup(address)
     Note("명령줄로 맡겼습니다 — 메뉴는 건드리지 않습니다")
     ExitApp
 }
@@ -148,7 +160,7 @@ if (UseCmdLine) {
 Note("메인 메뉴를 기다리는 중...")
 t0 := A_TickCount
 if (mode = "join" && PingWarmup)
-    Warmup(address)
+    Warmup(address, 4)
 rest := WaitMenu - (A_TickCount - t0)
 if (rest > 0)
     Sleep rest
@@ -219,10 +231,10 @@ ExitApp
  * 다 실패해도 막지는 않습니다. 상대 방화벽이 핑만 막아둔 경우에도
  * 게임은 붙기 때문입니다. 알려만 주고 지나갑니다.
  */
-Warmup(ip) {
+Warmup(ip, times := 4) {
     tmp := A_Temp "\r6ping.txt"
     try FileDelete tmp
-    try RunWait A_ComSpec ' /c ping -n 4 -w 1000 ' ip ' > "' tmp '"', , "Hide"
+    try RunWait A_ComSpec ' /c ping -n ' times ' -w 700 ' ip ' > "' tmp '"', , "Hide"
 
     out := ""
     try out := FileRead(tmp)
