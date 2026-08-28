@@ -406,6 +406,60 @@ tbody tr:hover td{ background:var(--surface-sunken); }
 }
 .month-past:empty{ display:none; }
 
+/* ---------- 접속 예상 시간 ---------- */
+.slot-summary{
+  /* 좁은 화면에서도 두 칸은 들어오도록 최소 너비를 낮게 잡는다 */
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(132px,1fr)); gap:var(--sp-3);
+}
+.slot-col{
+  border:1px solid var(--border); border-radius:var(--radius-md);
+  background:var(--surface-sunken); padding:var(--sp-4); min-width:0;
+}
+.slot-col.busy{ background:var(--accent-bg); border-color:transparent; }
+.slot-col-h{
+  display:flex; align-items:baseline; gap:var(--sp-2);
+  margin-bottom:var(--sp-3); padding-bottom:var(--sp-2);
+  border-bottom:1px solid var(--border-strong);
+}
+.slot-col-t{ font-size:var(--fs-subhead); font-weight:var(--fw-bold); }
+.slot-col-n{ font-size:var(--fs-footnote); color:var(--text-secondary); margin-left:auto; }
+.slot-names{ display:flex; flex-wrap:wrap; gap:var(--sp-1) var(--sp-2); }
+.slot-name{
+  font-size:var(--fs-footnote); font-weight:var(--fw-medium); color:var(--text-primary);
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius-pill); padding:2px var(--sp-3);
+}
+.slot-none{ font-size:var(--fs-footnote); color:var(--text-tertiary); }
+
+.slot-divider{ border-top:1px solid var(--border); margin:var(--sp-6) 0 var(--sp-5); }
+
+.slot-board{
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:var(--sp-3);
+}
+.slot-row{
+  display:flex; align-items:center; gap:var(--sp-3); flex-wrap:wrap;
+  border:1px solid var(--border); border-radius:var(--radius-md);
+  background:var(--surface-sunken); padding:var(--sp-3) var(--sp-4); min-width:0;
+}
+.slot-row-id{
+  flex:1; min-width:90px; font-size:var(--fs-caption); font-weight:var(--fw-bold);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.slot-chips{ display:flex; gap:var(--sp-1); flex:none; }
+.slot-chip{
+  border:1px solid var(--border-strong); border-radius:var(--radius-sm);
+  background:var(--surface); color:var(--text-tertiary);
+  font-family:inherit; font-size:var(--fs-footnote); font-weight:var(--fw-medium);
+  padding:var(--sp-1) var(--sp-2); min-width:30px; cursor:pointer;
+  transition:background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+}
+.slot-chip:hover:not(:disabled){ color:var(--text-primary); border-color:var(--accent); }
+.slot-chip.on{
+  background:var(--accent); border-color:var(--accent);
+  color:var(--on-accent); font-weight:var(--fw-bold);
+}
+.slot-chip:focus-visible{ outline:none; box-shadow:var(--shadow-focus); }
+
 /* ---------- 출퇴근 ---------- */
 .att-board{
   display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:var(--sp-3);
@@ -1052,6 +1106,21 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 
   <!-- ATTENDANCE — 출퇴근 기록 -->
   <div class="tab-panel" id="tab-attendance">
+    <div class="panel hud-corner">
+      <h2>접속 예상 시간</h2>
+      <div class="foot-note" style="margin-top:0;margin-bottom:14px;">
+        평소 들어오는 시간대를 체크해두면 누가 언제 접속하는지 서로 볼 수 있습니다 ·
+        아래에서 본인 아이디를 찾아 시간대를 누르세요 · 달이 바뀌어도 그대로 남습니다.
+      </div>
+      <div id="slotSummary" class="slot-summary"></div>
+
+      <div class="slot-divider"></div>
+      <div class="search-row">
+        <input type="text" id="slotSearch" autocomplete="off" placeholder="아이디 또는 클랜으로 검색...">
+      </div>
+      <div id="slotBoard" class="slot-board"></div>
+    </div>
+
     <div class="panel hud-corner">
       <div class="panel-head">
         <h2>출퇴근 · Attendance</h2>

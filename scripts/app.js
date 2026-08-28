@@ -15,6 +15,8 @@ let viewSeasonId = null;    // 화면에서 보고 있는 달. null 이면 진�
 const seasonCache = {};     // 지난 달 상세 (id -> {players, matches})
 let attLogs = [];           // 보고 있는 달의 출퇴근 기록
 let attLoaded = null;       // 그 기록이 어느 달 것인지
+let playSlots = [];         // 고를 수 있는 시간대
+let playSchedule = [];      // [{handle, slot}] 접속 예상 시간
 let openCommentForm = null; // 댓글 입력창이 열린 글 id
 
 /* 대회 참가 팀. api/tournament.js 의 TEAMS 와 id 가 일치해야 합니다. */
@@ -132,6 +134,8 @@ async function loadAttendance(id) {
   try {
     const d = await apiGet('/api/attendance?season=' + encodeURIComponent(target));
     attLogs = d.logs || [];
+    if (d.slots) playSlots = d.slots;
+    playSchedule = d.schedule || [];
     attLoaded = target;
   } catch { attLogs = []; attLoaded = null; }
 }
@@ -536,6 +540,107 @@ function renderAll() {
   renderSeasons();
 }
 
+/* ---------- 접속 예상 시간 ---------- */
+
+/** handle -> Set(시간대) */
+function scheduleMap() {
+  const map = new Map();
+  for (const r of playSchedule) {
+    if (!map.has(r.handle)) map.set(r.handle, new Set());
+    map.get(r.handle).add(r.slot);
+  }
+  return map;
+}
+
+/** 시간대별로 누가 오는지 */
+function renderSlotSummary() {
+  const el = document.getElementById('slotSummary');
+  if (!el) return;
+  if (!playSlots.length) { el.innerHTML = ''; return; }
+
+  // 명단에 있는 회원만 센다. 탈퇴한 아이디가 남아 보이지 않게.
+  const roster = new Set(players.map(p => p.handle));
+  const bySlot = new Map(playSlots.map(s => [s, []]));
+  for (const r of playSchedule) {
+    if (roster.has(r.handle) && bySlot.has(r.slot)) bySlot.get(r.slot).push(r.handle);
+  }
+
+  el.innerHTML = playSlots.map(slot => {
+    const names = bySlot.get(slot).sort((a, b) => a.localeCompare(b));
+    return `<div class="slot-col${names.length ? ' busy' : ''}">
+      <div class="slot-col-h">
+        <span class="slot-col-t">${slot}시대</span>
+        <span class="slot-col-n">${names.length}명</span>
+      </div>
+      <div class="slot-names">${names.length
+        ? names.map(h => `<span class="slot-name">${esc(h)}</span>`).join('')
+        : '<span class="slot-none">아직 없음</span>'}</div>
+    </div>`;
+  }).join('');
+}
+
+/** 회원별 시간대 체크 판 */
+function renderSlotBoard() {
+  const el = document.getElementById('slotBoard');
+  if (!el) return;
+
+  const search = document.getElementById('slotSearch');
+  const query = search ? search.value.trim().toLowerCase() : '';
+  const map = scheduleMap();
+
+  const list = players.filter(p =>
+    !query || p.handle.toLowerCase().includes(query) || (p.clan || '').toLowerCase().includes(query));
+
+  el.innerHTML = list.map(p => {
+    const on = map.get(p.handle) || new Set();
+    return `<div class="slot-row">
+      <span class="slot-row-id">${esc(p.handle)}</span>
+      <span class="slot-chips">${playSlots.map(slot =>
+        `<button type="button" class="slot-chip${on.has(slot) ? ' on' : ''}"
+          data-slot="${slot}" data-handle="${esc(p.handle)}"
+          aria-pressed="${on.has(slot)}">${slot}</button>`).join('')}</span>
+    </div>`;
+  }).join('') || '<div class="att-empty">해당하는 회원이 없습니다.</div>';
+}
+
+function renderSchedule() {
+  renderSlotSummary();
+  renderSlotBoard();
+}
+
+/** 칩 하나를 눌러 그 시간대를 켜고 끈다 */
+async function toggleSlot(handle, slot) {
+  const map = scheduleMap();
+  const on = new Set(map.get(handle) || []);
+  if (on.has(slot)) on.delete(slot); else on.add(slot);
+  const next = [...on];
+
+  // 먼저 화면에 반영하고, 실패하면 되돌린다
+  const before = playSchedule;
+  playSchedule = playSchedule.filter(r => r.handle !== handle)
+    .concat(next.map(s => ({ handle, slot: s })));
+  renderSchedule();
+
+  try {
+    await apiPost('/api/attendance', { action: 'schedule', handle, slots: next });
+  } catch (e) {
+    playSchedule = before;
+    renderSchedule();
+    showToast(e.message);
+  }
+}
+
+function initScheduleEvents() {
+  const search = document.getElementById('slotSearch');
+  if (search) search.addEventListener('input', renderSlotBoard);
+
+  const board = document.getElementById('slotBoard');
+  if (board) board.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-slot]');
+    if (btn) toggleSlot(btn.dataset.handle, Number(btn.dataset.slot));
+  });
+}
+
 /* ---------- 출퇴근 (ATTENDANCE) ---------- */
 
 const ATT_TOP = 5;          // 출근·게임시간 표에 보여줄 인원
@@ -627,6 +732,7 @@ function renderAttendanceBoard() {
 }
 
 function renderAttendance() {
+  renderSchedule();
   renderAttendanceBoard();
 
   // 기록 목록 (최근 것이 위로)
@@ -1751,6 +1857,7 @@ async function boot() {
   initTournamentEvents();
   initBoardEvents();
   initAttendanceEvents();
+  initScheduleEvents();
   initMonthPickers();
   renderAuthBar();
   try {

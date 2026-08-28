@@ -1,6 +1,9 @@
 import { q, tx, body, methodGuard, currentAdmin, audit } from './_lib.js';
 import { syncSeason } from './_season.js';
 
+/** 접속 예상 시간대. 화면(app.js)의 SLOTS 와 같아야 한다. */
+export const SLOTS = [8, 9, 10, 11, 12];
+
 /**
  * 출퇴근 기록.
  * 한 번의 출근~퇴근이 한 줄이다. 퇴근 전이면 clock_out 이 비어 있다.
@@ -22,6 +25,13 @@ async function ensureTable() {
   // 한 사람이 동시에 두 번 출근 상태가 되는 것을 DB 차원에서 막는다
   await q(`CREATE UNIQUE INDEX IF NOT EXISTS idx_attendance_open
              ON attendance (handle) WHERE clock_out IS NULL`);
+  // 접속 예상 시간대. 기록이 아니라 예정이라 달이 바뀌어도 그대로 둔다.
+  await q(`
+    CREATE TABLE IF NOT EXISTS play_schedule (
+      handle TEXT NOT NULL,
+      slot   INTEGER NOT NULL,
+      PRIMARY KEY (handle, slot)
+    )`);
   ensured = true;
 }
 
@@ -43,11 +53,17 @@ export default async function handler(req, res) {
 
     if (req.method === 'GET') {
       const id = (req.query && req.query.season) || (season ? season.id : null);
-      const rows = id
-        ? await q(`SELECT * FROM attendance WHERE season = $1 ORDER BY clock_in ASC`, [id])
-        : [];
+      const [rows, slots] = await Promise.all([
+        id ? q(`SELECT * FROM attendance WHERE season = $1 ORDER BY clock_in ASC`, [id]) : [],
+        q(`SELECT handle, slot FROM play_schedule ORDER BY handle, slot`),
+      ]);
       res.setHeader('Cache-Control', 'no-store');
-      return res.status(200).json({ season: id, logs: rows.map(rowToLog) });
+      return res.status(200).json({
+        season: id,
+        logs: rows.map(rowToLog),
+        slots: SLOTS,
+        schedule: slots.map(r => ({ handle: r.handle, slot: r.slot })),
+      });
     }
 
     const { action, handle, id } = body(req);
@@ -55,6 +71,7 @@ export default async function handler(req, res) {
       if (!season) return res.status(400).json({ error: '아직 시즌이 시작되지 않았습니다.' });
       return await punch(res, action, handle, season);
     }
+    if (action === 'schedule') return await setSchedule(res, handle, body(req).slots);
     if (action === 'remove') return await remove(req, res, id);
     return res.status(400).json({ error: '알 수 없는 요청입니다.' });
   } catch (e) {
@@ -94,6 +111,26 @@ async function punch(res, action, handle, season) {
   });
 
   res.status(200).json({ ok: true, log: out });
+}
+
+/** 접속 예상 시간대를 통째로 다시 저장한다 */
+async function setSchedule(res, handle, slots) {
+  if (!handle || typeof handle !== 'string') {
+    return res.status(400).json({ error: '아이디를 선택해주세요.' });
+  }
+  const picked = Array.isArray(slots)
+    ? [...new Set(slots.map(Number))].filter(n => SLOTS.includes(n))
+    : [];
+
+  await tx(async (c) => {
+    const { rows } = await c.query(`SELECT handle FROM players WHERE handle = $1`, [handle]);
+    if (!rows.length) throw new Error('명단에 없는 선수입니다: ' + handle);
+    await c.query(`DELETE FROM play_schedule WHERE handle = $1`, [handle]);
+    for (const slot of picked) {
+      await c.query(`INSERT INTO play_schedule (handle, slot) VALUES ($1,$2)`, [handle, slot]);
+    }
+  });
+  res.status(200).json({ ok: true, handle, slots: picked });
 }
 
 /** 잘못 찍힌 기록 지우기 — 관리자만 */

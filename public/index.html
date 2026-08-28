@@ -406,6 +406,60 @@ tbody tr:hover td{ background:var(--surface-sunken); }
 }
 .month-past:empty{ display:none; }
 
+/* ---------- 접속 예상 시간 ---------- */
+.slot-summary{
+  /* 좁은 화면에서도 두 칸은 들어오도록 최소 너비를 낮게 잡는다 */
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(132px,1fr)); gap:var(--sp-3);
+}
+.slot-col{
+  border:1px solid var(--border); border-radius:var(--radius-md);
+  background:var(--surface-sunken); padding:var(--sp-4); min-width:0;
+}
+.slot-col.busy{ background:var(--accent-bg); border-color:transparent; }
+.slot-col-h{
+  display:flex; align-items:baseline; gap:var(--sp-2);
+  margin-bottom:var(--sp-3); padding-bottom:var(--sp-2);
+  border-bottom:1px solid var(--border-strong);
+}
+.slot-col-t{ font-size:var(--fs-subhead); font-weight:var(--fw-bold); }
+.slot-col-n{ font-size:var(--fs-footnote); color:var(--text-secondary); margin-left:auto; }
+.slot-names{ display:flex; flex-wrap:wrap; gap:var(--sp-1) var(--sp-2); }
+.slot-name{
+  font-size:var(--fs-footnote); font-weight:var(--fw-medium); color:var(--text-primary);
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius-pill); padding:2px var(--sp-3);
+}
+.slot-none{ font-size:var(--fs-footnote); color:var(--text-tertiary); }
+
+.slot-divider{ border-top:1px solid var(--border); margin:var(--sp-6) 0 var(--sp-5); }
+
+.slot-board{
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:var(--sp-3);
+}
+.slot-row{
+  display:flex; align-items:center; gap:var(--sp-3); flex-wrap:wrap;
+  border:1px solid var(--border); border-radius:var(--radius-md);
+  background:var(--surface-sunken); padding:var(--sp-3) var(--sp-4); min-width:0;
+}
+.slot-row-id{
+  flex:1; min-width:90px; font-size:var(--fs-caption); font-weight:var(--fw-bold);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.slot-chips{ display:flex; gap:var(--sp-1); flex:none; }
+.slot-chip{
+  border:1px solid var(--border-strong); border-radius:var(--radius-sm);
+  background:var(--surface); color:var(--text-tertiary);
+  font-family:inherit; font-size:var(--fs-footnote); font-weight:var(--fw-medium);
+  padding:var(--sp-1) var(--sp-2); min-width:30px; cursor:pointer;
+  transition:background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+}
+.slot-chip:hover:not(:disabled){ color:var(--text-primary); border-color:var(--accent); }
+.slot-chip.on{
+  background:var(--accent); border-color:var(--accent);
+  color:var(--on-accent); font-weight:var(--fw-bold);
+}
+.slot-chip:focus-visible{ outline:none; box-shadow:var(--shadow-focus); }
+
 /* ---------- 출퇴근 ---------- */
 .att-board{
   display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:var(--sp-3);
@@ -1053,6 +1107,21 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   <!-- ATTENDANCE — 출퇴근 기록 -->
   <div class="tab-panel" id="tab-attendance">
     <div class="panel hud-corner">
+      <h2>접속 예상 시간</h2>
+      <div class="foot-note" style="margin-top:0;margin-bottom:14px;">
+        평소 들어오는 시간대를 체크해두면 누가 언제 접속하는지 서로 볼 수 있습니다 ·
+        아래에서 본인 아이디를 찾아 시간대를 누르세요 · 달이 바뀌어도 그대로 남습니다.
+      </div>
+      <div id="slotSummary" class="slot-summary"></div>
+
+      <div class="slot-divider"></div>
+      <div class="search-row">
+        <input type="text" id="slotSearch" autocomplete="off" placeholder="아이디 또는 클랜으로 검색...">
+      </div>
+      <div id="slotBoard" class="slot-board"></div>
+    </div>
+
+    <div class="panel hud-corner">
       <div class="panel-head">
         <h2>출퇴근 · Attendance</h2>
         <select class="month-select" aria-label="조회할 월 선택"></select>
@@ -1353,6 +1422,8 @@ let viewSeasonId = null;    // 화면에서 보고 있는 달. null 이면 진�
 const seasonCache = {};     // 지난 달 상세 (id -> {players, matches})
 let attLogs = [];           // 보고 있는 달의 출퇴근 기록
 let attLoaded = null;       // 그 기록이 어느 달 것인지
+let playSlots = [];         // 고를 수 있는 시간대
+let playSchedule = [];      // [{handle, slot}] 접속 예상 시간
 let openCommentForm = null; // 댓글 입력창이 열린 글 id
 
 /* 대회 참가 팀. api/tournament.js 의 TEAMS 와 id 가 일치해야 합니다. */
@@ -1470,6 +1541,8 @@ async function loadAttendance(id) {
   try {
     const d = await apiGet('/api/attendance?season=' + encodeURIComponent(target));
     attLogs = d.logs || [];
+    if (d.slots) playSlots = d.slots;
+    playSchedule = d.schedule || [];
     attLoaded = target;
   } catch { attLogs = []; attLoaded = null; }
 }
@@ -1874,6 +1947,107 @@ function renderAll() {
   renderSeasons();
 }
 
+/* ---------- 접속 예상 시간 ---------- */
+
+/** handle -> Set(시간대) */
+function scheduleMap() {
+  const map = new Map();
+  for (const r of playSchedule) {
+    if (!map.has(r.handle)) map.set(r.handle, new Set());
+    map.get(r.handle).add(r.slot);
+  }
+  return map;
+}
+
+/** 시간대별로 누가 오는지 */
+function renderSlotSummary() {
+  const el = document.getElementById('slotSummary');
+  if (!el) return;
+  if (!playSlots.length) { el.innerHTML = ''; return; }
+
+  // 명단에 있는 회원만 센다. 탈퇴한 아이디가 남아 보이지 않게.
+  const roster = new Set(players.map(p => p.handle));
+  const bySlot = new Map(playSlots.map(s => [s, []]));
+  for (const r of playSchedule) {
+    if (roster.has(r.handle) && bySlot.has(r.slot)) bySlot.get(r.slot).push(r.handle);
+  }
+
+  el.innerHTML = playSlots.map(slot => {
+    const names = bySlot.get(slot).sort((a, b) => a.localeCompare(b));
+    return `<div class="slot-col${names.length ? ' busy' : ''}">
+      <div class="slot-col-h">
+        <span class="slot-col-t">${slot}시대</span>
+        <span class="slot-col-n">${names.length}명</span>
+      </div>
+      <div class="slot-names">${names.length
+        ? names.map(h => `<span class="slot-name">${esc(h)}</span>`).join('')
+        : '<span class="slot-none">아직 없음</span>'}</div>
+    </div>`;
+  }).join('');
+}
+
+/** 회원별 시간대 체크 판 */
+function renderSlotBoard() {
+  const el = document.getElementById('slotBoard');
+  if (!el) return;
+
+  const search = document.getElementById('slotSearch');
+  const query = search ? search.value.trim().toLowerCase() : '';
+  const map = scheduleMap();
+
+  const list = players.filter(p =>
+    !query || p.handle.toLowerCase().includes(query) || (p.clan || '').toLowerCase().includes(query));
+
+  el.innerHTML = list.map(p => {
+    const on = map.get(p.handle) || new Set();
+    return `<div class="slot-row">
+      <span class="slot-row-id">${esc(p.handle)}</span>
+      <span class="slot-chips">${playSlots.map(slot =>
+        `<button type="button" class="slot-chip${on.has(slot) ? ' on' : ''}"
+          data-slot="${slot}" data-handle="${esc(p.handle)}"
+          aria-pressed="${on.has(slot)}">${slot}</button>`).join('')}</span>
+    </div>`;
+  }).join('') || '<div class="att-empty">해당하는 회원이 없습니다.</div>';
+}
+
+function renderSchedule() {
+  renderSlotSummary();
+  renderSlotBoard();
+}
+
+/** 칩 하나를 눌러 그 시간대를 켜고 끈다 */
+async function toggleSlot(handle, slot) {
+  const map = scheduleMap();
+  const on = new Set(map.get(handle) || []);
+  if (on.has(slot)) on.delete(slot); else on.add(slot);
+  const next = [...on];
+
+  // 먼저 화면에 반영하고, 실패하면 되돌린다
+  const before = playSchedule;
+  playSchedule = playSchedule.filter(r => r.handle !== handle)
+    .concat(next.map(s => ({ handle, slot: s })));
+  renderSchedule();
+
+  try {
+    await apiPost('/api/attendance', { action: 'schedule', handle, slots: next });
+  } catch (e) {
+    playSchedule = before;
+    renderSchedule();
+    showToast(e.message);
+  }
+}
+
+function initScheduleEvents() {
+  const search = document.getElementById('slotSearch');
+  if (search) search.addEventListener('input', renderSlotBoard);
+
+  const board = document.getElementById('slotBoard');
+  if (board) board.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-slot]');
+    if (btn) toggleSlot(btn.dataset.handle, Number(btn.dataset.slot));
+  });
+}
+
 /* ---------- 출퇴근 (ATTENDANCE) ---------- */
 
 const ATT_TOP = 5;          // 출근·게임시간 표에 보여줄 인원
@@ -1965,6 +2139,7 @@ function renderAttendanceBoard() {
 }
 
 function renderAttendance() {
+  renderSchedule();
   renderAttendanceBoard();
 
   // 기록 목록 (최근 것이 위로)
@@ -3089,6 +3264,7 @@ async function boot() {
   initTournamentEvents();
   initBoardEvents();
   initAttendanceEvents();
+  initScheduleEvents();
   initMonthPickers();
   renderAuthBar();
   try {
