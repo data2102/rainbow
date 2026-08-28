@@ -535,10 +535,19 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .team-grid{ display:grid; grid-template-columns:1fr 1fr; gap:var(--sp-5); align-items:start; }
 @media (max-width:640px){ .team-grid{ grid-template-columns:1fr; } }
 .side-label{
+  display:flex; align-items:baseline; gap:var(--sp-2);
   font-size:var(--fs-footnote); color:var(--text-tertiary);
   text-transform:uppercase; letter-spacing:.06em; margin-bottom:var(--sp-3);
   font-weight:var(--fw-medium);
 }
+/* 몇 명 체크했는지. 8:8 처럼 인원을 맞춰야 할 때 눈으로 세지 않도록. */
+.pick-n{
+  margin-left:auto; text-transform:none; letter-spacing:0;
+  font-size:var(--fs-caption); font-weight:var(--fw-bold);
+  font-variant-numeric:tabular-nums;
+  opacity:.35;                      /* 0명일 때는 조용히 */
+}
+.pick-n.on{ opacity:1; }
 .checklist{
   max-height:300px; overflow-y:auto;
   border:1px solid var(--border); border-radius:var(--radius-md);
@@ -553,6 +562,24 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .check-item input{ accent-color:var(--accent); width:16px; height:16px; cursor:pointer; flex-shrink:0; }
 .check-item.disabled{ opacity:.4; }
 .check-item .clan-mini{ color:var(--text-tertiary); font-size:var(--fs-footnote); }
+
+/* 확정 버튼 위의 대진 표시 — 8 : 8 이 맞았는지 한눈에 */
+.pick-sum{
+  display:flex; align-items:center; justify-content:center; gap:var(--sp-3);
+  margin:var(--sp-5) 0 var(--sp-3);
+  font-size:var(--fs-title); font-weight:var(--fw-bold);
+  font-variant-numeric:tabular-nums; letter-spacing:var(--ls-tight);
+  line-height:var(--lh-tight);
+}
+.pick-sum .pw{ color:var(--success-strong); }
+.pick-sum .pl{ color:var(--danger-strong); }
+.pick-sum .px{ color:var(--text-tertiary); font-weight:var(--fw-regular); }
+.pick-sum.zero .pw, .pick-sum.zero .pl{ color:var(--text-tertiary); }
+.pick-note{
+  text-align:center; font-size:var(--fs-footnote); color:var(--text-tertiary);
+  margin:calc(var(--sp-3) * -1) 0 var(--sp-4);
+}
+.pick-note.warn{ color:var(--danger-strong); }
 
 .rules{ font-size:var(--fs-caption); color:var(--text-secondary); line-height:2; }
 .rules b{ color:var(--text-primary); font-weight:var(--fw-medium); }
@@ -1310,14 +1337,18 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
       <div class="foot-note" style="margin-top:0;margin-bottom:14px;">7:7, 8:8, 7:8 등 팀전 지원 — 승리한 인원과 패배한 인원을 각각 여러 명 체크한 뒤 기록하세요.</div>
       <div class="team-grid">
         <div>
-          <div class="side-label" style="color:var(--success-strong);">WIN TEAM · 승리 팀</div>
+          <div class="side-label" style="color:var(--success-strong);">WIN TEAM · 승리 팀<span class="pick-n" id="winCount">0명</span></div>
           <div class="checklist" id="winList"></div>
         </div>
         <div>
-          <div class="side-label" style="color:var(--danger-strong);">LOSE TEAM · 패배 팀</div>
+          <div class="side-label" style="color:var(--danger-strong);">LOSE TEAM · 패배 팀<span class="pick-n" id="loseCount">0명</span></div>
           <div class="checklist" id="loseList"></div>
         </div>
       </div>
+      <div class="pick-sum zero" id="pickSum" aria-live="polite">
+        <span class="pw">0</span><span class="px">:</span><span class="pl">0</span>
+      </div>
+      <div class="pick-note" id="pickNote"></div>
       <button class="btn" id="submitMatch" disabled>기록 확정 (Record Match)</button>
       <div class="foot-note">동일 선수를 양쪽에 동시 체크할 수 없습니다. 최소 각 팀 1명 이상 선택하세요.</div>
     </div>

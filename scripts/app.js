@@ -369,8 +369,45 @@ function renderChecklists() {
     el.addEventListener('change', renderChecklists);
   });
 
+  const nWin = getChecked('winList').length;
+  const nLose = getChecked('loseList').length;
+  showPickCount(nWin, nLose);
+
   const submit = document.getElementById('submitMatch');
-  if (submit) submit.disabled = !(getChecked('winList').length > 0 && getChecked('loseList').length > 0);
+  if (submit) submit.disabled = !(nWin > 0 && nLose > 0);
+}
+
+/**
+ * 몇 명 체크했는지 보여준다.
+ *
+ * 8:8 을 넣을 때 체크박스를 눈으로 세는 일이 없도록, 팀 이름 옆에 인원을 적고
+ * 확정 버튼 위에 대진을 크게 띄운다. 인원이 안 맞아도 막지는 않는다 —
+ * 7:8 같은 경기도 기록해야 하기 때문이다. 다르다는 사실만 알려준다.
+ */
+function showPickCount(nWin, nLose) {
+  const set = (id, n) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = n + '명';
+    el.classList.toggle('on', n > 0);
+  };
+  set('winCount', nWin);
+  set('loseCount', nLose);
+
+  const sum = document.getElementById('pickSum');
+  if (sum) {
+    sum.innerHTML = `<span class="pw">${nWin}</span><span class="px">:</span><span class="pl">${nLose}</span>`;
+    sum.classList.toggle('zero', nWin === 0 && nLose === 0);
+  }
+
+  const note = document.getElementById('pickNote');
+  if (!note) return;
+  let msg = '';
+  if (nWin === 0 && nLose === 0) msg = '';
+  else if (nWin === 0) msg = '승리 팀을 체크해주세요.';
+  else if (nLose === 0) msg = '패배 팀을 체크해주세요.';
+  else if (nWin !== nLose) msg = '양 팀 인원이 다릅니다 · 7:8 같은 경기도 그대로 기록할 수 있습니다.';
+  note.textContent = msg;
 }
 
 function renderHistory() {
