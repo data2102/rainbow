@@ -8,9 +8,16 @@
 ;    r6clan://create → MULTIPLAYER > CREATE GAME  (방장)
 ;    r6clan://join   → MULTIPLAYER > JOIN GAME    (참가자)
 ;
-;  게임 메뉴에는 "바로 여기로 가라"는 실행 옵션이 없습니다. 그래서 사람이
-;  누르던 자리를 대신 눌러줍니다. 컴퓨터마다 게임이 뜨는 속도가 달라서
-;  아래 기다리는 시간을 한두 번 맞춰야 할 수 있습니다.
+;  마우스 좌표를 쓰지 않고 키보드로만 움직입니다.
+;  그래서 해상도가 640x480 이든 1920x1080 이든 똑같이 동작합니다.
+;
+;    메인 메뉴 — 커서가 SINGLE PLAYER 에 있음
+;      ↓ 한 번 → MULTIPLAYER, Enter → 서버 화면
+;    서버 화면 — 커서가 CREATE GAME 에 있음
+;      방장  : Enter
+;      참가자: ↑ 한 번 → JOIN GAME, Enter
+;
+;  손볼 것은 아래 "기다리는 시간" 뿐입니다.
 ; ============================================================
 
 
@@ -19,42 +26,56 @@
 ; 게임 위치
 GamePath := "C:\Program Files (x86)\Red Storm Entertainment\Tom Clancy's Rainbow Six\RainbowSix.exe"
 
-; 오프닝 영상을 넘기려고 ESC 를 누르는 횟수.
-; 영상이 없거나 ESC 로 안 넘어가면 0 으로 두고 WaitMenu 를 늘리세요.
-IntroSkip := 4
+; 게임 창이 뜬 뒤 메인 메뉴가 나올 때까지 기다리는 시간 (1000 = 1초)
+; 오프닝 영상이 있으면 그만큼 넉넉히 주세요. 너무 짧으면 키가 허공에 나갑니다.
+WaitMenu := 12000
 
-; 기다리는 시간 (1000 = 1초)
-WaitMenu := 3500        ; 메인 메뉴가 나올 때까지
-WaitPage := 1800        ; 화면이 한 번 바뀔 때까지
+; 키를 하나 누른 뒤 화면이 반응할 때까지 기다리는 시간
+WaitStep := 900
 
-; true 로 두면 어디를 누르는지 화면에 띄워 보여줍니다. 맞출 때만 켜세요.
+; 화면이 한 번 통째로 바뀔 때까지 기다리는 시간 (메인 → 서버 화면)
+WaitPage := 2500
+
+; true 로 두면 무엇을 누르는지 화면 구석에 띄워 보여줍니다. 맞출 때만 켜세요.
 Debug := false
-
-; 640 x 480 화면에서의 버튼 위치. 창이 더 크면 알아서 늘려 씁니다.
-XY_MULTIPLAYER := [200, 257]    ; 메인 메뉴의 MULTIPLAYER
-XY_CREATE      := [ 90, 127]    ; CREATE GAME
-XY_JOIN        := [ 90,  96]    ; JOIN GAME
 
 ; =============================================================
 
+
+; ---------- 관리자 권한으로 다시 뜬다 ----------
+; 게임을 관리자 권한으로 켜면, 같은 권한이 아닌 프로그램은 그 창에 키를 보낼 수 없습니다.
+; (윈도우가 막습니다) 그래서 이 스크립트도 관리자로 올라가야 합니다.
+if !A_IsAdmin {
+    arg := (A_Args.Length > 0) ? A_Args[1] : ""
+    try Run '*RunAs "' A_AhkPath '" "' A_ScriptFullPath '" "' arg '"'
+    ExitApp
+}
 
 ; ---------- 어디로 갈지 정한다 ----------
 mode := "create"
 if (A_Args.Length > 0 && InStr(A_Args[1], "join"))
     mode := "join"
 
-; ---------- 게임을 켠다 (이미 켜져 있으면 그 창을 쓴다) ----------
-if !ProcessExist("RainbowSix.exe") {
+Note(text) {
+    global Debug
+    if (Debug) {
+        ToolTip text
+        Sleep 900
+        ToolTip()
+    }
+}
+
+; ---------- 게임을 켠다 ----------
+alreadyRunning := ProcessExist("RainbowSix.exe") ? true : false
+
+if (!alreadyRunning) {
     if !FileExist(GamePath) {
-        MsgBox "게임을 찾지 못했습니다:`n" GamePath "`n`n이 파일 위쪽의 GamePath 를 고쳐주세요.",
+        MsgBox "게임을 찾지 못했습니다.`n`n" GamePath "`n`n이 파일 위쪽의 GamePath 를 고쳐주세요.",
                "R6 런쳐", "Icon!"
         ExitApp
     }
     SplitPath GamePath, , &gameDir
     Run '"' GamePath '"', gameDir
-    startedByUs := true
-} else {
-    startedByUs := false
 }
 
 if !WinWait("ahk_exe RainbowSix.exe", , 60) {
@@ -62,54 +83,47 @@ if !WinWait("ahk_exe RainbowSix.exe", , 60) {
     ExitApp
 }
 WinActivate "ahk_exe RainbowSix.exe"
-WinWaitActive "ahk_exe RainbowSix.exe", , 10
+WinWaitActive "ahk_exe RainbowSix.exe", , 15
 
-; ---------- 오프닝을 넘기고 메뉴를 기다린다 ----------
-; 이미 켜져 있던 게임이라면 오프닝은 지나갔으므로 건너뛴다
-if (startedByUs) {
-    Loop IntroSkip {
-        Send "{Escape}"
-        Sleep 700
-    }
-    Sleep WaitMenu
-} else {
-    Sleep 400
+; 이미 켜져 있던 게임이라면 어느 화면에 있는지 알 수 없다.
+; 함부로 키를 누르면 엉뚱한 곳으로 가므로 창만 앞으로 꺼내고 끝낸다.
+if (alreadyRunning) {
+    Note("게임이 이미 켜져 있어 화면만 앞으로 꺼냈습니다")
+    ExitApp
 }
 
-; ---------- 메뉴를 대신 눌러준다 ----------
-ClickAt(XY_MULTIPLAYER, "MULTIPLAYER")
+; ---------- 메인 메뉴를 기다린다 ----------
+Note("메인 메뉴를 기다리는 중...")
+Sleep WaitMenu
+
+; ---------- 메인 메뉴: SINGLE PLAYER → MULTIPLAYER ----------
+Note("↓  MULTIPLAYER 로")
+Tap("{Down}")
+Sleep WaitStep
+
+Note("Enter  서버 화면으로")
+Tap("{Enter}")
 Sleep WaitPage
 
-if (mode = "join")
-    ClickAt(XY_JOIN, "JOIN GAME")
-else
-    ClickAt(XY_CREATE, "CREATE GAME")
+; ---------- 서버 화면: 커서는 CREATE GAME 에 있다 ----------
+if (mode = "join") {
+    Note("↑  JOIN GAME 으로")
+    Tap("{Up}")
+    Sleep WaitStep
+    Note("Enter  방장 방에 들어가기")
+} else {
+    Note("Enter  CREATE GAME")
+}
+Tap("{Enter}")
 
 ExitApp
 
 
-/**
- * 640x480 기준 좌표를 실제 창 크기에 맞춰 누른다.
- * 창이 1024x768 이든 전체화면이든 같은 자리를 누르게 된다.
- */
-ClickAt(pt, label) {
-    global Debug
+/** 게임 창에만 키를 보낸다. 도중에 다른 창을 눌러도 엉뚱한 곳으로 가지 않는다. */
+Tap(key) {
     if !WinExist("ahk_exe RainbowSix.exe")
-        return
-    WinGetClientPos , , &w, &h, "ahk_exe RainbowSix.exe"
-    if (w = 0 || h = 0)
-        return
-    x := Round(pt[1] * w / 640)
-    y := Round(pt[2] * h / 480)
-
-    CoordMode "Mouse", "Client"
-    if (Debug) {
-        ToolTip label "  →  " x ", " y
-        Sleep 1200
-    }
-    MouseMove x, y, 2
-    Sleep 200
-    Click
-    if (Debug)
-        ToolTip()
+        ExitApp
+    WinActivate "ahk_exe RainbowSix.exe"
+    Sleep 120
+    Send key
 }

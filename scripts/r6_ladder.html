@@ -1642,10 +1642,14 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
             <li><a href="/r6clan-auto.reg" download>r6clan-auto.reg</a> 를 받아 실행
                 (기본 등록을 덮어씁니다)</li>
           </ol>
-          <p class="setup-warn">컴퓨터마다 게임이 뜨는 속도가 달라서 처음엔 엉뚱한 데를 누를 수 있습니다.
-             그때는 <code>r6launch.ahk</code> 를 메모장으로 열어 위쪽의
-             <b>WaitMenu</b> 값을 늘려보세요. <b>Debug</b> 를 <code>true</code> 로 두면
-             어디를 누르는지 화면에 보여줍니다. 기본 등록으로 되돌리려면
+          <p>마우스 좌표가 아니라 <b>키보드로만</b> 움직입니다 —
+             메인 메뉴에서 <kbd>↓</kbd> <kbd>Enter</kbd>, 서버 화면에서
+             방장은 <kbd>Enter</kbd>, 참가자는 <kbd>↑</kbd> <kbd>Enter</kbd>.
+             그래서 <b>해상도가 640×480 이든 1920×1080 이든 똑같이 동작합니다.</b></p>
+          <p class="setup-warn">컴퓨터마다 게임이 뜨는 속도가 달라서, 오프닝이 길면 키가 허공에
+             나갈 수 있습니다. 그때는 <code>r6launch.ahk</code> 를 메모장으로 열어 위쪽의
+             <b>WaitMenu</b> 값을 늘려보세요(기본 12초). <b>Debug</b> 를 <code>true</code> 로
+             두면 무엇을 누르는지 화면에 보여줍니다. 기본 등록으로 되돌리려면
              <b>r6clan.reg</b> 를 다시 실행하면 됩니다.</p>
         </div>
       </details>
