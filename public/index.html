@@ -793,29 +793,63 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 
 .room-grid{
   display:grid; gap:var(--sp-3);
-  grid-template-columns:repeat(4,1fr);
+  grid-template-columns:repeat(4,minmax(0,1fr));
 }
-@media (max-width:900px){ .room-grid{ grid-template-columns:repeat(2,1fr); } }
+@media (max-width:900px){ .room-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
+/* 정사각형 카드. 위에 방 정보, 가운데 들어가기, 아래 누가 있는지. */
 .room-card{
-  display:flex; flex-direction:column; gap:var(--sp-2); text-align:left;
+  aspect-ratio:1 / 1; display:flex; flex-direction:column; text-align:left;
   border:1px solid var(--border-strong); border-radius:var(--radius-md);
-  background:var(--surface-sunken); padding:var(--sp-4);
-  font-family:inherit; color:var(--text-primary); cursor:pointer;
+  background:var(--surface-sunken); padding:var(--sp-4); min-width:0;
+  color:var(--text-primary);
   transition:border-color var(--dur-fast) var(--ease-standard);
 }
-.room-card:hover{ border-color:var(--accent); }
-.room-card:focus-visible{ outline:none; box-shadow:var(--shadow-focus); }
-.room-card:disabled{ cursor:not-allowed; opacity:.55; }
-.room-card.mine{ border-color:var(--accent); background:var(--accent-bg); }
-.room-card-h{ display:flex; align-items:center; gap:var(--sp-2); }
-.room-no{ font-size:var(--fs-subhead); font-weight:var(--fw-bold); }
-.room-n{ margin-left:auto; font-size:var(--fs-footnote); color:var(--text-tertiary); }
-.room-host{ font-size:var(--fs-footnote); color:var(--text-secondary); }
-.room-host b{ font-weight:var(--fw-medium); }
+.room-card:hover{ border-color:var(--border-strong); }
+.room-card.live{ border-color:var(--success); }
+.room-card.full{ opacity:.6; }
+.room-card-h{ display:flex; align-items:center; gap:var(--sp-2); flex:none; }
+.room-card-mid{ flex:1; display:flex; align-items:center; justify-content:center; }
+.room-card-f{ flex:none; display:flex; flex-direction:column; gap:2px; min-height:34px; min-width:0; }
+.room-no{ font-size:var(--fs-subhead); font-weight:var(--fw-bold); white-space:nowrap; }
+.room-n{
+  margin-left:auto; font-size:var(--fs-footnote); color:var(--text-tertiary);
+  white-space:nowrap; flex:none;
+}
+.room-host{
+  font-size:var(--fs-footnote); color:var(--text-secondary);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;
+}
+.room-host b{ font-weight:var(--fw-medium); color:var(--text-primary); }
+.room-seatline{
+  font-size:var(--fs-footnote); color:var(--text-tertiary);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;
+}
 .room-live{
   font-size:var(--fs-footnote); font-weight:var(--fw-bold);
   color:var(--success-strong); background:var(--success-bg);
   border-radius:var(--radius-pill); padding:1px var(--sp-2);
+  white-space:nowrap; flex:none;
+}
+.room-enter{
+  background:var(--accent); color:var(--on-accent);
+  border:none; border-radius:var(--radius-md);
+  padding:var(--sp-3) var(--sp-6); font-family:inherit;
+  font-size:var(--fs-caption); font-weight:var(--fw-bold); cursor:pointer;
+  transition:background var(--dur-fast) var(--ease-standard);
+}
+.room-enter:hover{ background:var(--accent-hover); }
+.room-enter:focus-visible{ outline:none; box-shadow:var(--shadow-focus); }
+.room-enter:disabled{
+  background:var(--surface); color:var(--text-disabled);
+  border:1px solid var(--border-strong); cursor:not-allowed;
+}
+/* 카드가 손바닥만 해지는 화면 — 글자를 줄이고 방장 줄은 두 줄까지 허용한다 */
+@media (max-width:520px){
+  .room-card{ padding:var(--sp-3); }
+  .room-no{ font-size:var(--fs-caption); }
+  .room-live,.room-n{ font-size:11px; }
+  .room-host{ white-space:normal; }
+  .room-enter{ padding:var(--sp-2) var(--sp-4); font-size:var(--fs-footnote); }
 }
 
 .room-bar{
@@ -3157,16 +3191,27 @@ function renderRoomGrid() {
   if (!box) return;
   box.innerHTML = rooms.map(r => {
     const full = r.members.length >= ROOM_CAPACITY;
-    return `<button type="button" class="room-card" data-room="${r.room}" ${full ? 'disabled' : ''}>
-      <span class="room-card-h">
+    // 방장을 뺀 나머지를 몇 명만 보여준다. 다 적으면 카드가 넘친다.
+    const rest = r.members.slice(1);
+    const shown = rest.slice(0, 3).join(', ') + (rest.length > 3 ? ` 외 ${rest.length - 3}명` : '');
+    return `<div class="room-card${r.running ? ' live' : ''}${full ? ' full' : ''}">
+      <div class="room-card-h">
         <span class="room-no">${r.room}번방</span>
         ${r.running ? '<span class="room-live">실행 중</span>' : ''}
         <span class="room-n">${r.members.length} / ${ROOM_CAPACITY}</span>
-      </span>
-      <span class="room-host">${r.host
-        ? `방장 <b>${esc(r.host)}</b>`
-        : (full ? '정원이 찼습니다' : '비어 있음 · 먼저 들어가면 방장')}</span>
-    </button>`;
+      </div>
+      <div class="room-card-mid">
+        <button type="button" class="room-enter" data-enter="${r.room}" ${full ? 'disabled' : ''}>
+          ${full ? '정원 마감' : '들어가기'}
+        </button>
+      </div>
+      <div class="room-card-f">
+        <span class="room-host">${r.host
+          ? `방장 <b>${esc(r.host)}</b>`
+          : '비어 있음 · 먼저 들어가면 방장'}</span>
+        <span class="room-seatline">${rest.length ? esc(shown) : ''}</span>
+      </div>
+    </div>`;
   }).join('');
 }
 
@@ -3287,8 +3332,8 @@ async function sendChat() {
 function initLauncherEvents() {
   const grid = document.getElementById('roomGrid');
   if (grid) grid.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-room]');
-    if (btn) enterRoom(Number(btn.dataset.room));
+    const btn = e.target.closest('[data-enter]');
+    if (btn) enterRoom(Number(btn.dataset.enter));
   });
 
   const login = document.getElementById('lcLoginBtn');

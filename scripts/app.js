@@ -1714,16 +1714,27 @@ function renderRoomGrid() {
   if (!box) return;
   box.innerHTML = rooms.map(r => {
     const full = r.members.length >= ROOM_CAPACITY;
-    return `<button type="button" class="room-card" data-room="${r.room}" ${full ? 'disabled' : ''}>
-      <span class="room-card-h">
+    // 방장을 뺀 나머지를 몇 명만 보여준다. 다 적으면 카드가 넘친다.
+    const rest = r.members.slice(1);
+    const shown = rest.slice(0, 3).join(', ') + (rest.length > 3 ? ` 외 ${rest.length - 3}명` : '');
+    return `<div class="room-card${r.running ? ' live' : ''}${full ? ' full' : ''}">
+      <div class="room-card-h">
         <span class="room-no">${r.room}번방</span>
         ${r.running ? '<span class="room-live">실행 중</span>' : ''}
         <span class="room-n">${r.members.length} / ${ROOM_CAPACITY}</span>
-      </span>
-      <span class="room-host">${r.host
-        ? `방장 <b>${esc(r.host)}</b>`
-        : (full ? '정원이 찼습니다' : '비어 있음 · 먼저 들어가면 방장')}</span>
-    </button>`;
+      </div>
+      <div class="room-card-mid">
+        <button type="button" class="room-enter" data-enter="${r.room}" ${full ? 'disabled' : ''}>
+          ${full ? '정원 마감' : '들어가기'}
+        </button>
+      </div>
+      <div class="room-card-f">
+        <span class="room-host">${r.host
+          ? `방장 <b>${esc(r.host)}</b>`
+          : '비어 있음 · 먼저 들어가면 방장'}</span>
+        <span class="room-seatline">${rest.length ? esc(shown) : ''}</span>
+      </div>
+    </div>`;
   }).join('');
 }
 
@@ -1844,8 +1855,8 @@ async function sendChat() {
 function initLauncherEvents() {
   const grid = document.getElementById('roomGrid');
   if (grid) grid.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-room]');
-    if (btn) enterRoom(Number(btn.dataset.room));
+    const btn = e.target.closest('[data-enter]');
+    if (btn) enterRoom(Number(btn.dataset.enter));
   });
 
   const login = document.getElementById('lcLoginBtn');
