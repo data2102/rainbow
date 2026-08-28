@@ -983,6 +983,25 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .room-actions .btn{ flex:1 1 160px; margin-top:0; }
 .room-actions .btn-ghost{ flex:1 1 160px; margin-top:0; }
 
+/* ---------- 출발 카운트다운 ---------- */
+.cd{
+  position:fixed; inset:0; z-index:var(--z-modal);
+  display:none; align-items:center; justify-content:center;
+  background:rgba(6,8,10,.82); cursor:pointer;
+}
+.cd.show{ display:flex; }
+.cd-n{
+  font-family:var(--font-mono); font-weight:var(--fw-bold); line-height:1;
+  font-size:clamp(110px, 30vw, 280px); letter-spacing:-.03em;
+  color:var(--danger); text-shadow:0 0 48px rgba(240,62,62,.5);
+}
+/* START 는 글자가 다섯이라 한 줄에 들어오도록 줄여 잡는다 */
+.cd-n.go{ font-size:clamp(52px, 15vw, 150px); letter-spacing:.1em; }
+@keyframes cd-pop{ from{ transform:scale(1.55); opacity:0; } to{ transform:scale(1); opacity:1; } }
+@media (prefers-reduced-motion:no-preference){
+  .cd-n{ animation:cd-pop .26s var(--ease-out) both; }
+}
+
 /* ---------- 토스트 / 모달 ---------- */
 .toast{
   position:fixed; bottom:var(--sp-6); right:var(--sp-6);
@@ -1601,6 +1620,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   </div>
 </div>
 <div class="toast" id="toast"></div>
+<div class="cd" id="countdown" aria-hidden="true"><div class="cd-n" id="countdownN"></div></div>
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal-box" id="modalContent"></div>
 </div>
