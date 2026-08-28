@@ -302,8 +302,9 @@ async function start(req, res) {
   const me = await requireUser(req, res);
   if (!me) return;
 
+  // 주소는 있으면 좋고 없어도 된다. 대개는 JOIN GAME 목록에 방장의 방이 떠서
+  // 주소를 몰라도 들어갈 수 있다. 목록이 안 뜨는 사람을 위한 뒷길일 뿐이다.
   const address = cleanAddress(body(req).address);
-  if (!address) return res.status(400).json({ error: '접속 주소를 입력해주세요.' });
 
   const rows = await q(`SELECT room FROM room_members WHERE handle = $1`, [me]);
   if (!rows.length) return res.status(400).json({ error: '먼저 방에 들어가주세요.' });
@@ -324,7 +325,9 @@ async function start(req, res) {
         SET running = true, started_at = $2, started_by = $3, address = $4`,
     [room, now, me, address]
   );
-  await q(`UPDATE players SET radmin_ip = $1 WHERE handle = $2`, [address, me]);
-  await system(room, `${me} 님이 게임을 실행했습니다 · 접속 주소 ${address}`);
+  if (address) await q(`UPDATE players SET radmin_ip = $1 WHERE handle = $2`, [address, me]);
+  await system(room, address
+    ? `${me} 님이 게임을 실행했습니다 · 접속 주소 ${address}`
+    : `${me} 님이 게임을 실행했습니다. JOIN GAME 목록에서 찾아 들어가세요.`);
   res.status(200).json({ ok: true, room, startedAt: now, address });
 }

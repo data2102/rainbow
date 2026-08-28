@@ -1011,6 +1011,11 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   font-size:var(--fs-caption); color:var(--text-secondary);
   line-height:var(--lh-body); margin-bottom:2px;
 }
+.steps-alt{
+  margin-top:var(--sp-2); padding-top:var(--sp-2);
+  border-top:1px solid var(--border);
+  font-size:var(--fs-footnote); color:var(--text-tertiary); line-height:var(--lh-body);
+}
 .room-steps kbd{
   font-family:var(--font-mono); font-size:var(--fs-footnote); font-weight:var(--fw-bold);
   color:var(--text-primary); background:var(--surface);
@@ -3384,8 +3389,8 @@ async function launchGame(address) {
   if (address) await copyText(address);
   window.location.href = GAME_PROTOCOL;
   showToast(address
-    ? `접속 주소 ${address} 복사됨 · 게임이 안 켜지면 조인하기를 눌러주세요.`
-    : '게임을 실행합니다.');
+    ? `게임 실행 · JOIN GAME 목록에서 찾으세요 (주소 ${address} 도 복사됨)`
+    : '게임 실행 · JOIN GAME 목록에서 방장을 찾아 들어가세요.');
 }
 
 /** 클립보드. 막혀 있으면 옛 방식으로 한 번 더 시도한다. */
@@ -3591,14 +3596,19 @@ function renderRoomView(r) {
            <li><kbd>MULTIPLAYER</kbd></li>
            <li><kbd>CREATE GAME</kbd></li>
            <li>맵과 인원을 정하고 사람들이 다 들어오면 <kbd>START MISSION</kbd></li>
-         </ol>`
+         </ol>
+         <div class="steps-alt">내 서버가 사람들 <kbd>JOIN GAME</kbd> 목록에 떠야 합니다 —
+           MULTIPLAYER OPTIONS 의 <b>ANNOUNCE SERVER</b> 체크를 확인하세요.</div>`
       : `<div class="room-steps-h">게임이 켜지면 — 방장에게 들어가기</div>
          <ol>
            <li><kbd>MULTIPLAYER</kbd></li>
-           <li><kbd>MANUAL JOIN</kbd></li>
-           <li>주소 칸에 <kbd>Ctrl</kbd> + <kbd>V</kbd> — 조인하기를 누를 때 복사해뒀습니다
-               ${r.address ? `(<b>${esc(r.address)}</b>)` : ''}</li>
-         </ol>`;
+           <li><kbd>JOIN GAME</kbd></li>
+           <li>목록에 뜬 방장의 서버를 <b>더블클릭</b></li>
+         </ol>
+         <div class="steps-alt">목록에 안 뜨면 — <kbd>MANUAL JOIN</kbd> 에
+           ${r.address
+             ? `<b>${esc(r.address)}</b> 를 넣으세요 (조인하기를 누르면 복사됩니다)`
+             : '방장의 Radmin 주소를 넣으세요'}</div>`;
   }
 
   const actions = document.getElementById('roomActions');
@@ -3623,7 +3633,7 @@ function renderRoomView(r) {
       ? 'Radmin VPN 에서 게임을 열고, 실행하기에 내 Radmin 주소(26.…)를 적어주세요.'
         + ' 방에 있는 모두가 함께 카운트다운을 보고 게임이 켜집니다.'
       : (r.running
-        ? '방장이 실행하면 카운트다운 뒤 게임이 저절로 켜집니다 · 안 켜졌다면 조인하기를 눌러주세요.'
+        ? '게임이 켜졌으면 JOIN GAME 목록에서 방장을 찾아 들어가세요 · 게임이 안 켜졌다면 조인하기.'
         : '방장이 실행하기를 누르면 다 같이 카운트다운이 돌고 게임이 켜집니다.');
   }
 }
@@ -3634,14 +3644,15 @@ function showStartModal() {
   openModal(`
     <button class="modal-x" onclick="closeModal()">✕</button>
     <h3>게임 실행</h3>
-    <div class="foot-note" style="margin-top:0;">Radmin VPN 창에 보이는
-      <b>내 주소</b>를 적어주세요. 방에 있는 사람들이 이 주소로 찾아 들어갑니다.</div>
-    <label>내 Radmin 주소</label>
+    <div class="foot-note" style="margin-top:0;">바로 실행해도 됩니다 —
+      대개는 방장의 방이 사람들 <b>JOIN GAME</b> 목록에 떠서 주소가 필요 없습니다.
+      목록이 안 뜨는 사람을 위해 적어두면 뒷길이 됩니다.</div>
+    <label>내 Radmin 주소 (선택)</label>
     <input type="text" id="startAddr" maxlength="21" autocomplete="off"
            placeholder="예: 26.131.188.239" value="${esc((here && here.address) || savedAddress || '')}">
     <div class="modal-error" id="startErr"></div>
     <button class="btn" id="startSubmit">실행하기</button>
-    <div class="foot-note">한 번 적어두면 다음부터 자동으로 채워집니다.</div>`);
+    <div class="foot-note">한 번 적어두면 다음부터 자동으로 채워집니다 · 비워두고 실행해도 됩니다.</div>`);
   const go = () => startRoom();
   document.getElementById('startSubmit').addEventListener('click', go);
   document.getElementById('startAddr').addEventListener('keydown', e => {
