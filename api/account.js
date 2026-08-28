@@ -38,6 +38,7 @@ export default async function handler(req, res) {
       case 'logout':   return await logout(req, res);
       case 'me':       return await whoami(req, res);
       case 'signup':   return await signup(req, res);
+      case 'checkId':  return await checkId(req, res);
       case 'resetPw':  return await resetPw(req, res);
       case 'changePw': return await changePw(req, res);
       case 'list':     return await list(req, res);
@@ -109,25 +110,43 @@ async function signup(req, res) {
 
 /* ---------- 비밀번호 ---------- */
 
-/**
- * 비밀번호 분실. 아이디·클랜·이메일 세 가지가 모두 맞아야 새 비밀번호를 정할 수 있다.
- * 메일을 보내는 절차가 없으므로, 세 가지를 아는 사람은 비밀번호를 바꿀 수 있다.
- */
-async function resetPw(req, res) {
-  const { id, clan, email, password } = body(req);
-  const handle = String(id == null ? '' : id).trim();
-  const clanName = String(clan == null ? '' : clan).trim();
-  const mail = String(email == null ? '' : email).trim();
-  checkPw(password);
-
+/** 아이디·클랜·이메일 세 가지가 모두 맞는 계정을 찾는다 */
+async function findByIdentity({ id, clan, email }) {
   const rows = await q(
     `SELECT handle FROM players
       WHERE lower(handle) = lower($1) AND lower(clan) = lower($2) AND lower(email) = lower($3)`,
-    [handle, clanName, mail]
+    [
+      String(id == null ? '' : id).trim(),
+      String(clan == null ? '' : clan).trim(),
+      String(email == null ? '' : email).trim(),
+    ]
   );
-  if (!rows.length) {
+  return rows.length ? rows[0].handle : null;
+}
+
+/** 1단계: 본인 확인만 한다. 여기서 맞아야 새 비밀번호 화면으로 넘어간다. */
+async function checkId(req, res) {
+  const handle = await findByIdentity(body(req));
+  if (!handle) {
     return res.status(400).json({ error: '아이디·클랜·이메일이 일치하는 계정이 없습니다.' });
   }
+  res.status(200).json({ ok: true, handle });
+}
+
+/**
+ * 2단계: 새 비밀번호를 정한다.
+ * 여기서도 세 가지를 다시 확인한다. 1단계를 건너뛰고 바로 불러도 통과하지 못하도록.
+ * 메일을 보내는 절차가 없으므로, 세 가지를 아는 사람은 비밀번호를 바꿀 수 있다.
+ */
+async function resetPw(req, res) {
+  const { password } = body(req);
+  checkPw(password);
+
+  const handle = await findByIdentity(body(req));
+  if (!handle) {
+    return res.status(400).json({ error: '아이디·클랜·이메일이 일치하는 계정이 없습니다.' });
+  }
+  const rows = [{ handle }];
 
   await q(`UPDATE players SET pw_hash = $1 WHERE handle = $2`, [hashPw(password), rows[0].handle]);
   await q(`DELETE FROM sessions WHERE admin_id = $1`, [rows[0].handle]);

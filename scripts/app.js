@@ -1388,9 +1388,9 @@ function showSignupModal() {
   openModal(`
     <button class="modal-x" onclick="closeModal()">✕</button>
     <h3>회원가입</h3>
-    <label>ID *</label><input type="text" id="suId" maxlength="40" placeholder="예: SNC_NewName">
-    <label>CLAN *</label><input type="text" id="suClan" maxlength="20" placeholder="예: SNC">
-    <label>이메일 주소 *</label><input type="text" id="suEmail" maxlength="120" placeholder="예: name@example.com">
+    <label>ID *</label><input type="text" id="suId" maxlength="40" autocomplete="username" placeholder="예: SNC_NewName">
+    <label>CLAN *</label><input type="text" id="suClan" maxlength="20" autocomplete="off" placeholder="예: SNC">
+    <label>이메일 주소 *</label><input type="text" id="suEmail" maxlength="120" autocomplete="email" placeholder="예: name@example.com">
     <div class="modal-error" id="suErr"></div>
     <button class="btn" id="suSubmit">가입 신청</button>
     <div class="foot-note">관리자가 승인하면 계정이 만들어집니다 · 초기 비밀번호는 1234입니다 ·
@@ -1413,33 +1413,67 @@ async function doSignup() {
   } catch (e) { err.textContent = e.message; }
 }
 
+/* 비밀번호 찾기는 두 단계다. 본인 확인이 끝나야 새 비밀번호를 정하는 창이 뜬다. */
+
 function showFindPwModal() {
   openModal(`
     <button class="modal-x" onclick="closeModal()">✕</button>
     <h3>비밀번호 찾기</h3>
-    <div class="foot-note" style="margin-top:0;">ID · CLAN · 이메일 주소가 모두 맞으면
-      새 비밀번호를 정할 수 있습니다.</div>
-    <label>ID</label><input type="text" id="fpId" maxlength="40">
-    <label>CLAN</label><input type="text" id="fpClan" maxlength="20">
-    <label>이메일 주소</label><input type="text" id="fpEmail" maxlength="120">
-    <label>새 비밀번호 (4자 이상)</label><input type="password" id="fpPw1">
-    <label>새 비밀번호 확인</label><input type="password" id="fpPw2">
+    <div class="foot-note" style="margin-top:0;">ID · CLAN · 이메일 주소가 모두 맞아야
+      다음 단계로 넘어갑니다.</div>
+    <label>ID</label><input type="text" id="fpId" maxlength="40" autocomplete="username">
+    <label>CLAN</label><input type="text" id="fpClan" maxlength="20" autocomplete="off">
+    <label>이메일 주소</label><input type="text" id="fpEmail" maxlength="120" autocomplete="email">
     <div class="modal-error" id="fpErr"></div>
-    <button class="btn" id="fpSubmit">비밀번호 재설정</button>`);
-  document.getElementById('fpSubmit').addEventListener('click', doFindPw);
+    <button class="btn" id="fpSubmit">다음</button>
+    <div class="foot-note">비밀번호를 찾지 못할 경우 관리자에게 문의하세요.</div>`);
+  document.getElementById('fpSubmit').addEventListener('click', doCheckIdentity);
+  document.getElementById('fpEmail').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doCheckIdentity();
+  });
 }
 
-async function doFindPw() {
+async function doCheckIdentity() {
   const id = document.getElementById('fpId').value.trim();
   const clan = document.getElementById('fpClan').value.trim();
   const email = document.getElementById('fpEmail').value.trim();
-  const p1 = document.getElementById('fpPw1').value;
-  const p2 = document.getElementById('fpPw2').value;
   const err = document.getElementById('fpErr');
+  err.textContent = '';
+  if (!id || !clan || !email) { err.textContent = '세 항목을 모두 입력해주세요.'; return; }
+  try {
+    const d = await apiPost('/api/account', { action: 'checkId', id, clan, email });
+    showNewPwModal({ id, clan, email, handle: d.handle });
+  } catch (e) { err.textContent = e.message; }
+}
+
+function showNewPwModal(who) {
+  openModal(`
+    <button class="modal-x" onclick="closeModal()">✕</button>
+    <h3>새 비밀번호 설정</h3>
+    <div class="foot-note" style="margin-top:0;">본인 확인이 끝났습니다 ·
+      <b>${esc(who.handle)}</b> 계정의 새 비밀번호를 정해주세요.</div>
+    <label>새 비밀번호 (4자 이상)</label>
+    <input type="password" id="npPw1" autocomplete="new-password">
+    <label>새 비밀번호 확인</label>
+    <input type="password" id="npPw2" autocomplete="new-password">
+    <div class="modal-error" id="npErr"></div>
+    <button class="btn" id="npSubmit">비밀번호 재설정</button>`);
+  document.getElementById('npSubmit').addEventListener('click', () => doResetPw(who));
+  document.getElementById('npPw2').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doResetPw(who);
+  });
+}
+
+async function doResetPw(who) {
+  const p1 = document.getElementById('npPw1').value;
+  const p2 = document.getElementById('npPw2').value;
+  const err = document.getElementById('npErr');
   err.textContent = '';
   if (p1 !== p2) { err.textContent = '새 비밀번호가 서로 일치하지 않습니다.'; return; }
   try {
-    await apiPost('/api/account', { action: 'resetPw', id, clan, email, password: p1 });
+    await apiPost('/api/account', {
+      action: 'resetPw', id: who.id, clan: who.clan, email: who.email, password: p1,
+    });
     closeModal();
     showToast('비밀번호를 바꿨습니다. 새 비밀번호로 로그인해주세요.');
   } catch (e) { err.textContent = e.message; }
@@ -1449,8 +1483,8 @@ function showChangePasswordModal() {
   openModal(`
     <button class="modal-x" onclick="closeModal()">✕</button>
     <h3>비밀번호 변경</h3>
-    <label>새 비밀번호 (4자 이상)</label><input type="password" id="cpNew1">
-    <label>새 비밀번호 확인</label><input type="password" id="cpNew2">
+    <label>새 비밀번호 (4자 이상)</label><input type="password" id="cpNew1" autocomplete="new-password">
+    <label>새 비밀번호 확인</label><input type="password" id="cpNew2" autocomplete="new-password">
     <div class="modal-error" id="cpErr"></div>
     <button class="btn" id="cpSubmit">변경하기</button>`);
   document.getElementById('cpSubmit').addEventListener('click', doChangePassword);
