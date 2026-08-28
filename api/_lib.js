@@ -42,8 +42,8 @@ export async function tx(fn) {
 
 /**
  * 새 계정과 재발급에 쓰는 임시 비밀번호.
- * 모바일에서 받아치기 쉽도록 짧게 두었다. 이 값으로 로그인하면
- * 비밀번호 변경 창이 강제로 뜨고, 8자 이상으로 바꿔야 이용할 수 있다.
+ * 모바일에서 받아치기 쉽도록 짧게 두었다. 이 값 그대로 로그인하면
+ * 비밀번호를 바꾸는 창이 강제로 뜨고, 바꾸기 전에는 닫을 수 없다.
  */
 export const TEMP_PASSWORD = '1234';
 
@@ -173,6 +173,21 @@ export async function audit(adminId, action, detail) {
 
 export function genReqId() {
   return 'req_' + Date.now() + '_' + randomBytes(4).toString('hex');
+}
+
+/** 이메일 최대 길이 */
+export const MAX_EMAIL = 120;
+
+/**
+ * 이메일을 다듬는다. 빈 값이면 null.
+ * 아주 느슨하게만 본다. 오타까지 잡아주려다 멀쩡한 주소를 막는 편이 더 나쁘다.
+ */
+export function cleanEmail(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return null;
+  if (s.length > MAX_EMAIL) throw new Error('이메일이 너무 깁니다.');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) throw new Error('이메일 형식이 올바르지 않습니다.');
+  return s;
 }
 
 export function parseHandle(full) {

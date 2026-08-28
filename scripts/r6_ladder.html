@@ -591,6 +591,8 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .role-tag.admin{ background:var(--accent-bg); color:var(--accent-strong); }
 .role-tag.master{ background:var(--warning-bg); color:var(--warning-strong); }
 .acct-email{ color:var(--text-tertiary); font-size:var(--fs-footnote); }
+.acct-actions{ display:flex; gap:var(--sp-2); flex:none; }
+.search-row .btn-mini{ flex:none; white-space:nowrap; padding:var(--sp-3) var(--sp-4); }
 
 /* ---------- 회원 관리 ---------- */
 .member-list{
@@ -1002,10 +1004,11 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
         <div class="foot-note" style="margin-top:0;margin-bottom:12px;" id="roleNote"></div>
         <div class="search-row">
           <input type="text" id="roleSearch" autocomplete="off" placeholder="아이디 또는 클랜으로 검색...">
+          <button class="btn-mini btn-edit" id="acctAddBtn">＋ 계정 추가</button>
         </div>
         <div class="table-wrap">
           <table id="roleTable">
-            <thead><tr><th>ID</th><th>Clan</th><th>이메일</th><th>권한</th></tr></thead>
+            <thead><tr><th>ID</th><th>Clan</th><th>이메일</th><th>권한</th><th>관리</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -1014,7 +1017,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
       <div class="panel hud-corner">
         <h2>계정 로그</h2>
         <div class="foot-note" style="margin-top:0;margin-bottom:12px;">
-          가입 승인 · 계정 삭제 · 권한 변경 기록입니다 · 최근 200건.
+          계정 추가 · 수정 · 삭제 · 가입 승인 · 권한 변경 기록입니다 · 최근 200건.
         </div>
         <div class="table-wrap">
           <table id="acctLogTable" class="history-table">

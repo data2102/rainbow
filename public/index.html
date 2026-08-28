@@ -591,6 +591,8 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .role-tag.admin{ background:var(--accent-bg); color:var(--accent-strong); }
 .role-tag.master{ background:var(--warning-bg); color:var(--warning-strong); }
 .acct-email{ color:var(--text-tertiary); font-size:var(--fs-footnote); }
+.acct-actions{ display:flex; gap:var(--sp-2); flex:none; }
+.search-row .btn-mini{ flex:none; white-space:nowrap; padding:var(--sp-3) var(--sp-4); }
 
 /* ---------- 회원 관리 ---------- */
 .member-list{
@@ -1002,10 +1004,11 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
         <div class="foot-note" style="margin-top:0;margin-bottom:12px;" id="roleNote"></div>
         <div class="search-row">
           <input type="text" id="roleSearch" autocomplete="off" placeholder="아이디 또는 클랜으로 검색...">
+          <button class="btn-mini btn-edit" id="acctAddBtn">＋ 계정 추가</button>
         </div>
         <div class="table-wrap">
           <table id="roleTable">
-            <thead><tr><th>ID</th><th>Clan</th><th>이메일</th><th>권한</th></tr></thead>
+            <thead><tr><th>ID</th><th>Clan</th><th>이메일</th><th>권한</th><th>관리</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -1014,7 +1017,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
       <div class="panel hud-corner">
         <h2>계정 로그</h2>
         <div class="foot-note" style="margin-top:0;margin-bottom:12px;">
-          가입 승인 · 계정 삭제 · 권한 변경 기록입니다 · 최근 200건.
+          계정 추가 · 수정 · 삭제 · 가입 승인 · 권한 변경 기록입니다 · 최근 200건.
         </div>
         <div class="table-wrap">
           <table id="acctLogTable" class="history-table">
@@ -1682,8 +1685,11 @@ function renderChecklists() {
   const winList = document.getElementById('winList');
   const loseList = document.getElementById('loseList');
   if (!winList || !loseList) return;
-  winList.innerHTML = players.map(p => rowHtml(p, 'win')).join('');
-  loseList.innerHTML = players.map(p => rowHtml(p, 'lose')).join('');
+  // 점수 순이 아니라 아이디 순(ABC)으로 늘어놓는다. 체크할 사람을 눈으로 찾기 쉽도록.
+  const byId = [...players].sort((a, b) =>
+    a.handle.localeCompare(b.handle, 'en', { sensitivity: 'base' }));
+  winList.innerHTML = byId.map(p => rowHtml(p, 'win')).join('');
+  loseList.innerHTML = byId.map(p => rowHtml(p, 'lose')).join('');
 
   document.querySelectorAll('#winList input, #loseList input').forEach(el => {
     el.addEventListener('change', renderChecklists);
@@ -2709,6 +2715,83 @@ async function doLogin() {
     renderAuthBar();
     await refreshAll();
     showToast(`${me.handle} 님, 반갑습니다.`);
+    runRequiredSetup();
+  } catch (e) { err.textContent = e.message; }
+}
+
+/* ---------- 로그인 직후 반드시 거치는 절차 ---------- */
+
+/**
+ * 초기 비밀번호(1234)를 그대로 쓰고 있거나 이메일이 없으면 창을 띄운다.
+ * 둘 다 비밀번호를 잊었을 때 본인을 확인할 방법이 없어지는 문제라,
+ * 창을 닫거나 건너뛸 수 없게 한다. 비밀번호를 먼저 받고 이메일을 받는다.
+ */
+function runRequiredSetup() {
+  if (!me) return;
+  if (me.mustChangePw) { showForcedPwModal(); return; }
+  if (me.mustSetEmail) { showForcedEmailModal(); return; }
+}
+
+function showForcedPwModal() {
+  openModal(`
+    <h3>비밀번호를 바꿔주세요</h3>
+    <div class="foot-note" style="margin-top:0;">지금은 초기 비밀번호(1234)를 그대로 쓰고 있습니다 ·
+      <b>다른 사람이 그대로 로그인할 수 있으니</b> 반드시 바꿔주세요.</div>
+    <label>새 비밀번호 (4자 이상)</label>
+    <input type="password" id="fcPw1" autocomplete="new-password">
+    <label>새 비밀번호 확인</label>
+    <input type="password" id="fcPw2" autocomplete="new-password">
+    <div class="modal-error" id="fcErr"></div>
+    <button class="btn" id="fcSubmit">변경하기</button>`, true);
+  const go = () => doForcedPwChange();
+  document.getElementById('fcSubmit').addEventListener('click', go);
+  document.getElementById('fcPw2').addEventListener('keydown', e => {
+    if (e.key === 'Enter') go();
+  });
+}
+
+async function doForcedPwChange() {
+  const p1 = document.getElementById('fcPw1').value;
+  const p2 = document.getElementById('fcPw2').value;
+  const err = document.getElementById('fcErr');
+  err.textContent = '';
+  if (p1 !== p2) { err.textContent = '새 비밀번호가 서로 일치하지 않습니다.'; return; }
+  try {
+    await apiPost('/api/account', { action: 'changePw', password: p1 });
+    me = { ...me, mustChangePw: false };
+    showToast('비밀번호가 변경되었습니다.');
+    if (me.mustSetEmail) { showForcedEmailModal(); return; }
+    closeModal();
+  } catch (e) { err.textContent = e.message; }
+}
+
+function showForcedEmailModal() {
+  openModal(`
+    <h3>이메일 주소를 등록해주세요</h3>
+    <div class="foot-note" style="margin-top:0;">등록된 이메일 주소가 없습니다.</div>
+    <label>이메일 주소</label>
+    <input type="text" id="fmEmail" maxlength="120" autocomplete="email" placeholder="예: name@example.com">
+    <div class="modal-error" id="fmErr"></div>
+    <button class="btn" id="fmSubmit">등록하기</button>
+    <div class="foot-note"><b>이메일 주소를 올바르게 입력하지 않으면 비밀번호를 잃어버렸을 때 찾기 어렵습니다.</b>
+      비밀번호 찾기는 ID · CLAN · 이메일 주소 세 가지가 모두 맞아야 진행됩니다.</div>`, true);
+  const go = () => doForcedEmail();
+  document.getElementById('fmSubmit').addEventListener('click', go);
+  document.getElementById('fmEmail').addEventListener('keydown', e => {
+    if (e.key === 'Enter') go();
+  });
+}
+
+async function doForcedEmail() {
+  const email = document.getElementById('fmEmail').value.trim();
+  const err = document.getElementById('fmErr');
+  err.textContent = '';
+  try {
+    const d = await apiPost('/api/account', { action: 'setEmail', email });
+    me = { ...me, email: d.email, mustSetEmail: false };
+    closeModal();
+    showToast('이메일 주소를 등록했습니다.');
+    await refreshAll();
   } catch (e) { err.textContent = e.message; }
 }
 
@@ -2867,14 +2950,105 @@ function renderRoleTable() {
             `<option value="${r}"${r === a.role ? ' selected' : ''}>${ROLE_LABEL[r]}</option>`).join('')
         }</select>`
       : `<span class="role-tag ${esc(a.role)}">${esc(ROLE_LABEL[a.role] || '일반')}</span>`}</td>
-  </tr>`).join('') || '<tr><td colspan="4" class="log-empty">계정이 없습니다.</td></tr>';
+    <td><span class="acct-actions">
+      <button class="btn-mini btn-edit" data-aedit="${esc(a.handle)}">수정</button>
+      ${me && me.handle === a.handle
+        ? ''
+        : `<button class="btn-mini btn-reject" data-adel="${esc(a.handle)}">삭제</button>`}
+    </span></td>
+  </tr>`).join('') || '<tr><td colspan="5" class="log-empty">계정이 없습니다.</td></tr>';
+}
+
+/* 계정 정보는 선수 명단과 같은 것이므로 /api/player 를 그대로 쓴다.
+   여기서 한 일도 audit_log 에 남아 아래 '계정 로그'에 그대로 나온다. */
+
+function showAcctAddModal() {
+  openModal(`
+    <button class="modal-x" onclick="closeModal()">✕</button>
+    <h3>계정 추가</h3>
+    <label>ID *</label>
+    <input type="text" id="aaId" maxlength="40" autocomplete="off" placeholder="예: SNC_NewName">
+    <label>CLAN</label>
+    <input type="text" id="aaClan" maxlength="20" autocomplete="off" placeholder="비워두면 ID 앞부분을 씁니다">
+    <label>이메일 주소</label>
+    <input type="text" id="aaEmail" maxlength="120" autocomplete="off" placeholder="예: name@example.com">
+    <div class="foot-note" style="margin-top:8px;">승인 절차 없이 바로 명단에 들어갑니다 ·
+      초기 비밀번호는 1234이고, 본인이 처음 로그인할 때 바꾸게 됩니다.</div>
+    <div class="modal-error" id="aaErr"></div>
+    <button class="btn" id="aaSubmit">추가하기</button>
+    <button class="btn-ghost" style="width:100%;margin-top:8px;" onclick="closeModal()">취소</button>`);
+  const err = document.getElementById('aaErr');
+  document.getElementById('aaSubmit').addEventListener('click', async () => {
+    const handle = document.getElementById('aaId').value.trim();
+    const clan = document.getElementById('aaClan').value.trim();
+    const email = document.getElementById('aaEmail').value.trim();
+    err.textContent = '';
+    if (!handle) { err.textContent = 'ID를 입력해주세요.'; return; }
+    try {
+      await apiPost('/api/player', { action: 'create', handle, clan, email });
+      closeModal();
+      await refreshAll();
+      showToast(`${handle} 계정을 추가했습니다.`);
+    } catch (e) { err.textContent = e.message; }
+  });
+}
+
+function showAcctEditModal(handle) {
+  const a = accounts.find(x => x.handle === handle);
+  if (!a) return;
+  openModal(`
+    <button class="modal-x" onclick="closeModal()">✕</button>
+    <h3>계정 정보 수정</h3>
+    <label>ID</label>
+    <input type="text" id="aeId" maxlength="40" autocomplete="off" value="${esc(a.handle)}">
+    <label>CLAN</label>
+    <input type="text" id="aeClan" maxlength="20" autocomplete="off" value="${esc(a.clan || '')}">
+    <label>이메일 주소</label>
+    <input type="text" id="aeEmail" maxlength="120" autocomplete="off" value="${esc(a.email || '')}">
+    <div class="foot-note" style="margin-top:8px;">ID를 바꾸면 경기 기록·출석 기록에 남은 이름도 함께 바뀝니다 ·
+      점수와 전적은 그대로입니다 · 이메일을 비우면 지워집니다.</div>
+    <div class="modal-error" id="aeErr"></div>
+    <button class="btn" id="aeSubmit">저장</button>
+    <button class="btn-ghost" style="width:100%;margin-top:8px;" onclick="closeModal()">취소</button>`);
+  const err = document.getElementById('aeErr');
+  document.getElementById('aeSubmit').addEventListener('click', async () => {
+    const newHandle = document.getElementById('aeId').value.trim();
+    const clan = document.getElementById('aeClan').value.trim();
+    const email = document.getElementById('aeEmail').value.trim();
+    err.textContent = '';
+    if (!newHandle) { err.textContent = 'ID를 입력해주세요.'; return; }
+    try {
+      const d = await apiPost('/api/player', { action: 'update', handle, newHandle, clan, email });
+      closeModal();
+      // 내 계정을 고쳤다면 화면이 들고 있는 내 정보도 따라가야 한다
+      if (me && me.handle === handle) {
+        me = { ...me, handle: newHandle, clan, email: email || null, mustSetEmail: !email };
+        renderAuthBar();
+      }
+      await refreshAll();
+      showToast(d.matchesUpdated
+        ? `수정했습니다. 경기 기록 ${d.matchesUpdated}건의 이름도 함께 바꿨습니다.`
+        : '수정했습니다.');
+    } catch (e) { err.textContent = e.message; }
+  });
+}
+
+async function removeAccount(handle) {
+  if (!confirm(`'${handle}' 계정을 삭제할까요?\n\n로그인할 수 없게 되고 랭킹에서도 사라집니다. 지난 경기 기록은 그대로 남습니다.`)) return;
+  try {
+    await apiPost('/api/player', { action: 'remove', handle });
+    await refreshAll();
+    showToast(`${handle} 계정을 삭제했습니다.`);
+  } catch (e) { showToast(e.message); }
 }
 
 const ACCT_ACTION_LABEL = {
   approve_add: '가입 승인',
   approve_remove: '삭제 승인',
-  remove_player: '계정 삭제',
   reject_request: '요청 거절',
+  create_player: '계정 추가',
+  update_player: '계정 수정',
+  remove_player: '계정 삭제',
   set_role: '권한 변경',
 };
 
@@ -2886,9 +3060,19 @@ function renderAcctLogs() {
   empty.style.display = acctLogs.length ? 'none' : 'block';
   tbody.innerHTML = acctLogs.map(l => {
     const d = l.detail || {};
-    const target = d.handle || d.target || '-';
-    const extra = l.action === 'set_role' && d.from
-      ? ` (${ROLE_LABEL[d.from] || d.from} → ${ROLE_LABEL[d.to] || d.to})` : '';
+    const target = d.handle || d.to || d.target || '-';
+    let extra = '';
+    if (l.action === 'set_role' && d.from) {
+      extra = ` (${ROLE_LABEL[d.from] || d.from} → ${ROLE_LABEL[d.to] || d.to})`;
+    } else if (l.action === 'update_player') {
+      const parts = [];
+      if (d.from && d.to && d.from !== d.to) parts.push(`${d.from} → ${d.to}`);
+      if (d.clan) parts.push(`CLAN ${d.clan}`);
+      if ('email' in d) parts.push(`이메일 ${d.email || '삭제'}`);
+      if (parts.length) extra = ` (${parts.join(' · ')})`;
+    } else if (l.action === 'create_player' && d.clan) {
+      extra = ` (${d.clan}${d.email ? ' · ' + d.email : ''})`;
+    }
     return `<tr>
       <td class="h-inline" data-l="일시">${formatDateTime(l.ts)}</td>
       <td class="h-inline" data-l="내용">${esc(ACCT_ACTION_LABEL[l.action] || l.action)}</td>
@@ -2918,10 +3102,21 @@ function initAccountEvents() {
   if (search) search.addEventListener('input', renderRoleTable);
 
   const table = document.getElementById('roleTable');
-  if (table) table.addEventListener('change', (e) => {
-    const sel = e.target.closest('[data-role]');
-    if (sel) setRole(sel.dataset.role, sel.value);
-  });
+  if (table) {
+    table.addEventListener('change', (e) => {
+      const sel = e.target.closest('[data-role]');
+      if (sel) setRole(sel.dataset.role, sel.value);
+    });
+    table.addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      if (btn.dataset.aedit) showAcctEditModal(btn.dataset.aedit);
+      if (btn.dataset.adel) removeAccount(btn.dataset.adel);
+    });
+  }
+
+  const add = document.getElementById('acctAddBtn');
+  if (add) add.addEventListener('click', showAcctAddModal);
 }
 
 /* ---------- 경기 기록 ---------- */

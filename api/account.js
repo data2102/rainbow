@@ -1,7 +1,7 @@
 import {
   q, body, methodGuard, audit, hashPw, verifyPw, createSession,
   currentUser, requireAdmin, requireMaster, ensureAccounts,
-  genReqId, parseHandle, ROLES, ROLE_LABEL,
+  genReqId, parseHandle, cleanEmail, ROLES, ROLE_LABEL, TEMP_PASSWORD,
 } from './_lib.js';
 
 /**
@@ -9,17 +9,7 @@ import {
  * 권한은 일반 < 관리자 < 마스터 셋이고, 권한을 바꾸는 것은 마스터만 할 수 있다.
  */
 
-const MAX_EMAIL = 120;
 const MIN_PW = 4;
-
-function cleanEmail(v) {
-  const s = String(v == null ? '' : v).trim();
-  if (!s) return null;
-  if (s.length > MAX_EMAIL) throw new Error('이메일이 너무 깁니다.');
-  // 아주 느슨하게만 본다. 오타까지 잡아주려다 멀쩡한 주소를 막는 편이 더 나쁘다.
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) throw new Error('이메일 형식이 올바르지 않습니다.');
-  return s;
-}
 
 function checkPw(pw) {
   if (typeof pw !== 'string' || pw.length < MIN_PW) {
@@ -41,6 +31,7 @@ export default async function handler(req, res) {
       case 'checkId':  return await checkId(req, res);
       case 'resetPw':  return await resetPw(req, res);
       case 'changePw': return await changePw(req, res);
+      case 'setEmail': return await setEmail(req, res);
       case 'list':     return await list(req, res);
       case 'setRole':  return await setRole(req, res);
       case 'logs':     return await logs(req, res);
@@ -65,10 +56,24 @@ async function login(req, res) {
   }
 
   const token = await createSession(p.handle);
-  res.status(200).json({
-    ok: true, token,
-    account: { handle: p.handle, role: p.role || 'member', clan: p.clan, email: p.email },
-  });
+  res.status(200).json({ ok: true, token, account: toAccount(p) });
+}
+
+/**
+ * 화면에 넘겨주는 계정 정보.
+ * mustChangePw · mustSetEmail 이 붙어 있으면 화면이 창을 강제로 띄운다.
+ * 초기 비밀번호(1234)를 그대로 쓰거나 이메일이 없으면 비밀번호를 잃었을 때
+ * 본인 확인을 할 방법이 없으므로, 미루지 못하게 막는다.
+ */
+function toAccount(p) {
+  return {
+    handle: p.handle,
+    role: p.role || 'member',
+    clan: p.clan,
+    email: p.email || null,
+    mustChangePw: verifyPw(TEMP_PASSWORD, p.pw_hash),
+    mustSetEmail: !p.email,
+  };
 }
 
 async function logout(req, res) {
@@ -80,7 +85,9 @@ async function logout(req, res) {
 
 async function whoami(req, res) {
   const me = await currentUser(req);
-  res.status(200).json({ account: me });
+  if (!me) return res.status(200).json({ account: null });
+  const rows = await q(`SELECT * FROM players WHERE handle = $1`, [me.handle]);
+  res.status(200).json({ account: rows.length ? toAccount(rows[0]) : me });
 }
 
 /* ---------- 가입 신청 ---------- */
@@ -159,8 +166,21 @@ async function changePw(req, res) {
   if (!me) return res.status(401).json({ error: '로그인이 필요합니다.' });
   const { password } = body(req);
   checkPw(password);
+  if (password === TEMP_PASSWORD) {
+    return res.status(400).json({ error: '초기 비밀번호와 다른 비밀번호로 정해주세요.' });
+  }
   await q(`UPDATE players SET pw_hash = $1 WHERE handle = $2`, [hashPw(password), me.handle]);
   res.status(200).json({ ok: true });
+}
+
+/** 본인 이메일 등록·변경. 비밀번호를 잊었을 때 본인 확인에 쓰는 유일한 단서다. */
+async function setEmail(req, res) {
+  const me = await currentUser(req);
+  if (!me) return res.status(401).json({ error: '로그인이 필요합니다.' });
+  const email = cleanEmail(body(req).email);
+  if (!email) return res.status(400).json({ error: '이메일 주소를 입력해주세요.' });
+  await q(`UPDATE players SET email = $1 WHERE handle = $2`, [email, me.handle]);
+  res.status(200).json({ ok: true, email });
 }
 
 /* ---------- 권한 ---------- */
@@ -206,8 +226,11 @@ async function setRole(req, res) {
 
 /* ---------- 계정 로그 ---------- */
 
-/** 가입 승인 · 계정 삭제 · 권한 변경만 추려서 보여준다 */
-const LOG_ACTIONS = ['approve_add', 'approve_remove', 'remove_player', 'reject_request', 'set_role'];
+/** 계정을 만들고 · 고치고 · 지운 기록만 추려서 보여준다 */
+const LOG_ACTIONS = [
+  'approve_add', 'approve_remove', 'reject_request',
+  'create_player', 'update_player', 'remove_player', 'set_role',
+];
 
 async function logs(req, res) {
   const me = await requireAdmin(req, res);
