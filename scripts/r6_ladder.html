@@ -592,22 +592,8 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .role-tag.master{ background:var(--warning-bg); color:var(--warning-strong); }
 .acct-email{ color:var(--text-tertiary); font-size:var(--fs-footnote); }
 .acct-actions{ display:flex; gap:var(--sp-2); flex:none; }
+.acct-record{ color:var(--text-tertiary); font-size:var(--fs-footnote); white-space:nowrap; }
 .search-row .btn-mini{ flex:none; white-space:nowrap; padding:var(--sp-3) var(--sp-4); }
-
-/* ---------- 회원 관리 ---------- */
-.member-list{
-  max-height:340px; overflow-y:auto;
-  border:1px solid var(--border); border-radius:var(--radius-md);
-  background:var(--surface-sunken); padding:var(--sp-1); margin-top:var(--sp-3);
-}
-.member-row{
-  display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3);
-  padding:var(--sp-3); border-radius:var(--radius-sm);
-}
-.member-row:hover{ background:var(--surface); }
-.member-actions{ display:flex; gap:var(--sp-2); flex:none; }
-.member-id{ font-size:var(--fs-caption); font-weight:var(--fw-medium); }
-.member-meta{ font-size:var(--fs-footnote); color:var(--text-tertiary); }
 
 /* ---------- HISTORY ---------- */
 .history-table th{ cursor:default; }
@@ -989,18 +975,8 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
         <div id="pendingList"><div class="log-empty">대기 중인 요청이 없습니다.</div></div>
       </div>
 
-      <div class="panel hud-corner">
-        <h2>회원 관리</h2>
-        <div class="foot-note" style="margin-top:0;margin-bottom:10px;">
-          명단에서 회원을 바로 삭제합니다. 삭제해도 지난 경기 기록은 HISTORY에 그대로 남습니다.
-        </div>
-        <input type="text" id="memberSearch" autocomplete="off" placeholder="아이디 또는 클랜으로 검색...">
-        <div class="member-list" id="memberList"></div>
-        <div class="foot-note" id="memberCount"></div>
-      </div>
-
       <div class="panel hud-corner" id="rolePanel">
-        <h2>계정 권한</h2>
+        <h2>회원 정보 및 계정 권한</h2>
         <div class="foot-note" style="margin-top:0;margin-bottom:12px;" id="roleNote"></div>
         <div class="search-row">
           <input type="text" id="roleSearch" autocomplete="off" placeholder="아이디 또는 클랜으로 검색...">
@@ -1008,10 +984,11 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
         </div>
         <div class="table-wrap">
           <table id="roleTable">
-            <thead><tr><th>ID</th><th>Clan</th><th>이메일</th><th>권한</th><th>관리</th></tr></thead>
+            <thead><tr><th>ID</th><th>Clan</th><th>이메일</th><th>전적</th><th>권한</th><th>관리</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
+        <div class="foot-note" id="memberCount"></div>
       </div>
 
       <div class="panel hud-corner">

@@ -592,22 +592,8 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .role-tag.master{ background:var(--warning-bg); color:var(--warning-strong); }
 .acct-email{ color:var(--text-tertiary); font-size:var(--fs-footnote); }
 .acct-actions{ display:flex; gap:var(--sp-2); flex:none; }
+.acct-record{ color:var(--text-tertiary); font-size:var(--fs-footnote); white-space:nowrap; }
 .search-row .btn-mini{ flex:none; white-space:nowrap; padding:var(--sp-3) var(--sp-4); }
-
-/* ---------- 회원 관리 ---------- */
-.member-list{
-  max-height:340px; overflow-y:auto;
-  border:1px solid var(--border); border-radius:var(--radius-md);
-  background:var(--surface-sunken); padding:var(--sp-1); margin-top:var(--sp-3);
-}
-.member-row{
-  display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3);
-  padding:var(--sp-3); border-radius:var(--radius-sm);
-}
-.member-row:hover{ background:var(--surface); }
-.member-actions{ display:flex; gap:var(--sp-2); flex:none; }
-.member-id{ font-size:var(--fs-caption); font-weight:var(--fw-medium); }
-.member-meta{ font-size:var(--fs-footnote); color:var(--text-tertiary); }
 
 /* ---------- HISTORY ---------- */
 .history-table th{ cursor:default; }
@@ -989,18 +975,8 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
         <div id="pendingList"><div class="log-empty">대기 중인 요청이 없습니다.</div></div>
       </div>
 
-      <div class="panel hud-corner">
-        <h2>회원 관리</h2>
-        <div class="foot-note" style="margin-top:0;margin-bottom:10px;">
-          명단에서 회원을 바로 삭제합니다. 삭제해도 지난 경기 기록은 HISTORY에 그대로 남습니다.
-        </div>
-        <input type="text" id="memberSearch" autocomplete="off" placeholder="아이디 또는 클랜으로 검색...">
-        <div class="member-list" id="memberList"></div>
-        <div class="foot-note" id="memberCount"></div>
-      </div>
-
       <div class="panel hud-corner" id="rolePanel">
-        <h2>계정 권한</h2>
+        <h2>회원 정보 및 계정 권한</h2>
         <div class="foot-note" style="margin-top:0;margin-bottom:12px;" id="roleNote"></div>
         <div class="search-row">
           <input type="text" id="roleSearch" autocomplete="off" placeholder="아이디 또는 클랜으로 검색...">
@@ -1008,10 +984,11 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
         </div>
         <div class="table-wrap">
           <table id="roleTable">
-            <thead><tr><th>ID</th><th>Clan</th><th>이메일</th><th>권한</th><th>관리</th></tr></thead>
+            <thead><tr><th>ID</th><th>Clan</th><th>이메일</th><th>전적</th><th>권한</th><th>관리</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
+        <div class="foot-note" id="memberCount"></div>
       </div>
 
       <div class="panel hud-corner">
@@ -1787,76 +1764,6 @@ function renderPending() {
   });
 }
 
-function renderMemberList() {
-  const box = document.getElementById('memberList');
-  const count = document.getElementById('memberCount');
-  const search = document.getElementById('memberSearch');
-  if (!box || !count) return;
-
-  const q = search ? search.value.trim().toLowerCase() : '';
-  const list = q
-    ? players.filter(p => p.handle.toLowerCase().includes(q) || (p.clan || '').toLowerCase().includes(q))
-    : players;
-
-  box.innerHTML = list.map(p => `
-    <div class="member-row">
-      <div>
-        <div class="member-id">${esc(p.handle)} <span class="clan-tag">${esc(p.clan)}</span></div>
-        <div class="member-meta">${p.point}점 · ${p.wins}승 ${p.losses}패</div>
-      </div>
-      <span class="member-actions">
-        <button class="btn-mini btn-edit" data-medit="${esc(p.handle)}">수정</button>
-        <button class="btn-mini btn-reject" data-member="${esc(p.handle)}">삭제</button>
-      </span>
-    </div>`).join('')
-    || `<div class="log-empty">${q ? '검색 결과 없음' : '등록된 회원이 없습니다.'}</div>`;
-
-  count.textContent = q
-    ? `${players.length}명 중 ${list.length}명 표시`
-    : `등록된 회원 ${players.length}명`;
-}
-
-function showMemberEditModal(handle) {
-  const p = players.find(x => x.handle === handle);
-  if (!p) return;
-  openModal(`
-    <h3>회원 정보 수정</h3>
-    <label>ID</label>
-    <input type="text" id="meId" maxlength="40" value="${esc(p.handle)}">
-    <label>CLAN</label>
-    <input type="text" id="meClan" maxlength="20" value="${esc(p.clan)}">
-    <div class="foot-note" style="margin-top:8px;">
-      ID를 바꾸면 지난 경기 기록에 남은 이름도 함께 바뀝니다 · 점수와 전적은 그대로입니다.
-    </div>
-    <div class="modal-error" id="meErr"></div>
-    <button class="btn" id="meSubmit">저장</button>
-    <button class="btn-ghost" style="width:100%;margin-top:8px;" onclick="closeModal()">취소</button>
-  `);
-  const err = document.getElementById('meErr');
-  document.getElementById('meSubmit').addEventListener('click', async () => {
-    const newHandle = document.getElementById('meId').value.trim();
-    const clan = document.getElementById('meClan').value.trim();
-    if (!newHandle) { err.textContent = 'ID를 입력해주세요.'; return; }
-    try {
-      const d = await apiPost('/api/player', { action: 'update', handle, newHandle, clan });
-      closeModal();
-      await refreshAll();
-      showToast(d.matchesUpdated
-        ? `수정했습니다. 경기 기록 ${d.matchesUpdated}건의 이름도 함께 바꿨습니다.`
-        : '수정했습니다.');
-    } catch (e) { err.textContent = e.message; }
-  });
-}
-
-async function removeMember(handle) {
-  if (!confirm(`'${handle}' 회원을 명단에서 삭제할까요?\n\n랭킹에서 즉시 사라집니다. 지난 경기 기록은 HISTORY에 그대로 남습니다.`)) return;
-  try {
-    await apiPost('/api/player', { action: 'remove', handle });
-    await refreshAll();
-    showToast(`${handle} 회원을 삭제했습니다.`);
-  } catch (e) { showToast(e.message); }
-}
-
 function renderAll() {
   renderStanding();
   renderTop5();
@@ -1865,9 +1772,8 @@ function renderAll() {
   renderLog();
   renderHistory();
   renderPending();
-  renderRoleTable();
+  renderAccounts();
   renderAcctLogs();
-  renderMemberList();
   renderTournament();
   renderBoard();
   renderAttendance();
@@ -2926,24 +2832,38 @@ async function doChangePassword() {
 
 /* ---------- 계정 권한 · 로그 ---------- */
 
-function renderRoleTable() {
+/** 자기 계정은 지울 수 없고, 마스터 계정은 마스터만 지울 수 있다 (서버도 같이 막는다) */
+function canDelete(a) {
+  if (me && me.handle === a.handle) return false;
+  if (a.role === 'master' && !isMaster()) return false;
+  return true;
+}
+
+/** 회원 정보(명단)와 계정 권한을 한 표에서 다룬다 */
+function renderAccounts() {
   const tbody = document.querySelector('#roleTable tbody');
   const note = document.getElementById('roleNote');
+  const count = document.getElementById('memberCount');
   if (!tbody || !note) return;
 
-  note.innerHTML = isMaster()
-    ? '권한을 바꾸면 바로 적용됩니다 · <b>관리자·마스터 권한은 마스터만 줄 수 있습니다.</b>'
-    : '권한 변경은 마스터만 할 수 있습니다 · 목록만 보여집니다.';
+  note.innerHTML = '회원 정보를 추가·수정·삭제하고 권한을 정합니다 · 한 일은 아래 계정 로그에 남습니다'
+    + (isMaster()
+      ? ' · <b>관리자·마스터 권한은 마스터만 줄 수 있습니다.</b>'
+      : ' · 권한 변경은 마스터만 할 수 있습니다.');
 
   const search = document.getElementById('roleSearch');
   const query = search ? search.value.trim().toLowerCase() : '';
   const list = accounts.filter(a =>
     !query || a.handle.toLowerCase().includes(query) || (a.clan || '').toLowerCase().includes(query));
 
-  tbody.innerHTML = list.map(a => `<tr>
+  tbody.innerHTML = list.map(a => {
+    // 전적은 진행 중인 달의 명단(players)에서 가져온다
+    const p = findPlayer(a.handle);
+    return `<tr>
     <td>${esc(a.handle)}</td>
     <td class="clan-tag">${esc(a.clan || '-')}</td>
     <td class="acct-email">${esc(a.email || '-')}</td>
+    <td class="acct-record">${p ? `${p.point}점 · ${p.wins}승 ${p.losses}패` : '-'}</td>
     <td>${isMaster()
       ? `<select class="role-select" data-role="${esc(a.handle)}">${
           Object.keys(ROLE_LABEL).map(r =>
@@ -2952,11 +2872,16 @@ function renderRoleTable() {
       : `<span class="role-tag ${esc(a.role)}">${esc(ROLE_LABEL[a.role] || '일반')}</span>`}</td>
     <td><span class="acct-actions">
       <button class="btn-mini btn-edit" data-aedit="${esc(a.handle)}">수정</button>
-      ${me && me.handle === a.handle
-        ? ''
-        : `<button class="btn-mini btn-reject" data-adel="${esc(a.handle)}">삭제</button>`}
+      ${canDelete(a) ? `<button class="btn-mini btn-reject" data-adel="${esc(a.handle)}">삭제</button>` : ''}
     </span></td>
-  </tr>`).join('') || '<tr><td colspan="5" class="log-empty">계정이 없습니다.</td></tr>';
+  </tr>`;
+  }).join('') || `<tr><td colspan="6" class="log-empty">${query ? '검색 결과 없음' : '등록된 회원이 없습니다.'}</td></tr>`;
+
+  if (count) {
+    count.textContent = query
+      ? `${accounts.length}명 중 ${list.length}명 표시`
+      : `등록된 회원 ${accounts.length}명`;
+  }
 }
 
 /* 계정 정보는 선수 명단과 같은 것이므로 /api/player 를 그대로 쓴다.
@@ -3086,20 +3011,20 @@ async function setRole(handle, role) {
   try {
     await apiPost('/api/account', { action: 'setRole', handle, role });
     await loadAccounts();
-    renderRoleTable();
+    renderAccounts();
     renderAcctLogs();
     // 내 권한을 스스로 내렸다면 화면도 따라가야 한다
     if (me && me.handle === handle) { me = { ...me, role }; renderAuthBar(); }
     showToast(`${handle} → ${ROLE_LABEL[role]}`);
   } catch (e) {
     showToast(e.message);
-    renderRoleTable();
+    renderAccounts();
   }
 }
 
 function initAccountEvents() {
   const search = document.getElementById('roleSearch');
-  if (search) search.addEventListener('input', renderRoleTable);
+  if (search) search.addEventListener('input', renderAccounts);
 
   const table = document.getElementById('roleTable');
   if (table) {
@@ -3231,16 +3156,6 @@ function initStandingEvents() {
 }
 
 function initAdminEvents() {
-  const memberSearch = document.getElementById('memberSearch');
-  if (memberSearch) memberSearch.addEventListener('input', renderMemberList);
-
-  const memberList = document.getElementById('memberList');
-  if (memberList) memberList.addEventListener('click', e => {
-    const d = e.target.dataset || {};
-    if (d.member) removeMember(d.member);
-    if (d.medit) showMemberEditModal(d.medit);
-  });
-
   const lockedBtn = document.getElementById('adminLockedLoginBtn');
   if (lockedBtn) lockedBtn.addEventListener('click', showLoginModal);
   const reportBtn = document.getElementById('reportLoginBtn');
