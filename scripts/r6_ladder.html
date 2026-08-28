@@ -406,6 +406,46 @@ tbody tr:hover td{ background:var(--surface-sunken); }
 }
 .month-past:empty{ display:none; }
 
+/* ---------- 내 아이디 고르기 ---------- */
+.me-bar{
+  display:flex; align-items:center; gap:var(--sp-3); flex-wrap:wrap;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius-lg); box-shadow:var(--shadow-card);
+  padding:var(--sp-4) var(--sp-6); margin-bottom:var(--sp-4);
+}
+.me-bar-k{ font-size:var(--fs-caption); font-weight:var(--fw-bold); flex:none; }
+.me-bar select{ flex:none; width:auto; min-width:190px; padding:var(--sp-2) var(--sp-4); cursor:pointer; }
+.me-bar-hint{ font-size:var(--fs-footnote); color:var(--text-tertiary); }
+
+/* 내 시간대 · 내 출퇴근 한 줄 */
+.mine{
+  display:flex; align-items:center; gap:var(--sp-3); flex-wrap:wrap;
+  background:var(--surface-sunken); border:1px solid var(--border);
+  border-radius:var(--radius-md); padding:var(--sp-4) var(--sp-5);
+}
+.mine-k{ font-size:var(--fs-caption); font-weight:var(--fw-medium); color:var(--text-secondary); flex:none; }
+.mine-id{ font-size:var(--fs-subhead); font-weight:var(--fw-bold); flex:none; }
+.mine-state{ font-size:var(--fs-footnote); color:var(--text-secondary); }
+.mine-right{ margin-left:auto; display:flex; align-items:center; gap:var(--sp-3); flex-wrap:wrap; }
+.mine-none{ font-size:var(--fs-caption); color:var(--text-tertiary); }
+
+/* 지금 게임 중 */
+.now-box{
+  display:flex; align-items:center; gap:var(--sp-3); flex-wrap:wrap;
+  border-radius:var(--radius-md); padding:var(--sp-3) var(--sp-4); margin-bottom:var(--sp-3);
+  background:var(--surface-sunken); border:1px solid var(--border);
+}
+.now-box.on{ background:var(--success-bg); border-color:transparent; }
+.now-k{ font-size:var(--fs-caption); font-weight:var(--fw-bold); flex:none; }
+.now-box.on .now-k{ color:var(--success-strong); }
+.now-names{ display:flex; flex-wrap:wrap; gap:var(--sp-1) var(--sp-2); }
+.now-name{
+  font-size:var(--fs-footnote); font-weight:var(--fw-medium); color:var(--text-primary);
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius-pill); padding:2px var(--sp-3);
+}
+.now-name b{ color:var(--success-strong); font-weight:var(--fw-medium); margin-left:var(--sp-1); }
+
 /* ---------- 접속 예상 시간 ---------- */
 .slot-day{
   font-size:var(--fs-footnote); font-weight:var(--fw-medium);
@@ -1112,6 +1152,12 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 
   <!-- ATTENDANCE — 출퇴근 기록 -->
   <div class="tab-panel" id="tab-attendance">
+    <div class="me-bar">
+      <span class="me-bar-k">내 아이디</span>
+      <select id="meSelect" aria-label="내 아이디 선택"></select>
+      <span class="me-bar-hint">한 번 고르면 이 브라우저에 기억됩니다</span>
+    </div>
+
     <div class="panel hud-corner">
       <div class="panel-head">
         <h2>접속 예상 시간</h2>
@@ -1119,16 +1165,12 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
       </div>
       <div class="foot-note" style="margin-top:0;margin-bottom:14px;">
         오늘 들어올 시간대를 체크해두면 누가 언제 접속하는지 서로 볼 수 있습니다 ·
-        아래에서 본인 아이디를 찾아 시간대를 누르세요 ·
         <b>매일 아침 7시에 초기화</b>됩니다 (0시~7시 사이에는 전날 체크가 그대로 보입니다).
       </div>
       <div id="slotSummary" class="slot-summary"></div>
 
       <div class="slot-divider"></div>
-      <div class="search-row">
-        <input type="text" id="slotSearch" autocomplete="off" placeholder="아이디 또는 클랜으로 검색...">
-      </div>
-      <div id="slotBoard" class="slot-board"></div>
+      <div id="slotMine"></div>
     </div>
 
     <div class="panel hud-corner">
@@ -1139,12 +1181,11 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
       </div>
       <div class="foot-note" style="margin-top:0;margin-bottom:14px;">
         게임을 시작할 때 <b>출근</b>, 끝낼 때 <b>퇴근</b>을 눌러주세요 ·
-        기록은 매월 1일 00시에 새로 시작하고, 지난 달 기록은 조회만 됩니다.
+        기록은 매월 1일 00시에 새로 시작하고, 지난 달 기록은 조회만 됩니다 ·
+        전체 기록은 아래 표에서 볼 수 있습니다.
       </div>
-      <div class="search-row">
-        <input type="text" id="attSearch" autocomplete="off" placeholder="아이디 또는 클랜으로 검색...">
-      </div>
-      <div id="attBoard" class="att-board"></div>
+      <div id="attNow"></div>
+      <div id="attMine"></div>
     </div>
 
     <div class="panel hud-corner">

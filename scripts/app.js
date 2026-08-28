@@ -18,6 +18,7 @@ let attLoaded = null;       // 그 기록이 어느 달 것인지
 let playSlots = [];         // 고를 수 있는 시간대
 let playSchedule = [];      // [{handle, slot}] 오늘의 접속 예상 시간
 let playToday = null;       // 그 예정이 어느 날짜 것인지
+let meHandle = null;        // 출석 페이지에서 고른 내 아이디
 let openCommentForm = null; // 댓글 입력창이 열린 글 id
 
 /* 대회 참가 팀. api/tournament.js 의 TEAMS 와 id 가 일치해야 합니다. */
@@ -592,28 +593,26 @@ function renderSlotSummary() {
   }).join('');
 }
 
-/** 회원별 시간대 체크 판 */
-function renderSlotBoard() {
-  const el = document.getElementById('slotBoard');
+/** 내가 고른 아이디의 시간대만 한 줄로 보여준다 */
+function renderSlotMine() {
+  const el = document.getElementById('slotMine');
   if (!el) return;
 
-  const search = document.getElementById('slotSearch');
-  const query = search ? search.value.trim().toLowerCase() : '';
-  const map = scheduleMap();
-
-  const list = players.filter(p =>
-    !query || p.handle.toLowerCase().includes(query) || (p.clan || '').toLowerCase().includes(query));
-
-  el.innerHTML = list.map(p => {
-    const on = map.get(p.handle) || new Set();
-    return `<div class="slot-row">
-      <span class="slot-row-id">${esc(p.handle)}</span>
+  if (!meHandle) {
+    el.innerHTML = '<div class="mine"><span class="mine-none">'
+      + '위에서 내 아이디를 고르면 시간대를 체크할 수 있습니다.</span></div>';
+    return;
+  }
+  const on = scheduleMap().get(meHandle) || new Set();
+  el.innerHTML = `<div class="mine">
+    <span class="mine-k">내 시간대</span>
+    <span class="mine-id">${esc(meHandle)}</span>
+    <span class="mine-right">
       <span class="slot-chips">${playSlots.map(slot =>
         `<button type="button" class="slot-chip${on.has(slot) ? ' on' : ''}"
-          data-slot="${slot}" data-handle="${esc(p.handle)}"
-          aria-pressed="${on.has(slot)}">${slot}</button>`).join('')}</span>
-    </div>`;
-  }).join('') || '<div class="att-empty">해당하는 회원이 없습니다.</div>';
+          data-slot="${slot}" aria-pressed="${on.has(slot)}">${slot}</button>`).join('')}</span>
+    </span>
+  </div>`;
 }
 
 function renderSchedule() {
@@ -626,7 +625,7 @@ function renderSchedule() {
       : `${esc(d)} 기준 <b>· 날짜가 바뀌었습니다. 새로고침하세요.</b>`;
   }
   renderSlotSummary();
-  renderSlotBoard();
+  renderSlotMine();
 }
 
 /** 칩 하나를 눌러 그 시간대를 켜고 끈다 */
@@ -652,13 +651,10 @@ async function toggleSlot(handle, slot) {
 }
 
 function initScheduleEvents() {
-  const search = document.getElementById('slotSearch');
-  if (search) search.addEventListener('input', renderSlotBoard);
-
-  const board = document.getElementById('slotBoard');
-  if (board) board.addEventListener('click', (e) => {
+  const el = document.getElementById('slotMine');
+  if (el) el.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-slot]');
-    if (btn) toggleSlot(btn.dataset.handle, Number(btn.dataset.slot));
+    if (btn && meHandle) toggleSlot(meHandle, Number(btn.dataset.slot));
   });
 }
 
@@ -722,39 +718,56 @@ function attendanceRows(bodyId, list, timeFirst) {
 }
 
 /** 출근/퇴근 버튼 판 — STANDING 에 있는 회원 전원 */
-function renderAttendanceBoard() {
-  const el = document.getElementById('attBoard');
+/** 지금 게임 중인 사람들 */
+function renderAttNow() {
+  const el = document.getElementById('attNow');
   if (!el) return;
 
-  const live = isLiveView();
-  const search = document.getElementById('attSearch');
-  const query = search ? search.value.trim().toLowerCase() : '';
+  const open = attLogs.filter(l => l.clockOut == null)
+    .sort((a, b) => a.clockIn - b.clockIn);
+  el.innerHTML = `<div class="now-box${open.length ? ' on' : ''}">
+    <span class="now-k">지금 게임 중 ${open.length}명</span>
+    <span class="now-names">${open.length
+      ? open.map(l => `<span class="now-name">${esc(l.handle)}`
+          + `<b>${formatDuration(Date.now() - l.clockIn)}</b></span>`).join('')
+      : '<span class="mine-none">아직 없습니다.</span>'}</span>
+  </div>`;
+}
 
-  const open = new Map();
-  for (const log of attLogs) if (log.clockOut == null) open.set(log.handle, log);
+/** 내가 고른 아이디의 출근/퇴근 버튼 한 줄 */
+function renderAttMine() {
+  const el = document.getElementById('attMine');
+  if (!el) return;
 
-  const list = players.filter(p =>
-    !query || p.handle.toLowerCase().includes(query) || (p.clan || '').toLowerCase().includes(query));
+  if (!meHandle) {
+    el.innerHTML = '<div class="mine"><span class="mine-none">'
+      + '맨 위에서 내 아이디를 고르면 출근·퇴근을 찍을 수 있습니다.</span></div>';
+    return;
+  }
+  if (!isLiveView()) {
+    el.innerHTML = '<div class="mine"><span class="mine-none">'
+      + '지난 달 기록은 보기만 됩니다. 출근·퇴근은 이번 달에서 찍어주세요.</span></div>';
+    return;
+  }
 
-  el.innerHTML = list.map(p => {
-    const on = open.get(p.handle);
-    return `<div class="att-card${on ? ' on' : ''}">
-      <div class="att-who">
-        <div class="att-id">${esc(p.handle)}</div>
-        <div class="att-state">${on
-          ? `${formatClock(on.clockIn)} 출근 · ${formatDuration(Date.now() - on.clockIn)}째`
-          : '퇴근 상태'}</div>
-      </div>
+  const on = attLogs.find(l => l.handle === meHandle && l.clockOut == null);
+  el.innerHTML = `<div class="mine">
+    <span class="mine-id">${esc(meHandle)}</span>
+    <span class="mine-state">${on
+      ? `${formatClock(on.clockIn)} 출근 · ${formatDuration(Date.now() - on.clockIn)}째`
+      : '퇴근 상태'}</span>
+    <span class="mine-right">
       <button type="button" class="att-btn ${on ? 'out' : 'in'}"
-        data-att="${on ? 'out' : 'in'}" data-handle="${esc(p.handle)}"
-        ${live ? '' : 'disabled'}>${on ? '퇴근' : '출근'}</button>
-    </div>`;
-  }).join('') || '<div class="att-empty">해당하는 회원이 없습니다.</div>';
+        data-att="${on ? 'out' : 'in'}">${on ? '퇴근' : '출근'}</button>
+    </span>
+  </div>`;
 }
 
 function renderAttendance() {
+  renderMePicker();
   renderSchedule();
-  renderAttendanceBoard();
+  renderAttNow();
+  renderAttMine();
 
   // 기록 목록 (최근 것이 위로)
   const tbody = document.querySelector('#attLogTable tbody');
@@ -811,9 +824,41 @@ async function deleteAttendance(id) {
   } catch (e) { showToast(e.message); }
 }
 
+/* ---------- 내 아이디 ---------- */
+
+const ME_KEY = 'r6-me';
+
+/** 출석 페이지에서 쓰는 "나". 한 번 고르면 이 브라우저에 남는다. */
+function loadMe() {
+  try { meHandle = localStorage.getItem(ME_KEY) || null; } catch { meHandle = null; }
+}
+
+function renderMePicker() {
+  const sel = document.getElementById('meSelect');
+  if (!sel) return;
+  // 명단에서 빠진 아이디가 저장돼 있으면 놓아준다
+  if (meHandle && !players.some(p => p.handle === meHandle)) meHandle = null;
+
+  sel.innerHTML = '<option value="">선택하세요</option>'
+    + players.map(p => `<option value="${esc(p.handle)}"`
+      + `${p.handle === meHandle ? ' selected' : ''}>${esc(p.handle)}</option>`).join('');
+  sel.value = meHandle || '';
+}
+
+function setMe(handle) {
+  meHandle = handle || null;
+  try {
+    if (meHandle) localStorage.setItem(ME_KEY, meHandle);
+    else localStorage.removeItem(ME_KEY);
+  } catch { /* 사생활 보호 모드 등 */ }
+  renderSchedule();
+  renderAttMine();
+}
+
 function initAttendanceEvents() {
-  const search = document.getElementById('attSearch');
-  if (search) search.addEventListener('input', renderAttendanceBoard);
+  loadMe();
+  const sel = document.getElementById('meSelect');
+  if (sel) sel.addEventListener('change', () => setMe(sel.value));
 
   const panel = document.getElementById('tab-attendance');
   if (!panel) return;
@@ -821,7 +866,7 @@ function initAttendanceEvents() {
     const btn = e.target.closest('[data-att], [data-attdel]');
     if (!btn) return;
     if (btn.dataset.attdel) return deleteAttendance(btn.dataset.attdel);
-    punchAttendance(btn.dataset.att, btn.dataset.handle);
+    if (meHandle) punchAttendance(btn.dataset.att, meHandle);
   });
 
   // 게임 중인 사람의 경과 시간을 1분마다 갱신한다.
@@ -833,7 +878,7 @@ function initAttendanceEvents() {
       renderAttendance();
       return;
     }
-    if (attLogs.some(l => l.clockOut == null)) renderAttendanceBoard();
+    if (attLogs.some(l => l.clockOut == null)) { renderAttNow(); renderAttMine(); }
   }, 60000);
 }
 
