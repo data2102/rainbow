@@ -933,7 +933,12 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   color:var(--accent-strong); background:var(--accent-bg);
   border-radius:var(--radius-sm); padding:2px var(--sp-3);
 }
-.vpn-pw{ display:inline-flex; align-items:center; gap:var(--sp-3); }
+.vpn-pair{ display:inline-flex; align-items:center; gap:var(--sp-2); }
+.vpn-path{
+  font-size:var(--fs-footnote); color:var(--text-secondary);
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius-sm); padding:2px var(--sp-3); white-space:nowrap;
+}
 .vpn-note{ font-size:var(--fs-footnote); color:var(--text-tertiary); }
 
 .setup{
@@ -1524,13 +1529,17 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
       </div>
 
       <div class="vpn-bar">
-        <span class="vpn-k">Radmin VPN 네트워크</span>
-        <code class="vpn-v" id="vpnName"></code>
-        <span class="vpn-pw" id="vpnPwWrap" style="display:none;">
+        <span class="vpn-k">Radmin VPN</span>
+        <span class="vpn-path">네트워크 › 네트워크 연결</span>
+        <span class="vpn-pair">
+          <span class="vpn-k">아이디</span>
+          <code class="vpn-v" id="vpnName"></code>
+        </span>
+        <span class="vpn-pair" id="vpnPwWrap" style="display:none;">
           <span class="vpn-k">비밀번호</span>
           <code class="vpn-v" id="vpnPw"></code>
         </span>
-        <span class="vpn-note">먼저 Radmin VPN 으로 이 네트워크에 들어와 있어야 게임이 서로를 봅니다.</span>
+        <span class="vpn-note">이 네트워크에 먼저 들어와 있어야 게임이 서로를 봅니다.</span>
       </div>
 
       <details class="setup">
@@ -3324,7 +3333,7 @@ function renderVpnBar() {
   const wrap = document.getElementById('vpnPwWrap');
   const pw = document.getElementById('vpnPw');
   if (name) name.textContent = vpn.network;
-  if (wrap) wrap.style.display = vpn.password ? 'inline-flex' : 'none';
+  if (wrap) wrap.style.display = vpn.password ? 'inline-flex' : 'none';  // 로그인해야 온다
   if (pw) pw.textContent = vpn.password || '';
 }
 

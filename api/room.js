@@ -20,7 +20,7 @@ const IDLE_MS = 3 * 60 * 1000;
  * 사이트가 이 값으로 무엇을 하지는 않는다 — 회원이 Radmin 창에 직접 적는 안내일 뿐이다.
  */
 export const VPN_NETWORK = 'rainbowsix12345';
-export const VPN_PASSWORD = '111111';
+export const VPN_PASSWORD = '987654';
 
 const MAX_MSG = 200;
 /** 방마다 남겨두는 대화 수 */

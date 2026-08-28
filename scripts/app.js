@@ -1725,7 +1725,7 @@ function renderVpnBar() {
   const wrap = document.getElementById('vpnPwWrap');
   const pw = document.getElementById('vpnPw');
   if (name) name.textContent = vpn.network;
-  if (wrap) wrap.style.display = vpn.password ? 'inline-flex' : 'none';
+  if (wrap) wrap.style.display = vpn.password ? 'inline-flex' : 'none';  // 로그인해야 온다
   if (pw) pw.textContent = vpn.password || '';
 }
 
