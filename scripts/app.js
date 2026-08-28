@@ -1681,13 +1681,20 @@ function initAccountEvents() {
  */
 const GAME_PROTOCOL = 'r6clan://';
 
-/** 접속 주소를 복사하고, 등록해둔 사람은 게임까지 띄운다 */
-async function launchGame(address) {
+/**
+ * 접속 주소를 복사하고, 등록해둔 사람은 게임까지 띄운다.
+ * 주소 뒤에 create/join 을 붙여 어디로 갈지 알려준다 — 자동 진입판을 깔아둔
+ * 사람은 이것을 보고 CREATE GAME 이나 JOIN GAME 까지 알아서 들어간다.
+ * 기본판은 이 꼬리표를 무시하고 게임만 켠다.
+ */
+async function launchGame(address, mode) {
   if (address) await copyText(address);
-  window.location.href = GAME_PROTOCOL;
-  showToast(address
-    ? `게임 실행 · JOIN GAME 목록에서 찾으세요 (주소 ${address} 도 복사됨)`
-    : '게임 실행 · JOIN GAME 목록에서 방장을 찾아 들어가세요.');
+  window.location.href = GAME_PROTOCOL + (mode === 'create' ? 'create' : 'join');
+  showToast(mode === 'create'
+    ? '게임 실행 · CREATE GAME 으로 방을 만들어주세요.'
+    : (address
+      ? `게임 실행 · JOIN GAME 목록에서 찾으세요 (주소 ${address} 도 복사됨)`
+      : '게임 실행 · JOIN GAME 목록에서 방장을 찾아 들어가세요.'));
 }
 
 /** 클립보드. 막혀 있으면 옛 방식으로 한 번 더 시도한다. */
@@ -1803,7 +1810,7 @@ function maybePlayRoomCountdown() {
   }
   const panel = document.getElementById('tab-launcher');
   if (!panel || !panel.classList.contains('active')) return;
-  playCountdown(r.startedAt, () => launchGame(r.address));
+  playCountdown(r.startedAt, () => launchGame(r.address, 'join'));
 }
 
 function renderLauncher() {
@@ -1920,7 +1927,7 @@ function renderRoomView(r) {
       if (el) el.addEventListener('click', fn);
     };
     on('roomStart', showStartModal);
-    on('roomJoin', () => launchGame(r.address));
+    on('roomJoin', () => launchGame(r.address, 'join'));
     on('roomLeave', leaveRoom);
   }
 
@@ -2009,7 +2016,7 @@ async function startRoom() {
     await loadRooms();
     renderLauncher();
     // 5·4·3·2·1 을 세고 게임을 띄운다. 방에 있는 사람들도 같은 시각에 맞춰 함께 센다.
-    playCountdown(d.startedAt || Date.now(), () => launchGame(address));
+    playCountdown(d.startedAt || Date.now(), () => launchGame(address, 'create'));
   } catch (e) {
     if (err) err.textContent = e.message;
     else showToast(e.message);
