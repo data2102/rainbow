@@ -15,6 +15,7 @@ import tournament from './api/tournament.js';
 import player from './api/player.js';
 import post from './api/post.js';
 import season from './api/season.js';
+import attendance from './api/attendance.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -38,6 +39,7 @@ app.all('/api/tournament', wrap(tournament));
 app.all('/api/player', wrap(player));
 app.all('/api/post', wrap(post));
 app.all('/api/season', wrap(season));
+app.all('/api/attendance', wrap(attendance));
 
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: '5m' }));
 app.get('*', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));

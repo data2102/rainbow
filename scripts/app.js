@@ -13,6 +13,8 @@ let seasons = [];           // 시즌 목록(진행 중 + 마감)
 let seasonTop = 10;         // 월간 결산 표에 보여줄 등수
 let viewSeasonId = null;    // 화면에서 보고 있는 달. null 이면 진행 중인 달
 const seasonCache = {};     // 지난 달 상세 (id -> {players, matches})
+let attLogs = [];           // 보고 있는 달의 출퇴근 기록
+let attLoaded = null;       // 그 기록이 어느 달 것인지
 let openCommentForm = null; // 댓글 입력창이 열린 글 id
 
 /* 대회 참가 팀. api/tournament.js 의 TEAMS 와 id 가 일치해야 합니다. */
@@ -122,6 +124,16 @@ function viewMatches() {
 function viewSeason() {
   if (isLiveView()) return season;
   return seasons.find(s => s.id === viewSeasonId) || null;
+}
+
+async function loadAttendance(id) {
+  const target = id || (viewSeason() ? viewSeason().id : null);
+  if (!target) { attLogs = []; attLoaded = null; return; }
+  try {
+    const d = await apiGet('/api/attendance?season=' + encodeURIComponent(target));
+    attLogs = d.logs || [];
+    attLoaded = target;
+  } catch { attLogs = []; attLoaded = null; }
 }
 
 async function loadPosts() {
@@ -519,8 +531,178 @@ function renderAll() {
   renderMemberList();
   renderTournament();
   renderBoard();
+  renderAttendance();
   renderMonthPickers();
   renderSeasons();
+}
+
+/* ---------- 출퇴근 (ATTENDANCE) ---------- */
+
+const ATT_TOP = 5;          // 출근·게임시간 표에 보여줄 인원
+
+/** 밀리초를 '3시간 20분' 처럼 읽히게 */
+function formatDuration(ms) {
+  if (!ms || ms < 0) ms = 0;
+  const min = Math.floor(ms / 60000);
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  if (!h) return `${m}분`;
+  return m ? `${h}시간 ${m}분` : `${h}시간`;
+}
+
+function formatClock(ts) {
+  const d = new Date(ts);
+  return `${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+/**
+ * 아직 퇴근을 안 찍었으면 지금까지를 센다.
+ * 지난 달을 보고 있을 때는 그 달이 끝난 시각에서 멈춘다.
+ */
+function logDuration(log) {
+  const s = viewSeason();
+  const end = log.clockOut != null ? log.clockOut
+    : Math.min(Date.now(), s ? s.endsAt : Date.now());
+  return Math.max(0, end - log.clockIn);
+}
+
+/** 사람별로 출근 횟수와 게임시간을 합산한다 */
+function attendanceTotals() {
+  const map = new Map();
+  for (const log of attLogs) {
+    if (!map.has(log.handle)) map.set(log.handle, { handle: log.handle, count: 0, ms: 0 });
+    const t = map.get(log.handle);
+    t.count++;
+    t.ms += logDuration(log);
+  }
+  for (const t of map.values()) {
+    const p = findPlayer(t.handle);
+    t.clan = p ? p.clan : '-';
+  }
+  return [...map.values()];
+}
+
+function attendanceRows(bodyId, list, timeFirst) {
+  const el = document.getElementById(bodyId);
+  if (!el) return;
+  el.innerHTML = list.map((t, i) => `<tr>
+    <td class="rank-cell ${medalClass(i + 1)}">${i + 1}</td>
+    <td>${esc(t.handle)}</td>
+    <td class="clan-tag">${esc(t.clan)}</td>
+    ${timeFirst
+      ? `<td class="att-dur">${formatDuration(t.ms)}</td><td>${t.count}회</td>`
+      : `<td>${t.count}회</td><td class="att-dur">${formatDuration(t.ms)}</td>`}
+  </tr>`).join('') || '<tr><td colspan="5" class="log-empty">기록 없음</td></tr>';
+}
+
+/** 출근/퇴근 버튼 판 — STANDING 에 있는 회원 전원 */
+function renderAttendanceBoard() {
+  const el = document.getElementById('attBoard');
+  if (!el) return;
+
+  const live = isLiveView();
+  const search = document.getElementById('attSearch');
+  const query = search ? search.value.trim().toLowerCase() : '';
+
+  const open = new Map();
+  for (const log of attLogs) if (log.clockOut == null) open.set(log.handle, log);
+
+  const list = players.filter(p =>
+    !query || p.handle.toLowerCase().includes(query) || (p.clan || '').toLowerCase().includes(query));
+
+  el.innerHTML = list.map(p => {
+    const on = open.get(p.handle);
+    return `<div class="att-card${on ? ' on' : ''}">
+      <div class="att-who">
+        <div class="att-id">${esc(p.handle)}</div>
+        <div class="att-state">${on
+          ? `${formatClock(on.clockIn)} 출근 · ${formatDuration(Date.now() - on.clockIn)}째`
+          : '퇴근 상태'}</div>
+      </div>
+      <button type="button" class="att-btn ${on ? 'out' : 'in'}"
+        data-att="${on ? 'out' : 'in'}" data-handle="${esc(p.handle)}"
+        ${live ? '' : 'disabled'}>${on ? '퇴근' : '출근'}</button>
+    </div>`;
+  }).join('') || '<div class="att-empty">해당하는 회원이 없습니다.</div>';
+}
+
+function renderAttendance() {
+  renderAttendanceBoard();
+
+  // 기록 목록 (최근 것이 위로)
+  const tbody = document.querySelector('#attLogTable tbody');
+  const empty = document.getElementById('attLogEmpty');
+  const wrap = document.getElementById('attLogWrap');
+  if (tbody && empty && wrap) {
+    const rows = [...attLogs].reverse();
+    wrap.style.display = rows.length ? '' : 'none';
+    empty.style.display = rows.length ? 'none' : 'block';
+    tbody.innerHTML = rows.map((log, i) => `<tr>
+      <td class="h-no-cell h-inline" data-l="기록">#${rows.length - i}</td>
+      <td class="h-inline" data-l="ID">${esc(log.handle)}</td>
+      <td class="h-inline" data-l="출근">${formatClock(log.clockIn)}</td>
+      <td class="h-inline" data-l="퇴근">${log.clockOut != null
+        ? formatClock(log.clockOut) : '<span class="att-live">근무 중</span>'}</td>
+      <td class="h-inline att-dur" data-l="시간">${formatDuration(logDuration(log))}</td>
+      <td class="h-by-cell">${currentAdmin
+        ? `<button class="btn-mini btn-reject" data-attdel="${log.id}">삭제</button>` : ''}</td>
+    </tr>`).join('');
+  }
+
+  // 아래 두 표. 두 표 모두 동점이면 출근 횟수가 많은 쪽을 위로 둔다.
+  const totals = attendanceTotals();
+  attendanceRows('attCountBody', [...totals]
+    .sort((a, b) => b.count - a.count || b.ms - a.ms || a.handle.localeCompare(b.handle))
+    .slice(0, ATT_TOP), false);
+  attendanceRows('attTimeBody', [...totals]
+    .sort((a, b) => b.ms - a.ms || b.count - a.count || a.handle.localeCompare(b.handle))
+    .slice(0, ATT_TOP), true);
+
+  const note = document.getElementById('attNote');
+  if (note) {
+    note.innerHTML = '동점이면 <b>출근 횟수</b>가 많은 회원이 위로 갑니다 · '
+      + '퇴근을 누르지 않은 기록은 지금까지의 시간으로 계산하고, 달이 바뀌면 그 달 마지막 시각에서 멈춥니다.';
+  }
+}
+
+async function punchAttendance(action, handle) {
+  try {
+    await apiPost('/api/attendance', { action, handle });
+    await loadAttendance();
+    renderAttendance();
+    showToast(`${handle} · ${action === 'in' ? '출근' : '퇴근'} 기록했습니다.`);
+  } catch (e) { showToast(e.message); }
+}
+
+async function deleteAttendance(id) {
+  if (!confirm('이 출퇴근 기록을 지울까요?')) return;
+  try {
+    await apiPost('/api/attendance', { action: 'remove', id: Number(id) });
+    await loadAttendance();
+    renderAttendance();
+    showToast('기록을 삭제했습니다.');
+  } catch (e) { showToast(e.message); }
+}
+
+function initAttendanceEvents() {
+  const search = document.getElementById('attSearch');
+  if (search) search.addEventListener('input', renderAttendanceBoard);
+
+  const panel = document.getElementById('tab-attendance');
+  if (!panel) return;
+  panel.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-att], [data-attdel]');
+    if (!btn) return;
+    if (btn.dataset.attdel) return deleteAttendance(btn.dataset.attdel);
+    punchAttendance(btn.dataset.att, btn.dataset.handle);
+  });
+
+  // 근무 중인 사람의 경과 시간을 1분마다 갱신한다
+  setInterval(() => {
+    if (panel.classList.contains('active') && attLogs.some(l => l.clockOut == null)) {
+      renderAttendanceBoard();
+    }
+  }, 60000);
 }
 
 /* ---------- 월 선택(달력) ---------- */
@@ -569,11 +751,13 @@ async function selectMonth(id) {
     try { await loadSeasonDetail(id); }
     catch (e) { showToast(e.message); viewSeasonId = null; }
   }
+  await loadAttendance(id);
   renderMonthPickers();
   renderStanding();
   renderTop5();
   renderClanTop();
   renderHistory();
+  renderAttendance();
   renderSeasons();
 }
 
@@ -1459,6 +1643,7 @@ function activateTab(name) {
     renderStanding();
   }
   if (name === 'history') refreshAll();
+  if (name === 'attendance') { loadAttendance().then(renderAttendance); }
   if (name === 'season') { loadSeasons().then(() => { renderMonthPickers(); renderSeasons(); }); }
 }
 
@@ -1546,6 +1731,7 @@ function initAdminEvents() {
 async function refreshAll() {
   await loadState();
   await loadSeasons();
+  await loadAttendance();
   await loadTournament();
   await loadPosts();
   await loadAdmins();
@@ -1564,6 +1750,7 @@ async function boot() {
   initAdminEvents();
   initTournamentEvents();
   initBoardEvents();
+  initAttendanceEvents();
   initMonthPickers();
   renderAuthBar();
   try {

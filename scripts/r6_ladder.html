@@ -406,6 +406,40 @@ tbody tr:hover td{ background:var(--surface-sunken); }
 }
 .month-past:empty{ display:none; }
 
+/* ---------- 출퇴근 ---------- */
+.att-board{
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:var(--sp-3);
+}
+.att-card{
+  display:flex; align-items:center; gap:var(--sp-3);
+  border:1px solid var(--border); border-radius:var(--radius-md);
+  background:var(--surface-sunken); padding:var(--sp-3) var(--sp-4); min-width:0;
+}
+.att-card.on{ background:var(--success-bg); border-color:transparent; }
+.att-who{ min-width:0; flex:1; }
+.att-id{
+  font-size:var(--fs-caption); font-weight:var(--fw-bold); color:var(--text-primary);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.att-state{ font-size:var(--fs-footnote); color:var(--text-tertiary); margin-top:1px; }
+.att-card.on .att-state{ color:var(--success-strong); font-weight:var(--fw-medium); }
+.att-btn{
+  flex:none; border:1px solid var(--border-strong); border-radius:var(--radius-md);
+  background:var(--surface); color:var(--text-secondary);
+  font-family:inherit; font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+  padding:var(--sp-2) var(--sp-4); cursor:pointer;
+  transition:background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+}
+.att-btn.in{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
+.att-btn.in:hover{ background:var(--accent-hover); }
+.att-btn.out:hover{ border-color:var(--danger-strong); color:var(--danger-strong); }
+.att-btn:focus-visible{ outline:none; box-shadow:var(--shadow-focus); }
+.att-btn:disabled{ background:var(--surface-sunken); border-color:var(--border);
+  color:var(--text-disabled); cursor:default; }
+.att-empty{ font-size:var(--fs-caption); color:var(--text-tertiary); padding:var(--sp-5) 0; }
+.att-live{ color:var(--success-strong); font-weight:var(--fw-medium); }
+.att-dur{ font-variant-numeric:tabular-nums; }
+
 /* ---------- 월간 결산 ---------- */
 .season-now{
   display:flex; flex-wrap:wrap; gap:var(--sp-4) var(--sp-8); align-items:baseline;
@@ -815,10 +849,11 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
     <button class="tab-btn active" data-tab="standing">① STANDING</button>
     <button class="tab-btn" data-tab="mostpoint">② MOST POINT &amp; WIN</button>
     <button class="tab-btn" data-tab="history">③ HISTORY</button>
-    <button class="tab-btn" data-tab="season">④ MONTHLY</button>
-    <button class="tab-btn" data-tab="tournament">⑤ TOURNAMENT</button>
-    <button class="tab-btn" data-tab="board">⑥ BOARD</button>
-    <button class="tab-btn" data-tab="admin">⑦ ADMIN</button>
+    <button class="tab-btn" data-tab="attendance">④ ATTENDANCE</button>
+    <button class="tab-btn" data-tab="season">⑤ MONTHLY</button>
+    <button class="tab-btn" data-tab="tournament">⑥ TOURNAMENT</button>
+    <button class="tab-btn" data-tab="board">⑦ BOARD</button>
+    <button class="tab-btn" data-tab="admin">⑧ ADMIN</button>
   </nav>
 
   <!-- STANDING -->
@@ -1013,6 +1048,67 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
       </div>
       <div id="historyEmpty" class="log-empty">기록 없음</div>
     </div>
+  </div>
+
+  <!-- ATTENDANCE — 출퇴근 기록 -->
+  <div class="tab-panel" id="tab-attendance">
+    <div class="panel hud-corner">
+      <div class="panel-head">
+        <h2>출퇴근 · Attendance</h2>
+        <select class="month-select" aria-label="조회할 월 선택"></select>
+        <span class="month-past"></span>
+      </div>
+      <div class="foot-note" style="margin-top:0;margin-bottom:14px;">
+        게임을 시작할 때 <b>출근</b>, 끝낼 때 <b>퇴근</b>을 눌러주세요 ·
+        기록은 매월 1일 00시에 새로 시작하고, 지난 달 기록은 조회만 됩니다.
+      </div>
+      <div class="search-row">
+        <input type="text" id="attSearch" autocomplete="off" placeholder="아이디 또는 클랜으로 검색...">
+      </div>
+      <div id="attBoard" class="att-board"></div>
+    </div>
+
+    <div class="panel hud-corner">
+      <h2>출퇴근 기록</h2>
+      <div class="table-wrap" id="attLogWrap">
+        <table id="attLogTable" class="history-table">
+          <thead>
+            <tr>
+              <th class="h-no">#</th>
+              <th>ID</th>
+              <th>출근</th>
+              <th>퇴근</th>
+              <th>시간</th>
+              <th class="h-by"></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="attLogEmpty" class="log-empty">기록 없음</div>
+    </div>
+
+    <div class="split">
+      <div class="panel hud-corner">
+        <h2>출근 횟수 Top 5</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Rank</th><th>ID</th><th>Clan</th><th>출근</th><th>게임시간</th></tr></thead>
+            <tbody id="attCountBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="panel hud-corner">
+        <h2>게임시간 Top 5</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Rank</th><th>ID</th><th>Clan</th><th>게임시간</th><th>출근</th></tr></thead>
+            <tbody id="attTimeBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="foot-note" id="attNote"></div>
   </div>
 
   <!-- MONTHLY — 시즌(월) 단위 결산 -->

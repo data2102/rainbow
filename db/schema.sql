@@ -47,6 +47,19 @@ CREATE TABLE IF NOT EXISTS season_standings (
   PRIMARY KEY (season_id, handle)
 );
 
+-- 출퇴근 기록. 한 번의 출근~퇴근이 한 줄이고, 퇴근 전이면 clock_out 이 비어 있다.
+CREATE TABLE IF NOT EXISTS attendance (
+  id        BIGSERIAL PRIMARY KEY,
+  handle    TEXT NOT NULL,
+  season    TEXT,             -- 속한 시즌 id
+  clock_in  BIGINT NOT NULL,  -- epoch ms
+  clock_out BIGINT
+);
+CREATE INDEX IF NOT EXISTS idx_attendance_season ON attendance (season, clock_in DESC);
+-- 한 사람이 동시에 두 번 출근 상태가 되는 것을 막는다
+CREATE UNIQUE INDEX IF NOT EXISTS idx_attendance_open
+  ON attendance (handle) WHERE clock_out IS NULL;
+
 CREATE TABLE IF NOT EXISTS admins (
   id           TEXT PRIMARY KEY,
   pw_hash      TEXT NOT NULL,

@@ -93,6 +93,20 @@ async function resetPlayers(c) {
   );
 }
 
+/**
+ * 퇴근을 안 찍고 달이 넘어간 기록을 시즌 끝 시각으로 닫는다.
+ * 열어두면 다음 달까지 근무 중으로 남아 게임시간이 부풀려진다.
+ * 출퇴근 테이블은 늦게 생기므로 있을 때만 손댄다.
+ */
+async function closeOpenAttendance(c, seasonId, endsAt) {
+  const { rows } = await c.query(`SELECT to_regclass('public.attendance') AS t`);
+  if (!rows[0].t) return;
+  await c.query(
+    `UPDATE attendance SET clock_out = $1 WHERE season = $2 AND clock_out IS NULL`,
+    [endsAt, seasonId]
+  );
+}
+
 /** 끝난 시즌의 최종 순위를 그대로 저장해 둔다 */
 async function snapshot(c, seasonId) {
   await c.query(`DELETE FROM season_standings WHERE season_id = $1`, [seasonId]);
@@ -149,6 +163,7 @@ export async function ensureSeason(c, now = Date.now()) {
   let cursor = cur;
   while (cursor.endsAt <= now) {
     await snapshot(c, cursor.id);
+    await closeOpenAttendance(c, cursor.id, cursor.endsAt);
     await c.query(`UPDATE seasons SET closed_at = $1 WHERE id = $2`, [cursor.endsAt, cursor.id]);
     await resetPlayers(c);
     closed.push(cursor.id);
