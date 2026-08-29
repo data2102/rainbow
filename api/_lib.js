@@ -109,10 +109,19 @@ export async function ensureAccounts() {
 
 const SESSION_HOURS = 12;
 
-export async function createSession(handle) {
+/**
+ * "로그인 상태 유지"를 켠 사람의 세션 길이.
+ * 회원들이 들를 때마다 아이디와 비밀번호를 다시 치는 것이 힘들다고 해서 두었다.
+ * 비밀번호를 저장해두는 대신 세션을 길게 주는 쪽을 택했다 — 남는 것이
+ * 비밀번호가 아니라 이 계정 하나짜리 표라서, 잃어도 되돌리기 쉽다.
+ */
+const REMEMBER_DAYS = 30;
+
+export async function createSession(handle, remember = false) {
   const token = randomUUID() + randomBytes(16).toString('hex');
+  const span = remember ? `${REMEMBER_DAYS} days` : `${SESSION_HOURS} hours`;
   await q(
-    `INSERT INTO sessions (token, admin_id, expires_at) VALUES ($1, $2, now() + interval '${SESSION_HOURS} hours')`,
+    `INSERT INTO sessions (token, admin_id, expires_at) VALUES ($1, $2, now() + interval '${span}')`,
     [token, handle]
   );
   await q(`DELETE FROM sessions WHERE expires_at < now()`);

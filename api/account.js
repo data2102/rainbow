@@ -45,7 +45,7 @@ export default async function handler(req, res) {
 /* ---------- 로그인 ---------- */
 
 async function login(req, res) {
-  const { id, password } = body(req);
+  const { id, password, remember } = body(req);
   if (!id || !password) return res.status(400).json({ error: '아이디와 비밀번호를 입력해주세요.' });
 
   // 아이디는 대소문자를 가리지 않는다. 스펠링만 맞으면 된다.
@@ -55,7 +55,7 @@ async function login(req, res) {
     return res.status(401).json({ error: '아이디 또는 비밀번호가 올바르지 않습니다.' });
   }
 
-  const token = await createSession(p.handle);
+  const token = await createSession(p.handle, !!remember);
   res.status(200).json({ ok: true, token, account: toAccount(p) });
 }
 

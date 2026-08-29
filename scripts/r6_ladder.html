@@ -1209,6 +1209,16 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 }
 .modal-x:hover{ color:var(--text-primary); }
 .modal-error{ color:var(--danger-strong); font-size:var(--fs-footnote); margin-top:var(--sp-2); min-height:16px; }
+/* 창 안의 체크 한 줄 (로그인 상태 유지) */
+.modal-box label.check-line{
+  display:flex; align-items:center; gap:var(--sp-2);
+  margin:var(--sp-4) 0 0; cursor:pointer;
+  font-size:var(--fs-caption); color:var(--text-secondary);
+}
+.modal-box label.check-line input{
+  width:16px; height:16px; margin:0; flex:none;
+  accent-color:var(--accent); cursor:pointer;
+}
 
 #connBanner{
   display:none; border-radius:var(--radius-md);
