@@ -29,6 +29,9 @@ set "JOINWAIT=6"
 rem ---------- 사이트가 넘겨준 주소를 읽는다 ----------
 set "URL=%~1"
 
+rem 무엇이 넘어왔는지 한 줄 남겨둔다. 잘 안 될 때 이 파일만 보면 됩니다.
+echo %DATE% %TIME% ^| %URL%>> "%~dp0r6launch.log"
+
 set "MODE=create"
 if not "%URL%"=="%URL:join=%" set "MODE=join"
 
