@@ -2081,6 +2081,26 @@ function isHost(r) {
   return !!(r && me && r.host === me.handle);
 }
 
+/**
+ * 지금 쓰는 방식에 해당하는 것만 남긴다.
+ *
+ * 두 방식의 안내가 한 화면에 섞여 있으면 무엇을 해야 하는지 알 수 없다.
+ * data-mode 가 붙은 것은 그 방식일 때만 보여주고, 안 붙은 것은 늘 보여준다.
+ */
+function applyConnMode() {
+  document.querySelectorAll('#tab-launcher [data-mode]').forEach(el => {
+    el.style.display = (el.dataset.mode === connMode) ? '' : 'none';
+  });
+
+  const sub = document.getElementById('dlSub');
+  if (sub) {
+    sub.innerHTML = connMode === 'radmin'
+      ? '<b>①②③ 만 하시면 됩니다</b> · 한 번 해두면 다음부터는 그냥 들어가기만 하면 됩니다.'
+      : '<b>①②③ 은 모두</b> 하고, <b>＋ 는 방장을 할 사람만</b> 하면 됩니다 ·'
+        + ' 한 번 해두면 다음부터는 그냥 들어가기만 하면 됩니다.';
+  }
+}
+
 /** Radmin 네트워크 안내. 비밀번호는 로그인한 사람에게만 보인다. */
 function renderVpnBar() {
   const bar = document.getElementById('vpnBar');
@@ -2231,6 +2251,7 @@ async function saveMyIp() {
 }
 
 function renderLauncher() {
+  applyConnMode();
   renderVpnBar();
   renderMyIp();
   const gate = document.getElementById('lcGate');

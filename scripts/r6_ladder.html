@@ -1320,7 +1320,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
     <button class="tab-btn" data-tab="attendance">④ 출석</button>
     <button class="tab-btn" data-tab="tournament">⑤ 대회</button>
     <button class="tab-btn" data-tab="board">⑥ 게시판</button>
-    <button class="tab-btn" data-tab="launcher">⑦ 런쳐(준비중)</button>
+    <button class="tab-btn" data-tab="launcher">⑦ 런쳐</button>
   </nav>
 
   <!-- STANDING -->
@@ -1777,7 +1777,6 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
     <div class="panel hud-corner">
       <div class="panel-head">
         <h2>런쳐 · Launcher</h2>
-        <span class="lc-wip">준비중</span>
       </div>
       <div class="foot-note" style="margin-top:0;margin-bottom:14px;">
         방에 모여 이야기를 나누고, 다 모이면 방장이 게임을 실행합니다 ·
@@ -1808,8 +1807,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 
       <div class="dl-box">
         <div class="dl-h">처음 한 번만 — 설치 파일</div>
-        <div class="dl-sub"><b>①②③ 만 하시면 됩니다</b> (＋ 는 나중 이야기) ·
-          한 번 해두면 다음부터는 그냥 들어가기만 하면 됩니다.</div>
+        <div class="dl-sub" id="dlSub"></div>
 
         <div class="dl-row">
           <span class="dl-n">1</span>
@@ -1833,7 +1831,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
             <b>내 컴퓨터</b>의 윈도우 방화벽을 엽니다. 안 열면 접속이 느립니다.</span>
         </div>
 
-        <div class="dl-row dl-host">
+        <div class="dl-row dl-host" data-mode="auto">
           <span class="dl-n">＋</span>
           <a class="dl-a" href="/r6upnp.bat" download>r6upnp.bat</a>
           <span class="dl-d"><b>지금은 안 하셔도 됩니다</b> · Radmin 을 쓰면 공유기를
@@ -1902,59 +1900,43 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
             <li><a href="/r6clan-auto.reg" download>r6clan-auto.reg</a> 를 받아 실행
                 → "예" → "확인"</li>
           </ol>
-          <p>이 배치 파일이 하는 일은 게임에 주소를 넘겨 켜는 것뿐입니다 —
-             방장은 <code>-server 2346</code>, 참가자는 <code>-client 방장IP 2346</code>.
+          <p>배치 파일이 하는 일은 게임에 주소를 넘겨 켜는 것뿐입니다.
              메모장으로 열면 전부 보입니다.</p>
-          <p class="setup-warn">검은 창의 안내가 <b>영어</b>인 것은 일부러입니다.
-             cmd 는 배치 파일을 바이트 위치로 읽는데, 한글이 섞여 있으면 그 위치가
-             어긋나 뒤쪽 명령이 글자 중간부터 읽히면서
-             <code>'..' is not recognized</code> 로 깨집니다. 한글 안내는 여기 사이트에 둡니다.</p>
-          <p class="setup-warn"><b>검은 창만 잠깐 뜨고 게임이 안 켜지면</b> —
-             이제는 창이 닫히지 않고 이유를 보여줍니다. 그래도 모르겠으면
-             <code>C:\R6Clan\r6launch.log</code> 를 열어보세요. 무엇을 받아 무엇을
-             실행했고 결과가 어땠는지 한 줄씩 남습니다.</p>
-          <p class="setup-warn"><b>직접 돌려보려면</b> 시작 › <code>cmd</code> 에서
-             <code>C:\R6Clan\r6launch.bat "r6clan://create/"</code> 를 쳐보세요.
-             창이 그대로 남아 있어 모든 메시지를 읽을 수 있습니다.</p>
-          <p class="setup-warn">공인 IP 방식이면 적어둘 것이 없습니다.
-             Radmin 방식을 쓰는 방장만 위쪽 칸에 주소를 한 번 적어두세요.
-             게임이 다른 곳에 깔려 있으면 <code>r6launch.bat</code> 을 메모장으로 열어
-             <b>GAME</b> 경로만 고치면 됩니다. 기본 등록으로 되돌리려면
-             <b>r6clan.reg</b> 를 다시 실행하세요.</p>
-          <p class="setup-warn">혹시 명령줄 방식이 안 되는 PC 가 있으면
-             <a href="/r6launch.ahk" download>r6launch.ahk</a> 와
-             <a href="https://www.autohotkey.com/" target="_blank" rel="noopener">AutoHotkey v2</a> 로
-             메뉴를 대신 눌러주는 옛 방식을 쓸 수 있습니다.
-             <code>r6clan-auto.reg</code> 를 메모장으로 열면 바꾸는 줄이 적혀 있습니다.</p>
-        </div>
-      </details>
-
-      <details class="setup">
-        <summary>어떻게 로비로 바로 가는가 — 명령줄</summary>
-        <div class="setup-body">
-          <p>예전 Voobly 는 메뉴를 대신 눌러준 게 아니라, <b>게임을 켤 때 주소를 같이 넘겨</b>
-             곧장 붙였습니다. 레인보우식스에 이런 스위치가 있습니다.</p>
           <ul class="opt-list">
             <li><b>방장</b> <span><code>RainbowSix.exe -server 2346</code></span></li>
             <li><b>참가자</b> <span><code>RainbowSix.exe -client 방장IP 2346</code></span></li>
           </ul>
-          <p><b>런쳐가 이 방법을 씁니다.</b> 메뉴를 하나도 거치지 않으므로
-             화면 크기가 사람마다 달라도 상관없고, 마우스 좌표도 쓰지 않습니다.
-             설명서에는 안 적혀 있는 스위치입니다.</p>
-          <p>직접 해보시려면 시작 › <code>cmd</code> 에서:</p>
-          <ol>
-            <li><code>cd "C:\Program Files (x86)\Red Storm Entertainment\Tom Clancy's Rainbow Six"</code></li>
-            <li><code>RainbowSix.exe -server 2346</code></li>
-          </ol>
-          <p class="setup-warn">이 스위치는 설명서에 없습니다. Voobly 설치 파일 안에
-             적혀 있던 것을 찾아낸 것이고, 실제로 되는 것을 확인했습니다.
-             혹시 안 되는 PC 가 있으면 <code>r6launch.ahk</code> 를 메모장으로 열어
-             <b>UseCmdLine</b> 을 <code>false</code> 로 바꾸면 메뉴를 대신 눌러주는
-             옛 방식으로 돌아갑니다.</p>
+          <p>설명서에는 없는 스위치입니다. 예전 Voobly 설치 파일 안에 적혀 있던 것을
+             찾아낸 것이고, 실제로 되는 것을 확인했습니다. 메뉴를 하나도 거치지 않으므로
+             화면 크기가 사람마다 달라도 상관없습니다.</p>
+          <p class="setup-warn">게임이 다른 곳에 깔려 있으면 <code>r6launch.bat</code> 을
+             메모장으로 열어 <b>GAME</b> 경로만 고치면 됩니다.
+             기본 등록으로 되돌리려면 <b>r6clan.reg</b> 를 다시 실행하세요.</p>
         </div>
       </details>
 
-      <details class="setup">
+      <details class="setup" data-mode="radmin">
+        <summary>참가자가 <b>Multiplayer Connecting</b> 에서 멈출 때</summary>
+        <div class="setup-body">
+          <p>게임이 켜지고 <b>Multiplayer Connecting</b> 이 뜬 채로 멎어 있다면,
+             게임을 켜는 데까지는 다 맞은 것입니다. 두드리고는 있는데 방장 쪽까지
+             닿지 않는 상태이고, Radmin 방식에서는 볼 곳이 셋뿐입니다.</p>
+          <ol>
+            <li><b>양쪽 다 Radmin VPN 에 들어와 있나요?</b> 위 <b>Radmin VPN</b> 줄의
+                네트워크에 둘 다 접속해 있어야 합니다</li>
+            <li><b>방장의 주소가 맞나요?</b> 방장이 위쪽 <b>내 접속 주소</b>에 적어둔 값이
+                지금 Radmin 창에 보이는 값과 같아야 합니다.
+                컴퓨터를 바꾸거나 Radmin 을 다시 깔면 달라집니다</li>
+            <li><b><a href="/r6firewall.bat" download>r6firewall.bat</a> 을 둘 다 돌렸나요?</b>
+                안 열려 있으면 게임이 포트마다 시간초과를 기다렸다 넘어가느라 느립니다</li>
+          </ol>
+          <p class="setup-warn">그래도 안 되면 참가자 PC 의
+             <code>C:\R6Clan\r6launch.log</code> 를 보세요. <code>IP</code> 줄에 방장 주소가
+             제대로 들어갔는지, <code>RESULT</code> 가 무엇인지 적혀 있습니다.</p>
+        </div>
+      </details>
+
+      <details class="setup" data-mode="auto">
         <summary>참가자가 <b>Multiplayer Connecting</b> 에서 멈출 때</summary>
         <div class="setup-body">
           <p>게임이 켜지고 <b>Multiplayer Connecting</b> 이 뜬 채로 멎어 있다면,
@@ -2022,10 +2004,12 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
                 모두의 <kbd>JOIN GAME</kbd> 목록에 떠서, 런쳐를 거치지 않고도 아무나
                 들어옵니다. 끄면 <b>주소를 아는 사람만</b> 들어올 수 있고,
                 그 주소는 사이트에서 <b>같은 방에 들어와 있는 사람에게만</b> 보입니다</li>
-            <li><b>INTERNET / LAN</b> <span>LAN</span> — Radmin 이 랜처럼 이어주므로
-                <b>LAN 이 더 빠릅니다.</b> 이 값이 응답을 얼마나 기다릴지를 정합니다 —
-                INTERNET 은 느린 회선을 가정해 한참 기다립니다.
-                (Radmin 없이 공인 IP 로 붙는 사람만 INTERNET)</li>
+            <li data-mode="radmin"><b>INTERNET / LAN</b> <span>LAN</span> —
+                Radmin 이 랜처럼 이어주므로 <b>LAN 이 더 빠릅니다.</b>
+                이 값은 게임이 응답을 얼마나 참고 기다릴지를 정합니다 —
+                INTERNET 은 느린 회선을 가정해 한참 기다립니다.</li>
+            <li data-mode="auto"><b>INTERNET / LAN</b> <span>INTERNET</span> —
+                공인 IP 로 곧장 붙는 방식이라 INTERNET 이 맞습니다.</li>
             <li><b>BEHIND FIREWALL</b> <span>NO</span> — YES 로 두면 느려집니다.
                 대신 아래 포트를 열어주세요</li>
             <li><b>JOIN PORT</b> <span>2346</span> · <b>ANNOUNCE PORT</b> <span>2347</span> ·
