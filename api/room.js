@@ -221,6 +221,7 @@ export default async function handler(req, res) {
       case 'setIp': return await setIp(req, res);
       case 'giveHost': return await giveHost(req, res);
       case 'kick':     return await kick(req, res);
+      case 'report':   return await report(req, res);
       default:      return res.status(400).json({ error: '알 수 없는 요청입니다.' });
     }
   } catch (e) {
@@ -352,6 +353,32 @@ async function setIp(req, res) {
     address: rows.length ? rows[0].radmin_ip : address,
     mode: mode || undefined,
   });
+}
+
+/**
+ * 각자의 런쳐가 무엇을 했는지 방에 남긴다.
+ *
+ * 게임이 실제로 켜지고 붙는지는 각자 컴퓨터 안의 일이라 사이트가 볼 수 없다.
+ * 하지만 "누가 눌렀는지"까지는 알 수 있고, 그것만으로도 어디를 봐야 할지 갈린다.
+ *   줄이 안 뜬다  → 그 사람이 안 눌렀거나 자동 실행이 안 굴렀다
+ *   줄은 떴는데 게임이 안 켜진다 → 그 사람 컴퓨터의 설치 문제
+ *   게임은 켜졌는데 못 붙는다   → 그제서야 네트워크를 본다
+ */
+async function report(req, res) {
+  const me = await requireUser(req, res);
+  if (!me) return;
+
+  // 방을 이미 나갔으면 남길 곳이 없다. 실패로 만들 일은 아니다.
+  const rows = await q(`SELECT room FROM room_members WHERE handle = $1`, [me]);
+  if (!rows.length) return res.status(200).json({ ok: true });
+
+  const b = body(req);
+  const going = b.event === 'create' ? '방을 열러' : '들어가러';
+  let addr = null;
+  try { addr = cleanAddress(b.address); } catch { addr = null; }
+
+  await system(rows[0].room, `${me} 님이 런쳐를 눌렀습니다 — ${going} ${addr || '(주소 없음)'}`);
+  res.status(200).json({ ok: true });
 }
 
 /* ---------- 방장이 하는 일 ---------- */

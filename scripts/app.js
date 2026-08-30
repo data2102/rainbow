@@ -1967,12 +1967,21 @@ async function launchGame(address, mode) {
   const url = mode === 'create'
     ? GAME_PROTOCOL + 'create'
     : GAME_PROTOCOL + 'join' + (address ? '/' + address : '');
+  // 부르기 전에 방에 먼저 남긴다. 프로토콜이 등록돼 있지 않으면 브라우저가
+  // 아무 일도 하지 않고 조용히 끝나는데, 그때도 "누가 눌렀는지"는 남아야
+  // 누구 컴퓨터가 문제인지 가릴 수 있다. 알림일 뿐이라 실패해도 넘어간다.
+  try {
+    await apiPost('/api/room', { action: 'report', event: mode, address });
+  } catch { /* noop */ }
+
   window.location.href = url;
+
   showToast(mode === 'create'
-    ? '게임 실행 · CREATE GAME 으로 방을 만들어주세요.'
+    ? '게임을 켭니다 · 로비에서 사람들을 기다려주세요.'
     : (address
-      ? `게임 실행 · MANUAL JOIN 에 ${address} (복사해뒀습니다)`
-      : '게임 실행 · 방장 주소가 없습니다. JOIN GAME 목록에서 방 번호를 보고 고르세요.'));
+      ? `게임을 켭니다 · ${address} 로 붙습니다 (주소는 복사해뒀습니다)`
+      : '게임을 켭니다 · 방장 주소가 없어 자동으로 붙지 못할 수 있습니다.'));
+
 }
 
 /** 클립보드. 막혀 있으면 옛 방식으로 한 번 더 시도한다. */
