@@ -32,7 +32,7 @@ rem Lower it if joining feels slow; raise it if the guest arrives before
 rem the host is ready and the join fails.
 rem The site sends "/now" in the url when the host has already been up a
 rem while (someone pressing Join late) - then there is nothing to wait for.
-set "JOINWAIT=3"
+set "JOINWAIT=1"
 
 set "LOG=%~dp0r6launch.log"
 set "HELP=r6rank.co.kr - launcher tab"
