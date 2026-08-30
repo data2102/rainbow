@@ -29,6 +29,13 @@ if errorlevel 1 (
 )
 
 echo.
+echo   Opening the router - this takes up to 20 seconds.
+echo.
+echo   If the window title says "Select" and nothing moves, you clicked
+echo   inside it. Windows pauses the output while text is selected.
+echo   Press ESC and it will carry on.
+echo.
+
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$t=[IO.File]::ReadAllText('%~f0',[Text.Encoding]::UTF8); iex $t.Substring($t.LastIndexOf('#PS-START')+9)"
 
 set "RC=%ERRORLEVEL%"
@@ -60,6 +67,8 @@ exit /b %RC%
 $ErrorActionPreference = 'Stop'
 
 function Line($t) { Write-Host $t }
+
+Line '  reading this PC network settings...'
 
 # ---------- where this PC sits ----------
 $cfg = Get-NetIPConfiguration | Where-Object {
@@ -103,12 +112,13 @@ Line ''
 # ---------- ask the router ----------
 # Give it a few tries; SSDP discovery is not instant after a start.
 $col = $null
-for ($i = 1; $i -le 4 -and $null -eq $col; $i++) {
+for ($i = 1; $i -le 3 -and $null -eq $col; $i++) {
+    Line ('  asking the router over UPnP... (' + $i + '/3)')
     try {
         $nat = New-Object -ComObject HNetCfg.NATUPnP
         $col = $nat.StaticPortMappingCollection
     } catch { $col = $null }
-    if ($null -eq $col) { Line ('  looking for the router... (' + $i + '/4)'); Start-Sleep -Seconds 3 }
+    if ($null -eq $col -and $i -lt 3) { Start-Sleep -Seconds 2 }
 }
 
 if ($null -eq $col) {
