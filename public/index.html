@@ -1963,9 +1963,35 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
              것입니다(통신사 장비 + 내 공유기). 안쪽 공유기만 열려서 바깥에서는
              여전히 닿지 않습니다. 바깥 장비까지 열거나,
              <b>접속 방식을 Radmin 으로 바꿔주세요.</b></p>
-          <p><code>[X] The router did not answer UPnP</code> 가 뜨면 공유기에서 UPnP 가
-             꺼져 있는 것입니다. 공유기 설정에서 켜고 다시 실행하거나,
-             <b>포트 포워딩</b>에 UDP 2346·2347·2348 을 손으로 넣어주세요.</p>
+          <p><code>[X] The router did not answer UPnP</code> 가 뜨면 공유기가 UPnP 요청에
+             답하지 않은 것입니다. 이유는 둘 중 하나입니다.</p>
+          <ol>
+            <li><b>윈도우의 SSDP 서비스가 꺼져 있음</b> — <code>r6upnp.bat</code> 이 알아서
+                켜고 다시 시도합니다. <code>service SSDPSRV started</code> 가 보이면
+                그 다음 줄들을 보세요.</li>
+            <li><b>공유기에서 UPnP 가 꺼져 있음</b> — 이건 손으로 열어야 합니다.
+                <b>대부분 여기입니다.</b></li>
+          </ol>
+          <p>손으로 여는 방법은 <code>r6upnp.bat</code> 이 <b>내 실제 주소를 넣어서</b>
+             화면에 찍어줍니다. 그대로 따라 하시면 됩니다.</p>
+          <ol>
+            <li>브라우저에 화면에 찍힌 <code>router</code> 주소를 칩니다
+                (보통 <code>192.168.0.1</code> 또는 <code>192.168.219.1</code>)</li>
+            <li>로그인 후 <b>포트 포워딩</b>을 찾습니다
+                — 공유기마다 <b>NAT</b>, <b>가상 서버</b>, <b>포트포워드</b> 로도 부릅니다</li>
+            <li>규칙 셋을 넣습니다. 화면에 찍힌 <code>this PC</code> 주소로 보냅니다.
+              <ul class="opt-list">
+                <li><b>UDP 2346</b> <span>→ 내 PC</span></li>
+                <li><b>UDP 2347</b> <span>→ 내 PC</span></li>
+                <li><b>UDP 2348</b> <span>→ 내 PC</span></li>
+              </ul></li>
+            <li>들어간 김에 <b>UPnP</b> 항목이 있으면 켜두세요. 다음부터는
+                <code>r6upnp.bat</code> 이 알아서 합니다.</li>
+          </ol>
+          <p class="setup-warn">공유기를 못 건드리는 환경(회사·기숙사·공유 인터넷)이면
+             방장을 할 수 없습니다. <b>접속 방식을 Radmin 으로 바꾸면</b> 공유기와 무관하게
+             됩니다. 방장 한 명만 바꾸면 되는 게 아니라, <b>그 방에 들어올 사람 모두</b>
+             Radmin 을 켜야 합니다.</p>
         </div>
       </details>
 
