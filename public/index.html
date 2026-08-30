@@ -2011,20 +2011,27 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
           <p>게임 › <kbd>MULTIPLAYER</kbd> › <kbd>MULTIPLAYER OPTIONS</kbd> 에서 아래처럼 맞춰주세요.
              <b>회원 모두 같은 값</b>이어야 서로를 찾습니다.</p>
           <ul class="opt-list">
-            <li><b>ANNOUNCE SERVER</b> <span>체크</span> — 이게 켜져 있어야 방장의 방이
-                다른 사람 <kbd>JOIN GAME</kbd> 목록에 뜹니다</li>
+            <li><b>ANNOUNCE SERVER</b> <span>해제</span> — <b>꺼두세요.</b> 켜두면 방이
+                모두의 <kbd>JOIN GAME</kbd> 목록에 떠서, 런쳐를 거치지 않고도 아무나
+                들어옵니다. 끄면 <b>주소를 아는 사람만</b> 들어올 수 있고,
+                그 주소는 사이트에서 <b>같은 방에 들어와 있는 사람에게만</b> 보입니다</li>
             <li><b>INTERNET / LAN</b> <span>INTERNET</span> — 공인 IP 로 곧장 붙으므로
                 (Radmin 방식이면 LAN 도 해보세요)</li>
             <li><b>BEHIND FIREWALL</b> <span>NO</span> — YES 로 두면 느려집니다.
                 대신 아래 포트를 열어주세요</li>
             <li><b>JOIN PORT</b> <span>2346</span> · <b>ANNOUNCE PORT</b> <span>2347</span> ·
                 <b>INFO PORT</b> <span>2348</span> — 기본값 그대로</li>
-            <li><b>SERVER NAME</b> <span>알아보기 쉽게</span> — 예: <code>1번방 LOTUS_TeaRs</code>.
-                목록에 이 이름이 뜹니다</li>
+            <li><b>SERVER NAME</b> <span>방 번호를 넣어서</span> — 예: <code>1번방 LOTUS_TeaRs</code>.
+                ANNOUNCE 를 껐어도 방 안에서는 이 이름이 보입니다</li>
             <li><b>PLAYER NAME</b> <span>사이트 아이디와 같게</span> — 누가 누군지 바로 보입니다</li>
           </ul>
-          <p class="setup-warn">JOIN GAME 목록에 아무것도 안 뜨면 방화벽입니다.
-             그래도 안 되면 <kbd>MANUAL JOIN</kbd> 으로 주소를 넣으면 됩니다.</p>
+          <p class="setup-warn"><b>ANNOUNCE SERVER 를 끄면 <kbd>JOIN GAME</kbd> 목록에
+             아무것도 안 뜨는 것이 정상입니다.</b> 그게 목적입니다 —
+             런쳐가 알려주는 주소로만 들어오게 하려는 것입니다.
+             참가자는 런쳐가 알아서 그 주소로 붙여줍니다.</p>
+          <p class="setup-warn">그래도 목록에서 들어오게 하고 싶다면 ANNOUNCE 를 켜두시면
+             됩니다. 다만 여러 방이 동시에 열리면 목록에 다 떠서
+             <b>엉뚱한 방에 들어가는 일</b>이 생깁니다.</p>
         </div>
       </details>
 
@@ -4446,7 +4453,9 @@ function renderRoomView(r) {
            <li>사람들이 다 들어오면 맵과 인원을 정하고 <kbd>START MISSION</kbd></li>
          </ol>
          <div class="steps-alt">설치를 마쳤으면 <b>메인 메뉴를 거치지 않고 바로 로비</b>로
-           들어갑니다. 메인 메뉴에 그냥 서 있다면 위 설치 안내를 다시 확인해주세요.</div>`
+           들어갑니다. 메인 메뉴에 그냥 서 있다면 위 설치 안내를 다시 확인해주세요.
+           <br><b>MULTIPLAYER OPTIONS 의 ANNOUNCE SERVER 는 꺼두세요</b> —
+           켜두면 이 방이 모두의 목록에 떠서 런쳐를 거치지 않고도 들어옵니다.</div>`
       : `<div class="room-steps-h">게임이 켜지면 — ${esc(r.host || '방장')} 님 방으로</div>
          <ol>
            <li>자동으로 붙습니다. 로비에 들어가면 방장이 시작할 때까지 기다리세요.</li>

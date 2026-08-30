@@ -2324,7 +2324,9 @@ function renderRoomView(r) {
            <li>사람들이 다 들어오면 맵과 인원을 정하고 <kbd>START MISSION</kbd></li>
          </ol>
          <div class="steps-alt">설치를 마쳤으면 <b>메인 메뉴를 거치지 않고 바로 로비</b>로
-           들어갑니다. 메인 메뉴에 그냥 서 있다면 위 설치 안내를 다시 확인해주세요.</div>`
+           들어갑니다. 메인 메뉴에 그냥 서 있다면 위 설치 안내를 다시 확인해주세요.
+           <br><b>MULTIPLAYER OPTIONS 의 ANNOUNCE SERVER 는 꺼두세요</b> —
+           켜두면 이 방이 모두의 목록에 떠서 런쳐를 거치지 않고도 들어옵니다.</div>`
       : `<div class="room-steps-h">게임이 켜지면 — ${esc(r.host || '방장')} 님 방으로</div>
          <ol>
            <li>자동으로 붙습니다. 로비에 들어가면 방장이 시작할 때까지 기다리세요.</li>
