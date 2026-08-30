@@ -1898,11 +1898,13 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
           <p>이 배치 파일이 하는 일은 게임에 주소를 넘겨 켜는 것뿐입니다 —
              방장은 <code>-server 2346</code>, 참가자는 <code>-client 방장IP 2346</code>.
              메모장으로 열면 전부 보입니다.</p>
-          <p class="setup-warn">실행했을 때 검은 창에
-             <b>"내부 또는 외부 명령이 아닙니다"</b> 가 뜨면
-             <a href="/r6clan-auto.reg" download>r6clan-auto.reg</a> 를 다시 받아 실행해주세요.
-             예전 파일은 배치 파일을 부르는 방식에 문제가 있었습니다.
-             무엇이 넘어왔는지는 <code>C:\R6Clan\r6launch.log</code> 에 한 줄씩 남습니다.</p>
+          <p class="setup-warn"><b>검은 창만 잠깐 뜨고 게임이 안 켜지면</b> —
+             이제는 창이 닫히지 않고 이유를 보여줍니다. 그래도 모르겠으면
+             <code>C:\R6Clan\r6launch.log</code> 를 열어보세요. 무엇을 받아 무엇을
+             실행했고 결과가 어땠는지 한 줄씩 남습니다.</p>
+          <p class="setup-warn"><b>직접 돌려보려면</b> 시작 › <code>cmd</code> 에서
+             <code>C:\R6Clan\r6launch.bat "r6clan://create/"</code> 를 쳐보세요.
+             창이 그대로 남아 있어 모든 메시지를 읽을 수 있습니다.</p>
           <p class="setup-warn">공인 IP 방식이면 적어둘 것이 없습니다.
              Radmin 방식을 쓰는 방장만 위쪽 칸에 주소를 한 번 적어두세요.
              게임이 다른 곳에 깔려 있으면 <code>r6launch.bat</code> 을 메모장으로 열어
