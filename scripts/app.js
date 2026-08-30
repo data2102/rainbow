@@ -737,6 +737,24 @@ function scheduleMap() {
   return map;
 }
 
+/**
+ * 시간대 대신 고르는 두 가지. api/attendance.js 의 값과 같아야 한다.
+ * 시간대와 겹치지 않는 숫자를 자리로 쓴다.
+ */
+const SLOT_UNSURE = 0;
+const SLOT_ABSENT = -1;
+function isSpecialSlot(s) { return s === SLOT_UNSURE || s === SLOT_ABSENT; }
+function slotLabel(s) {
+  if (s === SLOT_UNSURE) return '미정';
+  if (s === SLOT_ABSENT) return '불참';
+  return `${s}시대`;
+}
+function slotChipLabel(s) {
+  if (s === SLOT_UNSURE) return '미정';
+  if (s === SLOT_ABSENT) return '불참';
+  return String(s);
+}
+
 /** 시간대별로 누가 오는지 */
 function renderSlotSummary() {
   const el = document.getElementById('slotSummary');
@@ -752,9 +770,13 @@ function renderSlotSummary() {
 
   el.innerHTML = playSlots.map(slot => {
     const names = bySlot.get(slot).sort((a, b) => a.localeCompare(b));
-    return `<div class="slot-col${names.length ? ' busy' : ''}">
+    // 미정·불참은 시간대 두 칸을 합친 너비로 둔다. 시간대가 아니므로
+    // 같은 크기로 나란히 두면 시간처럼 읽힌다.
+    const wide = isSpecialSlot(slot) ? ' wide' : '';
+    const kind = slot === SLOT_ABSENT ? ' absent' : (slot === SLOT_UNSURE ? ' unsure' : '');
+    return `<div class="slot-col${names.length ? ' busy' : ''}${wide}${kind}">
       <div class="slot-col-h">
-        <span class="slot-col-t">${slot}시대</span>
+        <span class="slot-col-t">${slotLabel(slot)}</span>
         <span class="slot-col-n">${names.length}명</span>
       </div>
       <div class="slot-names">${names.length
@@ -781,8 +803,8 @@ function renderSlotMine() {
   el.innerHTML = `<span class="mine-k">내 시간대</span>
     <span class="mine-id">${esc(me.handle)}</span>
     <span class="mine-right"><span class="slot-chips">${playSlots.map(slot =>
-      `<button type="button" class="slot-chip${on.has(slot) ? ' on' : ''}"
-        data-slot="${slot}" aria-pressed="${on.has(slot)}">${slot}</button>`).join('')}</span></span>`;
+      `<button type="button" class="slot-chip${on.has(slot) ? ' on' : ''}${isSpecialSlot(slot) ? ' wide' : ''}"
+        data-slot="${slot}" aria-pressed="${on.has(slot)}">${slotChipLabel(slot)}</button>`).join('')}</span></span>`;
 }
 
 function renderSchedule() {
@@ -803,8 +825,17 @@ async function toggleSlot(slot) {
   if (!isLoggedIn()) return;
   const handle = me.handle;
   const on = new Set(scheduleMap().get(handle) || []);
-  if (on.has(slot)) on.delete(slot); else on.add(slot);
-  const next = [...on];
+
+  // 미정·불참은 혼자 선다. 시간대를 고르면 그 둘은 풀리고,
+  // 그 둘을 고르면 시간대가 모두 풀린다 — "불참인데 8시"는 뜻이 없다.
+  let next;
+  if (isSpecialSlot(slot)) {
+    next = on.has(slot) ? [] : [slot];
+  } else {
+    const hours = new Set([...on].filter(s => !isSpecialSlot(s)));
+    if (hours.has(slot)) hours.delete(slot); else hours.add(slot);
+    next = [...hours];
+  }
 
   // 먼저 화면에 반영하고, 실패하면 되돌린다
   const before = playSchedule;

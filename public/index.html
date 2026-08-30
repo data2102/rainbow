@@ -438,6 +438,12 @@ tbody tr:hover td{ background:var(--surface-sunken); }
   background:var(--surface-sunken); padding:var(--sp-5); min-width:0; min-height:120px;
 }
 .slot-col.busy{ background:var(--accent-bg); border-color:transparent; }
+/* 미정·불참은 시간대가 아니므로 두 칸을 합쳐 따로 읽히게 한다 */
+.slot-col.wide{ grid-column:span 2; }
+.slot-col.unsure.busy{ background:var(--warning-bg); }
+.slot-col.absent.busy{ background:var(--danger-bg); }
+.slot-col.unsure .slot-col-t{ color:var(--warning-strong); }
+.slot-col.absent .slot-col-t{ color:var(--danger-strong); }
 .slot-col-h{
   display:flex; align-items:baseline; gap:var(--sp-2);
   margin-bottom:var(--sp-3); padding-bottom:var(--sp-2);
@@ -467,7 +473,8 @@ tbody tr:hover td{ background:var(--surface-sunken); }
   flex:1; min-width:90px; font-size:var(--fs-caption); font-weight:var(--fw-bold);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
-.slot-chips{ display:flex; gap:var(--sp-1); flex:none; }
+/* 칩이 열 개라 좁은 화면에서는 줄을 넘겨야 한다 */
+.slot-chips{ display:flex; flex-wrap:wrap; gap:var(--sp-1); min-width:0; }
 .slot-chip{
   border:1px solid var(--border-strong); border-radius:var(--radius-sm);
   background:var(--surface); color:var(--text-tertiary);
@@ -480,6 +487,7 @@ tbody tr:hover td{ background:var(--surface-sunken); }
   background:var(--accent); border-color:var(--accent);
   color:var(--on-accent); font-weight:var(--fw-bold);
 }
+.slot-chip.wide{ min-width:44px; }
 .slot-chip:focus-visible{ outline:none; box-shadow:var(--shadow-focus); }
 
 .search-row{ display:flex; gap:var(--sp-3); margin-bottom:var(--sp-4); flex-wrap:wrap; }
@@ -1564,12 +1572,13 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
       </div>
       <div class="foot-note" style="margin-top:0;margin-bottom:14px;">
         오늘 들어올 시간대를 체크해두면 누가 언제 접속하는지 서로 볼 수 있습니다 ·
+        아직 모르겠으면 <b>미정</b>, 오늘 못 오면 <b>불참</b>을 눌러주세요 (그 둘은 시간대와 함께 고를 수 없습니다) ·
         <b>매일 아침 7시에 초기화</b>됩니다 (0시~7시 사이에는 전날 체크가 그대로 보입니다).
       </div>
-      <div id="slotSummary" class="slot-summary"></div>
-
-      <div class="slot-divider"></div>
       <div class="mine" id="slotMine"></div>
+      <div class="slot-divider"></div>
+
+      <div id="slotSummary" class="slot-summary"></div>
     </div>
   </div>
 
@@ -2859,6 +2868,24 @@ function scheduleMap() {
   return map;
 }
 
+/**
+ * 시간대 대신 고르는 두 가지. api/attendance.js 의 값과 같아야 한다.
+ * 시간대와 겹치지 않는 숫자를 자리로 쓴다.
+ */
+const SLOT_UNSURE = 0;
+const SLOT_ABSENT = -1;
+function isSpecialSlot(s) { return s === SLOT_UNSURE || s === SLOT_ABSENT; }
+function slotLabel(s) {
+  if (s === SLOT_UNSURE) return '미정';
+  if (s === SLOT_ABSENT) return '불참';
+  return `${s}시대`;
+}
+function slotChipLabel(s) {
+  if (s === SLOT_UNSURE) return '미정';
+  if (s === SLOT_ABSENT) return '불참';
+  return String(s);
+}
+
 /** 시간대별로 누가 오는지 */
 function renderSlotSummary() {
   const el = document.getElementById('slotSummary');
@@ -2874,9 +2901,13 @@ function renderSlotSummary() {
 
   el.innerHTML = playSlots.map(slot => {
     const names = bySlot.get(slot).sort((a, b) => a.localeCompare(b));
-    return `<div class="slot-col${names.length ? ' busy' : ''}">
+    // 미정·불참은 시간대 두 칸을 합친 너비로 둔다. 시간대가 아니므로
+    // 같은 크기로 나란히 두면 시간처럼 읽힌다.
+    const wide = isSpecialSlot(slot) ? ' wide' : '';
+    const kind = slot === SLOT_ABSENT ? ' absent' : (slot === SLOT_UNSURE ? ' unsure' : '');
+    return `<div class="slot-col${names.length ? ' busy' : ''}${wide}${kind}">
       <div class="slot-col-h">
-        <span class="slot-col-t">${slot}시대</span>
+        <span class="slot-col-t">${slotLabel(slot)}</span>
         <span class="slot-col-n">${names.length}명</span>
       </div>
       <div class="slot-names">${names.length
@@ -2903,8 +2934,8 @@ function renderSlotMine() {
   el.innerHTML = `<span class="mine-k">내 시간대</span>
     <span class="mine-id">${esc(me.handle)}</span>
     <span class="mine-right"><span class="slot-chips">${playSlots.map(slot =>
-      `<button type="button" class="slot-chip${on.has(slot) ? ' on' : ''}"
-        data-slot="${slot}" aria-pressed="${on.has(slot)}">${slot}</button>`).join('')}</span></span>`;
+      `<button type="button" class="slot-chip${on.has(slot) ? ' on' : ''}${isSpecialSlot(slot) ? ' wide' : ''}"
+        data-slot="${slot}" aria-pressed="${on.has(slot)}">${slotChipLabel(slot)}</button>`).join('')}</span></span>`;
 }
 
 function renderSchedule() {
@@ -2925,8 +2956,17 @@ async function toggleSlot(slot) {
   if (!isLoggedIn()) return;
   const handle = me.handle;
   const on = new Set(scheduleMap().get(handle) || []);
-  if (on.has(slot)) on.delete(slot); else on.add(slot);
-  const next = [...on];
+
+  // 미정·불참은 혼자 선다. 시간대를 고르면 그 둘은 풀리고,
+  // 그 둘을 고르면 시간대가 모두 풀린다 — "불참인데 8시"는 뜻이 없다.
+  let next;
+  if (isSpecialSlot(slot)) {
+    next = on.has(slot) ? [] : [slot];
+  } else {
+    const hours = new Set([...on].filter(s => !isSpecialSlot(s)));
+    if (hours.has(slot)) hours.delete(slot); else hours.add(slot);
+    next = [...hours];
+  }
 
   // 먼저 화면에 반영하고, 실패하면 되돌린다
   const before = playSchedule;

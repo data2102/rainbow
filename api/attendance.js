@@ -5,7 +5,18 @@ import { syncSeason } from './_season.js';
  * 접속 예상 시간대. 12시 다음이 1시이므로 숫자 순서가 아니라 이 순서대로 보여준다.
  * 화면(app.js)은 서버가 준 이 목록을 그대로 그린다.
  */
-export const SLOTS = [6, 7, 8, 9, 10, 11, 12, 1];
+export const HOUR_SLOTS = [6, 7, 8, 9, 10, 11, 12, 1];
+
+/**
+ * 시간대 대신 고르는 두 가지.
+ * 칸이 숫자라서 시간과 겹치지 않는 값을 골라 자리로 쓴다.
+ * 이 둘은 시간대와 함께 고를 수 없다 — "불참인데 8시" 같은 것은 뜻이 없다.
+ */
+export const SLOT_UNSURE = 0;   // 미정
+export const SLOT_ABSENT = -1;  // 불참
+export const SPECIAL_SLOTS = [SLOT_UNSURE, SLOT_ABSENT];
+
+export const SLOTS = [...HOUR_SLOTS, ...SPECIAL_SLOTS];
 
 const KST = 9 * 60 * 60 * 1000;
 /** 접속 예상 시간이 초기화되는 시각 (한국 시각) */
@@ -157,9 +168,13 @@ async function punch(res, action, handle, season) {
 
 /** 로그인한 사람의 접속 예상 시간대를 통째로 다시 저장한다 */
 async function setSchedule(res, handle, slots) {
-  const picked = Array.isArray(slots)
+  let picked = Array.isArray(slots)
     ? [...new Set(slots.map(Number))].filter(n => SLOTS.includes(n))
     : [];
+
+  // 미정·불참은 혼자 서야 한다. 화면에서도 막지만 여기서도 정리해둔다.
+  const special = picked.find(n => SPECIAL_SLOTS.includes(n));
+  if (special !== undefined) picked = [special];
 
   const day = playDay();
   await tx(async (c) => {
