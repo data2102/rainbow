@@ -2022,8 +2022,10 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
                 모두의 <kbd>JOIN GAME</kbd> 목록에 떠서, 런쳐를 거치지 않고도 아무나
                 들어옵니다. 끄면 <b>주소를 아는 사람만</b> 들어올 수 있고,
                 그 주소는 사이트에서 <b>같은 방에 들어와 있는 사람에게만</b> 보입니다</li>
-            <li><b>INTERNET / LAN</b> <span>INTERNET</span> — 공인 IP 로 곧장 붙으므로
-                (Radmin 방식이면 LAN 도 해보세요)</li>
+            <li><b>INTERNET / LAN</b> <span>LAN</span> — Radmin 이 랜처럼 이어주므로
+                <b>LAN 이 더 빠릅니다.</b> 이 값이 응답을 얼마나 기다릴지를 정합니다 —
+                INTERNET 은 느린 회선을 가정해 한참 기다립니다.
+                (Radmin 없이 공인 IP 로 붙는 사람만 INTERNET)</li>
             <li><b>BEHIND FIREWALL</b> <span>NO</span> — YES 로 두면 느려집니다.
                 대신 아래 포트를 열어주세요</li>
             <li><b>JOIN PORT</b> <span>2346</span> · <b>ANNOUNCE PORT</b> <span>2347</span> ·
@@ -4089,6 +4091,8 @@ function initAccountEvents() {
  * 일어나지 않는다 — 그래서 주소 복사는 어느 쪽이든 늘 해준다.
  */
 const GAME_PROTOCOL = 'r6clan://';
+/** 방장이 이만큼 전에 켰으면 이미 자리를 잡았다고 본다 */
+const HOST_SETTLED_MS = 15000;
 
 /**
  * 접속 주소를 복사하고, 등록해둔 사람은 게임까지 띄운다.
@@ -4098,11 +4102,18 @@ const GAME_PROTOCOL = 'r6clan://';
  */
 async function launchGame(address, mode) {
   if (address) await copyText(address);
-  // 참가자에게는 방장 주소를 함께 넘긴다. 여러 방이 동시에 열려 있으면
-  // 목록만 보고는 어느 방인지 가릴 수 없어, 주소로 곧장 붙어야 한다.
+
+  // 참가자는 켜자마자 방장을 두드리므로, 방장 게임이 아직 뜨는 중이면
+  // 헛걸음이 된다. 그래서 런쳐가 몇 초 기다렸다 켠다. 다만 방장이 켠 지
+  // 한참 지난 뒤에 조인하기를 누른 사람은 기다릴 이유가 없다 —
+  // 그때는 주소에 now 를 끼워 보내 그 기다림을 건너뛴다.
+  const here = myRoomData();
+  const settled = mode === 'join' && here && here.startedAt
+    && (Date.now() - here.startedAt > HOST_SETTLED_MS);
+
   const url = mode === 'create'
     ? GAME_PROTOCOL + 'create'
-    : GAME_PROTOCOL + 'join' + (address ? '/' + address : '');
+    : GAME_PROTOCOL + 'join' + (settled ? '/now' : '') + (address ? '/' + address : '');
   // 부르기 전에 방에 먼저 남긴다. 프로토콜이 등록돼 있지 않으면 브라우저가
   // 아무 일도 하지 않고 조용히 끝나는데, 그때도 "누가 눌렀는지"는 남아야
   // 누구 컴퓨터가 문제인지 가릴 수 있다. 알림일 뿐이라 실패해도 넘어간다.

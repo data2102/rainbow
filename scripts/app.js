@@ -1953,6 +1953,8 @@ function initAccountEvents() {
  * 일어나지 않는다 — 그래서 주소 복사는 어느 쪽이든 늘 해준다.
  */
 const GAME_PROTOCOL = 'r6clan://';
+/** 방장이 이만큼 전에 켰으면 이미 자리를 잡았다고 본다 */
+const HOST_SETTLED_MS = 15000;
 
 /**
  * 접속 주소를 복사하고, 등록해둔 사람은 게임까지 띄운다.
@@ -1962,11 +1964,18 @@ const GAME_PROTOCOL = 'r6clan://';
  */
 async function launchGame(address, mode) {
   if (address) await copyText(address);
-  // 참가자에게는 방장 주소를 함께 넘긴다. 여러 방이 동시에 열려 있으면
-  // 목록만 보고는 어느 방인지 가릴 수 없어, 주소로 곧장 붙어야 한다.
+
+  // 참가자는 켜자마자 방장을 두드리므로, 방장 게임이 아직 뜨는 중이면
+  // 헛걸음이 된다. 그래서 런쳐가 몇 초 기다렸다 켠다. 다만 방장이 켠 지
+  // 한참 지난 뒤에 조인하기를 누른 사람은 기다릴 이유가 없다 —
+  // 그때는 주소에 now 를 끼워 보내 그 기다림을 건너뛴다.
+  const here = myRoomData();
+  const settled = mode === 'join' && here && here.startedAt
+    && (Date.now() - here.startedAt > HOST_SETTLED_MS);
+
   const url = mode === 'create'
     ? GAME_PROTOCOL + 'create'
-    : GAME_PROTOCOL + 'join' + (address ? '/' + address : '');
+    : GAME_PROTOCOL + 'join' + (settled ? '/now' : '') + (address ? '/' + address : '');
   // 부르기 전에 방에 먼저 남긴다. 프로토콜이 등록돼 있지 않으면 브라우저가
   // 아무 일도 하지 않고 조용히 끝나는데, 그때도 "누가 눌렀는지"는 남아야
   // 누구 컴퓨터가 문제인지 가릴 수 있다. 알림일 뿐이라 실패해도 넘어간다.

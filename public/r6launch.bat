@@ -27,8 +27,10 @@ rem ============================================================
 set "GAME=C:\Program Files (x86)\Red Storm Entertainment\Tom Clancy's Rainbow Six\RainbowSix.exe"
 set "PORT=2346"
 
-rem seconds a guest waits so the host game is up first
-set "JOINWAIT=6"
+rem Seconds a guest waits before starting, so the host game is up first.
+rem The site sends "/now" in the url when the host has already been up a
+rem while (someone pressing Join late) - then there is nothing to wait for.
+set "JOINWAIT=3"
 
 set "LOG=%~dp0r6launch.log"
 set "HELP=r6rank.co.kr - launcher tab"
@@ -40,10 +42,12 @@ call :log "URL     = %URL%"
 
 set "MODE=create"
 if not "%URL%"=="%URL:join=%" set "MODE=join"
+if not "%URL%"=="%URL:/now/=%" set "JOINWAIT=0"
 if "%MODE%"=="join" call :readip
 
 call :log "MODE    = %MODE%"
 call :log "IP      = %IP%"
+call :log "WAIT    = %JOINWAIT%"
 
 echo.
 if "%MODE%"=="join" echo   Rainbow Six - joining host %IP%
@@ -142,10 +146,12 @@ rem ============================================================
 rem  helpers
 rem ============================================================
 
-rem "r6clan://join/1.233.204.132/" -> 1.233.204.132
+rem The address is the last piece of the url, whatever comes before it:
+rem   r6clan://join/1.233.204.132       -> 1.233.204.132
+rem   r6clan://join/now/1.233.204.132/  -> 1.233.204.132
 :readip
-set "IP=%URL:*join/=%"
-set "IP=%IP:/=%"
+set "T=%URL:/= %"
+for %%A in (%T%) do set "IP=%%A"
 for /f "tokens=1 delims=:" %%A in ("%IP%") do set "IP=%%A"
 exit /b
 
@@ -154,7 +160,8 @@ rem waiting - the first packet otherwise pays for route setup.
 :waitforhost
 if "%IP%"=="" exit /b
 echo   opening the path to the host...
-ping -n 3 -w 700 %IP% >nul 2>&1
+ping -n 2 -w 500 %IP% >nul 2>&1
+if "%JOINWAIT%"=="0" exit /b
 echo   waiting for the host to settle...
 ping -n %JOINWAIT% 127.0.0.1 >nul 2>&1
 exit /b
