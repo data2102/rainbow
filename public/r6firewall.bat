@@ -1,23 +1,25 @@
 @echo off
-chcp 65001 >nul
 setlocal
+title R6 - Windows firewall
 
 rem ============================================================
-rem  r6rank.co.kr — 레인보우식스 방화벽 열기
+rem  r6rank.co.kr - open the Windows firewall for Rainbow Six
 rem ------------------------------------------------------------
-rem  JOIN 이 오래 걸리는 가장 흔한 이유는 윈도우 방화벽입니다.
-rem  게임은 접속할 때 상대의 포트 세 개를 두드려 보는데, 막혀 있으면
-rem  "응답 없음"으로 판정될 때까지 기다렸다가 다음을 시도합니다.
-rem  그 기다림이 쌓여 접속이 느려집니다.
+rem  This is THIS PC's door. r6upnp.bat opens the ROUTER's door.
+rem  Everyone runs this one; only the host needs r6upnp.bat.
 rem
-rem  이 파일은 그 문을 열어줍니다. 방장·참가자 모두 한 번씩 실행하세요.
+rem  The game knocks on three ports when connecting. If one is
+rem  blocked it waits for a timeout before trying the next, and
+rem  that waiting is what makes joining slow.
 rem
-rem  하는 일
-rem   · RainbowSix.exe 를 방화벽에서 허용 (들어오는 것/나가는 것)
-rem   · UDP 2346(JOIN) 2347(ANNOUNCE) 2348(INFO) 열기
-rem   · 핑(ping) 응답 허용 — 런처가 접속 전에 길을 미리 터두는 데 씁니다
+rem  Opens:
+rem   - RainbowSix.exe (in and out)
+rem   - UDP 2346 (JOIN) 2347 (ANNOUNCE) 2348 (INFO)
+rem   - ping replies, used by the launcher to warm the path
 rem
-rem  되돌리려면 이 파일 맨 아래 설명을 보세요.
+rem  ASCII only on purpose - see the note in r6launch.bat.
+rem  Korean help: r6rank.co.kr - launcher tab
+rem  To undo: see the bottom of this window after it runs.
 rem ============================================================
 
 set "GAME=C:\Program Files (x86)\Red Storm Entertainment\Tom Clancy's Rainbow Six\RainbowSix.exe"
@@ -25,18 +27,17 @@ set "GAME=C:\Program Files (x86)\Red Storm Entertainment\Tom Clancy's Rainbow Si
 net session >nul 2>&1
 if errorlevel 1 (
     echo.
-    echo   관리자 권한이 필요합니다.
-    echo   이 파일을 오른쪽 클릭 - "관리자 권한으로 실행" 해주세요.
+    echo   Please right-click this file and pick "Run as administrator".
     echo.
     pause
     exit /b 1
 )
 
 echo.
-echo   레인보우식스 방화벽을 엽니다...
+echo   Opening the Windows firewall...
 echo.
 
-rem 예전에 만든 규칙이 있으면 지우고 새로 만든다 (여러 번 실행해도 쌓이지 않게)
+rem drop old rules first so repeated runs do not pile up
 netsh advfirewall firewall delete rule name="Rainbow Six (r6rank)" >nul 2>&1
 netsh advfirewall firewall delete rule name="Rainbow Six UDP (r6rank)" >nul 2>&1
 netsh advfirewall firewall delete rule name="Rainbow Six PING (r6rank)" >nul 2>&1
@@ -44,27 +45,25 @@ netsh advfirewall firewall delete rule name="Rainbow Six PING (r6rank)" >nul 2>&
 if exist "%GAME%" (
     netsh advfirewall firewall add rule name="Rainbow Six (r6rank)" dir=in  action=allow program="%GAME%" enable=yes profile=any >nul
     netsh advfirewall firewall add rule name="Rainbow Six (r6rank)" dir=out action=allow program="%GAME%" enable=yes profile=any >nul
-    echo   [O] 게임 프로그램 허용
+    echo   [O] game allowed through
 ) else (
-    echo   [!] 게임을 찾지 못했습니다:
+    echo   [!] game not found:
     echo       %GAME%
-    echo       이 파일을 메모장으로 열어 GAME 경로를 고쳐주세요.
-    echo       포트만 열고 계속합니다.
+    echo       open this file in Notepad and fix the GAME path.
+    echo       opening the ports anyway.
 )
 
 netsh advfirewall firewall add rule name="Rainbow Six UDP (r6rank)" dir=in  action=allow protocol=UDP localport=2346-2348 enable=yes profile=any >nul
 netsh advfirewall firewall add rule name="Rainbow Six UDP (r6rank)" dir=out action=allow protocol=UDP localport=2346-2348 enable=yes profile=any >nul
-echo   [O] UDP 2346 - 2348 열기
+echo   [O] UDP 2346 - 2348 opened
 
-rem 런처가 게임을 켜는 동안 방장에게 핑을 보내 Radmin 길을 미리 터둡니다.
-rem 핑이 막혀 있으면 그 예열이 안 되고, 게임이 직접 기다리게 됩니다.
 netsh advfirewall firewall add rule name="Rainbow Six PING (r6rank)" dir=in action=allow protocol=icmpv4:8,any enable=yes profile=any >nul
-echo   [O] 핑(ping) 응답 허용
+echo   [O] ping replies allowed
 
 echo.
-echo   끝났습니다. 게임을 다시 켜서 접속해보세요.
+echo   Done. Open the game and try connecting again.
 echo.
-echo   되돌리려면 이 창에 아래 두 줄을 붙여넣으면 됩니다.
+echo   To undo, paste these three lines into this window:
 echo     netsh advfirewall firewall delete rule name="Rainbow Six (r6rank)"
 echo     netsh advfirewall firewall delete rule name="Rainbow Six UDP (r6rank)"
 echo     netsh advfirewall firewall delete rule name="Rainbow Six PING (r6rank)"

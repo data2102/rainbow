@@ -1898,6 +1898,10 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
           <p>이 배치 파일이 하는 일은 게임에 주소를 넘겨 켜는 것뿐입니다 —
              방장은 <code>-server 2346</code>, 참가자는 <code>-client 방장IP 2346</code>.
              메모장으로 열면 전부 보입니다.</p>
+          <p class="setup-warn">검은 창의 안내가 <b>영어</b>인 것은 일부러입니다.
+             cmd 는 배치 파일을 바이트 위치로 읽는데, 한글이 섞여 있으면 그 위치가
+             어긋나 뒤쪽 명령이 글자 중간부터 읽히면서
+             <code>'..' is not recognized</code> 로 깨집니다. 한글 안내는 여기 사이트에 둡니다.</p>
           <p class="setup-warn"><b>검은 창만 잠깐 뜨고 게임이 안 켜지면</b> —
              이제는 창이 닫히지 않고 이유를 보여줍니다. 그래도 모르겠으면
              <code>C:\R6Clan\r6launch.log</code> 를 열어보세요. 무엇을 받아 무엇을
@@ -1940,6 +1944,28 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
              혹시 안 되는 PC 가 있으면 <code>r6launch.ahk</code> 를 메모장으로 열어
              <b>UseCmdLine</b> 을 <code>false</code> 로 바꾸면 메뉴를 대신 눌러주는
              옛 방식으로 돌아갑니다.</p>
+        </div>
+      </details>
+
+      <details class="setup">
+        <summary>참가자가 <b>Multiplayer Connecting</b> 에서 멈출 때</summary>
+        <div class="setup-body">
+          <p>게임이 켜지고 <b>Multiplayer Connecting</b> 이 뜬 채로 멎어 있다면,
+             <b>참가자 쪽은 다 맞은 것</b>입니다. 두드리고는 있는데 방장 쪽에서
+             받아주지 않는 상태입니다. <b>볼 곳은 방장의 공유기 하나뿐입니다.</b></p>
+          <ol>
+            <li>방장이 <a href="/r6upnp.bat" download>r6upnp.bat</a> 을
+                <b>관리자 권한으로</b> 실행합니다</li>
+            <li>화면 끝의 <code>router sees you as</code> 주소를 확인합니다</li>
+            <li>그 주소가 위쪽 <b>내 접속 주소</b> 와 <b>같아야</b> 합니다</li>
+          </ol>
+          <p class="setup-warn"><b>두 주소가 다르면</b> 공유기가 두 겹으로 물려 있는
+             것입니다(통신사 장비 + 내 공유기). 안쪽 공유기만 열려서 바깥에서는
+             여전히 닿지 않습니다. 바깥 장비까지 열거나,
+             <b>접속 방식을 Radmin 으로 바꿔주세요.</b></p>
+          <p><code>[X] The router did not answer UPnP</code> 가 뜨면 공유기에서 UPnP 가
+             꺼져 있는 것입니다. 공유기 설정에서 켜고 다시 실행하거나,
+             <b>포트 포워딩</b>에 UDP 2346·2347·2348 을 손으로 넣어주세요.</p>
         </div>
       </details>
 
