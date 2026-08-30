@@ -28,6 +28,8 @@ set "GAME=C:\Program Files (x86)\Red Storm Entertainment\Tom Clancy's Rainbow Si
 set "PORT=2346"
 
 rem Seconds a guest waits before starting, so the host game is up first.
+rem Lower it if joining feels slow; raise it if the guest arrives before
+rem the host is ready and the join fails.
 rem The site sends "/now" in the url when the host has already been up a
 rem while (someone pressing Join late) - then there is nothing to wait for.
 set "JOINWAIT=3"
@@ -162,8 +164,11 @@ if "%IP%"=="" exit /b
 echo   opening the path to the host...
 ping -n 2 -w 500 %IP% >nul 2>&1
 if "%JOINWAIT%"=="0" exit /b
-echo   waiting for the host to settle...
-ping -n %JOINWAIT% 127.0.0.1 >nul 2>&1
+echo   waiting %JOINWAIT%s for the host to settle...
+rem ping -n N waits N-1 seconds between pings, so ask for one more.
+rem That way JOINWAIT is the real number of seconds, not one less.
+set /a "TICKS=%JOINWAIT% + 1"
+ping -n %TICKS% 127.0.0.1 >nul 2>&1
 exit /b
 
 rem one line into the log; redirect first so a trailing digit is safe
