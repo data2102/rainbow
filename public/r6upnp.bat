@@ -128,16 +128,25 @@ if ($null -eq $col) {
     Line '  Open it by hand instead - it is a one time thing:'
     Line ''
     Line ('   1. open  http://' + $gw + '  in a browser (that is your router)')
-    Line '   2. log in, then find "port forwarding"'
+    Line '   2. log in, then find the WAN / internet status page and note'
+    Line '      the WAN address. It has to match "my address" on the site.'
+    Line '      If it is another private address (10.x, 172.x, 192.168.x)'
+    Line '      you are behind two routers - opening ports here will not'
+    Line '      help, so use the Radmin mode instead.'
+    Line '   3. find "port forwarding"'
     Line '      (it may be called NAT, virtual server, or forwarding)'
-    Line '   3. add three rules, all pointing at this PC:'
+    Line '   4. add three rules, all pointing at this PC:'
     Line ''
     Line ('        UDP  2346  ->  ' + $ip)
     Line ('        UDP  2347  ->  ' + $ip)
     Line ('        UDP  2348  ->  ' + $ip)
     Line ''
-    Line '   4. while you are in there, look for a UPnP switch and turn'
+    Line '   5. while you are in there, look for a UPnP switch and turn'
     Line '      it on - then this file will work next time.'
+    Line ''
+    Line '  Cannot find port forwarding? Some routers have a DMZ box.'
+    Line ('  Putting ' + $ip + ' there opens everything to this PC -')
+    Line '  it works, but leaves this PC more exposed. Your call.'
     exit 3
 }
 

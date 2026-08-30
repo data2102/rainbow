@@ -1979,8 +1979,12 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
           <p>손으로 여는 방법은 <code>r6upnp.bat</code> 이 <b>내 실제 주소를 넣어서</b>
              화면에 찍어줍니다. 그대로 따라 하시면 됩니다.</p>
           <ol>
-            <li>브라우저에 화면에 찍힌 <code>router</code> 주소를 칩니다
-                (보통 <code>192.168.0.1</code> 또는 <code>192.168.219.1</code>)</li>
+            <li>브라우저에 화면에 찍힌 <code>router</code> 주소를 칩니다</li>
+            <li><b>먼저 WAN(인터넷) 주소부터 확인하세요.</b> 위쪽
+                <b>내 접속 주소</b>와 <b>같아야</b> 합니다.
+                <code>10.</code> · <code>172.</code> · <code>192.168.</code> 로 시작하는
+                다른 사설 주소가 찍혀 있으면 <b>공유기가 두 겹</b>이라
+                여기서 포트를 열어도 소용없습니다 → Radmin 으로 가세요.</li>
             <li>로그인 후 <b>포트 포워딩</b>을 찾습니다
                 — 공유기마다 <b>NAT</b>, <b>가상 서버</b>, <b>포트포워드</b> 로도 부릅니다</li>
             <li>규칙 셋을 넣습니다. 화면에 찍힌 <code>this PC</code> 주소로 보냅니다.
@@ -1992,6 +1996,8 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
             <li>들어간 김에 <b>UPnP</b> 항목이 있으면 켜두세요. 다음부터는
                 <code>r6upnp.bat</code> 이 알아서 합니다.</li>
           </ol>
+          <p>포트 포워딩 메뉴를 못 찾겠으면 <b>DMZ</b> 칸에 내 PC 주소를 넣어도 됩니다.
+             한 줄로 끝나지만 <b>그 PC의 모든 문이 열립니다</b> — 편한 만큼 덜 안전합니다.</p>
           <p class="setup-warn">공유기를 못 건드리는 환경(회사·기숙사·공유 인터넷)이면
              방장을 할 수 없습니다. <b>접속 방식을 Radmin 으로 바꾸면</b> 공유기와 무관하게
              됩니다. 방장 한 명만 바꾸면 되는 게 아니라, <b>그 방에 들어올 사람 모두</b>
