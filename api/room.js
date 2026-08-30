@@ -24,14 +24,18 @@ export const VPN_PASSWORD = '987654';
 
 /**
  * 서로를 찾는 방법.
- *   auto   — 사이트가 읽은 공인 IP 로 곧장 붙는다. 설치할 것이 없다.
  *   radmin — Radmin VPN 을 켜고 그 안의 주소(26.…)로 붙는다.
+ *   auto   — 사이트가 읽은 공인 IP 로 곧장 붙는다. 켤 프로그램이 없다.
  *
- * auto 는 방장 쪽 공유기에 UDP 2346 이 열려 있어야 한다(r6upnp.bat 이 열어준다).
- * 통신사가 공인 IP 를 주지 않는 회선이면 auto 로 방장을 할 수 없어 radmin 을 쓴다.
+ * 기본은 radmin 이다. auto 는 방장 쪽 공유기에 UDP 2346 이 열려 있어야 하는데,
+ * 공유기가 UPnP 에 답하지 않거나 손댈 수 없는 집이 있어 모두에게 강요할 수 없다.
+ * 공유기를 열어둔 사람은 각자 auto 로 바꾸면 된다.
+ *
+ * 방식은 사람마다 따로 두는데, 실제로 쓰이는 것은 그 방 방장의 방식뿐이다.
+ * 참가자는 방에 걸린 주소로 붙기만 하므로 방 안에서 서로 달라도 상관없다.
  */
 export const CONN_MODES = ['auto', 'radmin'];
-const DEFAULT_MODE = 'auto';
+const DEFAULT_MODE = 'radmin';
 
 const MAX_MSG = 200;
 /** 방마다 남겨두는 대화 수 */

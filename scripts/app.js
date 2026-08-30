@@ -22,7 +22,7 @@ let rooms = [];             // 런쳐 방 8개
 let myRoom = null;          // 내가 들어가 있는 방 번호
 let roomMsgs = [];          // 그 방의 대화
 let savedAddress = null;    // 내가 지난번에 적어둔 Radmin 주소
-let connMode = 'auto';      // 서로를 찾는 방법: 'auto'(공인 IP) | 'radmin'
+let connMode = 'radmin';    // 서로를 찾는 방법: 'radmin'(기본) | 'auto'(공인 IP)
 let publicIp = null;        // 사이트가 읽은 내 공인 IP
 let publicIpUsable = false; // 그 주소로 밖에서 찾아올 수 있는가 (CGNAT 이면 false)
 let leavingOnPurpose = false;  // 내가 눌러서 나가는 중인가 (강퇴와 구분하려고)
@@ -214,7 +214,7 @@ async function loadRooms() {
     myRoom = d.myRoom || null;
     roomMsgs = d.messages || [];
     savedAddress = d.savedAddress || null;
-    connMode = d.connMode || 'auto';
+    connMode = d.connMode || 'radmin';
     publicIp = d.publicIp || null;
     publicIpUsable = !!d.publicIpUsable;
     vpn = { network: d.network || '', password: d.networkPw || null };
@@ -2145,30 +2145,30 @@ function renderMyIp() {
  * 주지 않는 회선은 방장을 할 수 없다. 그때 Radmin 을 쓴다.
  */
 function showIpModal() {
-  const auto = connMode !== 'radmin';
+  const auto = connMode === 'auto';
   openModal(`
     <button class="modal-x" onclick="closeModal()">✕</button>
     <h3>접속 방식</h3>
     <div class="foot-note" style="margin-top:0;">방장이 되었을 때 사람들이
-      나를 어떻게 찾아올지 고릅니다.</div>
+      나를 어떻게 찾아올지 고릅니다. 참가만 할 때는 상관없습니다.</div>
+
+    <label class="pick-row${auto ? '' : ' on'}" id="pickRadmin">
+      <input type="radio" name="connMode" value="radmin" ${auto ? '' : 'checked'}>
+      <span class="pick-body">
+        <b>Radmin VPN <span class="pick-tag">기본</span></b>
+        <em>Radmin 을 켜고 그 안의 주소로 붙습니다 · 공유기를 손대지 않아도 됩니다</em>
+      </span>
+    </label>
 
     <label class="pick-row${auto ? ' on' : ''}" id="pickAuto">
       <input type="radio" name="connMode" value="auto" ${auto ? 'checked' : ''}>
       <span class="pick-body">
         <b>공인 IP · 자동</b>
-        <em>설치할 것 없음 · 사이트가 읽은 주소
+        <em>Radmin 없이 곧장 붙습니다 · 사이트가 읽은 주소
           ${publicIp ? `<code>${esc(publicIp)}</code>` : '(아직 못 읽음)'}
           ${publicIp && !publicIpUsable
             ? '<br><b class="warn">이 회선은 밖에서 찾아올 수 없어 방장을 할 수 없습니다.</b>'
-            : '<br>방장을 하려면 공유기에 UDP 2346 을 열어두세요 (r6upnp.bat).'}</em>
-      </span>
-    </label>
-
-    <label class="pick-row${auto ? '' : ' on'}" id="pickRadmin">
-      <input type="radio" name="connMode" value="radmin" ${auto ? '' : 'checked'}>
-      <span class="pick-body">
-        <b>Radmin VPN</b>
-        <em>Radmin 을 켜고 그 안의 주소로 붙습니다 · 공유기를 못 여는 회선에서도 됩니다</em>
+            : '<br><b>공유기에 UDP 2346 을 열어둔 사람만</b> 고르세요 (r6upnp.bat).'}</em>
       </span>
     </label>
 

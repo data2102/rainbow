@@ -1231,6 +1231,11 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 }
 .pick-body code{ font-family:var(--font-mono); color:var(--accent-strong); }
 .pick-body .warn{ color:var(--danger-strong); }
+.pick-tag{
+  margin-left:var(--sp-2); padding:1px var(--sp-2); border-radius:var(--radius-pill);
+  background:var(--accent); color:var(--on-accent);
+  font-size:10px; font-weight:var(--fw-bold); vertical-align:middle;
+}
 .vpn-note.warn{ color:var(--danger-strong); }
 
 /* 창 안의 체크 한 줄 (로그인 상태 유지) */
@@ -1803,7 +1808,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 
       <div class="dl-box">
         <div class="dl-h">처음 한 번만 — 설치 파일</div>
-        <div class="dl-sub"><b>①②③ 은 모두</b> 하고, <b>＋ 는 방장을 할 사람만</b> 하면 됩니다 ·
+        <div class="dl-sub"><b>①②③ 만 하시면 됩니다</b> (＋ 는 나중 이야기) ·
           한 번 해두면 다음부터는 그냥 들어가기만 하면 됩니다.</div>
 
         <div class="dl-row">
@@ -1831,9 +1836,9 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
         <div class="dl-row dl-host">
           <span class="dl-n">＋</span>
           <a class="dl-a" href="/r6upnp.bat" download>r6upnp.bat</a>
-          <span class="dl-d"><b>방장을 할 사람만</b> · 오른쪽 클릭 → 관리자 권한으로 실행 ·
-            <b>공유기</b>의 문을 엽니다(③ 은 내 컴퓨터, 이건 공유기라 둘 다 필요합니다).
-            참가만 하면 안 해도 됩니다.</span>
+          <span class="dl-d"><b>지금은 안 하셔도 됩니다</b> · Radmin 을 쓰면 공유기를
+            건드릴 일이 없습니다. 나중에 <b>Radmin 없이</b> 공인 IP 로 방장을 하고 싶을 때만,
+            그때 관리자 권한으로 실행하세요.</span>
         </div>
 
         <div class="dl-foot">모두 메모장으로 열면 무엇을 하는지 다 보입니다 ·
@@ -1847,15 +1852,17 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
              그 주소를 무엇으로 할지 두 가지 중에 고릅니다.
              위쪽 <b>내 접속 주소</b> 줄의 "방식 바꾸기"에서 언제든 바꿀 수 있습니다.</p>
           <ul class="opt-list">
-            <li><b>공인 IP · 자동</b> <span>설치할 것 없음</span> — 사이트가 여러분이 접속한
-                주소를 그대로 읽습니다. 적을 것도, 켤 프로그램도 없습니다.
-                <b>방장만</b> 공유기에 문을 열어두면 됩니다(<code>r6upnp.bat</code>).</li>
-            <li><b>Radmin VPN</b> <span>예전 방식</span> — Radmin 을 켜고 그 안의 주소(26.…)로
-                붙습니다. 공유기를 못 여는 회선에서도 됩니다.</li>
+            <li><b>Radmin VPN</b> <span>기본</span> — 모두 Radmin 에 모여서 그 안의
+                주소(26.…)로 붙습니다. <b>공유기를 손댈 필요가 없습니다.</b>
+                각자 자기 주소를 한 번만 적어두면 됩니다.</li>
+            <li><b>공인 IP · 자동</b> <span>나중에</span> — Radmin 없이 곧장 붙습니다.
+                적을 것도 켤 것도 없지만, <b>방장 쪽 공유기에 UDP 2346 이 열려 있어야</b>
+                합니다(<code>r6upnp.bat</code>). 공유기가 UPnP 에 답하지 않으면
+                손으로 열어야 하고, 통신사가 공인 IP 를 안 주는 회선(CGNAT)은 아예 안 됩니다.</li>
           </ul>
-          <p class="setup-warn">통신사가 공인 IP 를 주지 않는 회선(CGNAT)이 있습니다.
-             그런 회선은 <b>방장을 할 수 없고</b>, 사이트가 알아서 알려줍니다 —
-             그때는 Radmin 으로 바꿔주세요. <b>참가는 어느 회선이든 그대로 됩니다.</b></p>
+          <p class="setup-warn">방식은 <b>사람마다 따로</b>입니다. 실제로 쓰이는 것은
+             그 방 <b>방장의 방식</b>뿐이라, 방 안에서 서로 달라도 됩니다.
+             참가자는 방에 걸린 주소로 붙기만 합니다.</p>
         </div>
       </details>
 
@@ -2151,7 +2158,7 @@ let rooms = [];             // 런쳐 방 8개
 let myRoom = null;          // 내가 들어가 있는 방 번호
 let roomMsgs = [];          // 그 방의 대화
 let savedAddress = null;    // 내가 지난번에 적어둔 Radmin 주소
-let connMode = 'auto';      // 서로를 찾는 방법: 'auto'(공인 IP) | 'radmin'
+let connMode = 'radmin';    // 서로를 찾는 방법: 'radmin'(기본) | 'auto'(공인 IP)
 let publicIp = null;        // 사이트가 읽은 내 공인 IP
 let publicIpUsable = false; // 그 주소로 밖에서 찾아올 수 있는가 (CGNAT 이면 false)
 let leavingOnPurpose = false;  // 내가 눌러서 나가는 중인가 (강퇴와 구분하려고)
@@ -2343,7 +2350,7 @@ async function loadRooms() {
     myRoom = d.myRoom || null;
     roomMsgs = d.messages || [];
     savedAddress = d.savedAddress || null;
-    connMode = d.connMode || 'auto';
+    connMode = d.connMode || 'radmin';
     publicIp = d.publicIp || null;
     publicIpUsable = !!d.publicIpUsable;
     vpn = { network: d.network || '', password: d.networkPw || null };
@@ -4274,30 +4281,30 @@ function renderMyIp() {
  * 주지 않는 회선은 방장을 할 수 없다. 그때 Radmin 을 쓴다.
  */
 function showIpModal() {
-  const auto = connMode !== 'radmin';
+  const auto = connMode === 'auto';
   openModal(`
     <button class="modal-x" onclick="closeModal()">✕</button>
     <h3>접속 방식</h3>
     <div class="foot-note" style="margin-top:0;">방장이 되었을 때 사람들이
-      나를 어떻게 찾아올지 고릅니다.</div>
+      나를 어떻게 찾아올지 고릅니다. 참가만 할 때는 상관없습니다.</div>
+
+    <label class="pick-row${auto ? '' : ' on'}" id="pickRadmin">
+      <input type="radio" name="connMode" value="radmin" ${auto ? '' : 'checked'}>
+      <span class="pick-body">
+        <b>Radmin VPN <span class="pick-tag">기본</span></b>
+        <em>Radmin 을 켜고 그 안의 주소로 붙습니다 · 공유기를 손대지 않아도 됩니다</em>
+      </span>
+    </label>
 
     <label class="pick-row${auto ? ' on' : ''}" id="pickAuto">
       <input type="radio" name="connMode" value="auto" ${auto ? 'checked' : ''}>
       <span class="pick-body">
         <b>공인 IP · 자동</b>
-        <em>설치할 것 없음 · 사이트가 읽은 주소
+        <em>Radmin 없이 곧장 붙습니다 · 사이트가 읽은 주소
           ${publicIp ? `<code>${esc(publicIp)}</code>` : '(아직 못 읽음)'}
           ${publicIp && !publicIpUsable
             ? '<br><b class="warn">이 회선은 밖에서 찾아올 수 없어 방장을 할 수 없습니다.</b>'
-            : '<br>방장을 하려면 공유기에 UDP 2346 을 열어두세요 (r6upnp.bat).'}</em>
-      </span>
-    </label>
-
-    <label class="pick-row${auto ? '' : ' on'}" id="pickRadmin">
-      <input type="radio" name="connMode" value="radmin" ${auto ? '' : 'checked'}>
-      <span class="pick-body">
-        <b>Radmin VPN</b>
-        <em>Radmin 을 켜고 그 안의 주소로 붙습니다 · 공유기를 못 여는 회선에서도 됩니다</em>
+            : '<br><b>공유기에 UDP 2346 을 열어둔 사람만</b> 고르세요 (r6upnp.bat).'}</em>
       </span>
     </label>
 
