@@ -197,6 +197,45 @@ export function cleanEmail(v) {
   return s;
 }
 
+/* ---------- 접속 주소 ---------- */
+
+/**
+ * 이 요청을 보낸 사람의 공인 IP.
+ *
+ * 사이트는 Vercel 을 거쳐 오므로 소켓 주소는 프록시의 것이다. 진짜 손님은
+ * x-forwarded-for 맨 앞에 적혀 온다. 레인보우식스는 IPv4 만 알아들으므로
+ * IPv6 로만 들어온 사람은 주소가 없는 것으로 본다.
+ */
+export function clientIp(req) {
+  const h = req.headers || {};
+  const raw = String(h['x-forwarded-for'] || h['x-real-ip'] || '')
+    .split(',')[0].trim()
+    || (req.socket && req.socket.remoteAddress) || '';
+  // ::ffff:1.2.3.4 처럼 IPv6 껍데기를 쓴 IPv4 는 벗겨낸다
+  const m = /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.exec(raw);
+  if (!m) return null;
+  const ip = m[1];
+  return ip.split('.').every(n => Number(n) <= 255) ? ip : null;
+}
+
+/**
+ * 밖에서 찾아올 수 있는 주소인가.
+ *
+ * 통신사가 공인 IP 를 주지 않고 자기네 안에서만 쓰는 주소를 주는 회선이 있다
+ * (CGNAT, 100.64~100.127). 그런 회선은 방장을 할 수 없다 — 참가자는 괜찮다.
+ * 사설망 주소도 마찬가지다.
+ */
+export function isReachableIp(ip) {
+  if (!ip) return false;
+  const [a, b] = ip.split('.').map(Number);
+  if (a === 10 || a === 127 || a === 0) return false;
+  if (a === 172 && b >= 16 && b <= 31) return false;
+  if (a === 192 && b === 168) return false;
+  if (a === 169 && b === 254) return false;
+  if (a === 100 && b >= 64 && b <= 127) return false;   // CGNAT
+  return true;
+}
+
 export function parseHandle(full) {
   const idx = full.indexOf('_');
   if (idx !== -1) return { clan: full.slice(0, idx), name: full.slice(idx + 1) };

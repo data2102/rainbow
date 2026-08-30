@@ -1066,6 +1066,8 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .dl-d{ color:var(--text-secondary); min-width:0; }
 .dl-d a{ color:var(--accent); font-weight:var(--fw-medium); }
 .dl-d b{ color:var(--text-primary); font-weight:var(--fw-medium); }
+.dl-row.dl-host{ border-top:1px solid var(--border-strong); }
+.dl-row.dl-host .dl-n{ background:var(--warning-strong); }
 .dl-foot{
   font-size:var(--fs-footnote); color:var(--text-tertiary);
   margin-top:var(--sp-3); padding-top:var(--sp-3); border-top:1px solid var(--border);
@@ -1209,6 +1211,28 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 }
 .modal-x:hover{ color:var(--text-primary); }
 .modal-error{ color:var(--danger-strong); font-size:var(--fs-footnote); margin-top:var(--sp-2); min-height:16px; }
+/* 접속 방식 고르기 */
+.modal-box label.pick-row{
+  display:flex; align-items:flex-start; gap:var(--sp-3);
+  margin:var(--sp-3) 0 0; padding:var(--sp-4);
+  border:1px solid var(--border); border-radius:var(--radius-md);
+  cursor:pointer; color:var(--text-primary);
+}
+.modal-box label.pick-row.on{ border-color:var(--accent); background:var(--accent-bg); }
+.modal-box label.pick-row input{
+  width:16px; height:16px; margin:2px 0 0; flex:none;
+  accent-color:var(--accent); cursor:pointer;
+}
+.pick-body{ min-width:0; }
+.pick-body b{ display:block; font-size:var(--fs-caption); font-weight:var(--fw-bold); }
+.pick-body em{
+  display:block; margin-top:var(--sp-1); font-style:normal;
+  font-size:var(--fs-footnote); color:var(--text-secondary); line-height:var(--lh-body);
+}
+.pick-body code{ font-family:var(--font-mono); color:var(--accent-strong); }
+.pick-body .warn{ color:var(--danger-strong); }
+.vpn-note.warn{ color:var(--danger-strong); }
+
 /* 창 안의 체크 한 줄 (로그인 상태 유지) */
 .modal-box label.check-line{
   display:flex; align-items:center; gap:var(--sp-2);
@@ -1755,7 +1779,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
         방마다 <b>최대 16명</b>이고, <b>가장 먼저 들어온 사람이 방장</b>입니다.
       </div>
 
-      <div class="vpn-bar">
+      <div class="vpn-bar" id="vpnBar" style="display:none;">
         <span class="vpn-k">Radmin VPN</span>
         <span class="vpn-path">네트워크 › 네트워크 연결</span>
         <span class="vpn-pair">
@@ -1770,15 +1794,17 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
       </div>
 
       <div class="vpn-bar" id="myIpBar" style="display:none;">
-        <span class="vpn-k">내 Radmin 주소</span>
+        <span class="vpn-k">내 접속 주소</span>
         <code class="vpn-v" id="myIpValue"></code>
-        <button type="button" class="btn-mini btn-edit" id="myIpEdit">수정</button>
-        <span class="vpn-note">한 번만 적어두면 됩니다 · 방장이 되면 사람들이 이 주소로 찾아옵니다.</span>
+        <span class="vpn-path" id="myIpKind"></span>
+        <button type="button" class="btn-mini btn-edit" id="myIpEdit">방식 바꾸기</button>
+        <span class="vpn-note" id="myIpNote"></span>
       </div>
 
       <div class="dl-box">
-        <div class="dl-h">처음 한 번만 — 설치 파일 3개</div>
-        <div class="dl-sub">방장·참가자 <b>모두</b> 세 개 다 해야 합니다 · 한 번 해두면 다음부터는 그냥 들어가기만 하면 됩니다.</div>
+        <div class="dl-h">처음 한 번만 — 설치 파일</div>
+        <div class="dl-sub">위 세 개는 <b>모두</b> 해야 하고, 마지막 하나는 <b>방장을 할 사람만</b> 하면 됩니다 ·
+          한 번 해두면 다음부터는 그냥 들어가기만 하면 됩니다.</div>
 
         <div class="dl-row">
           <span class="dl-n">1</span>
@@ -1802,9 +1828,36 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
             UDP 2346·2347·2348 과 핑을 엽니다. 안 열면 접속이 느립니다.</span>
         </div>
 
-        <div class="dl-foot">셋 다 메모장으로 열면 무엇을 하는지 다 보입니다 ·
+        <div class="dl-row dl-host">
+          <span class="dl-n">＋</span>
+          <a class="dl-a" href="/r6upnp.bat" download>r6upnp.bat</a>
+          <span class="dl-d"><b>방장을 할 사람만</b> · 오른쪽 클릭 → 관리자 권한으로 실행 ·
+            공유기에 UDP 2346·2347·2348 을 열어 밖에서 찾아올 수 있게 합니다.
+            참가만 하면 필요 없습니다.</span>
+        </div>
+
+        <div class="dl-foot">모두 메모장으로 열면 무엇을 하는지 다 보입니다 ·
           자세한 설명과 되돌리는 방법은 아래 안내를 펼쳐보세요.</div>
       </div>
+
+      <details class="setup">
+        <summary>서로를 어떻게 찾는가 — 접속 방식 두 가지</summary>
+        <div class="setup-body">
+          <p>방장이 실행하면 참가자들이 <b>방장의 주소로 곧장</b> 붙습니다.
+             그 주소를 무엇으로 할지 두 가지 중에 고릅니다.
+             위쪽 <b>내 접속 주소</b> 줄의 "방식 바꾸기"에서 언제든 바꿀 수 있습니다.</p>
+          <ul class="opt-list">
+            <li><b>공인 IP · 자동</b> <span>설치할 것 없음</span> — 사이트가 여러분이 접속한
+                주소를 그대로 읽습니다. 적을 것도, 켤 프로그램도 없습니다.
+                <b>방장만</b> 공유기에 문을 열어두면 됩니다(<code>r6upnp.bat</code>).</li>
+            <li><b>Radmin VPN</b> <span>예전 방식</span> — Radmin 을 켜고 그 안의 주소(26.…)로
+                붙습니다. 공유기를 못 여는 회선에서도 됩니다.</li>
+          </ul>
+          <p class="setup-warn">통신사가 공인 IP 를 주지 않는 회선(CGNAT)이 있습니다.
+             그런 회선은 <b>방장을 할 수 없고</b>, 사이트가 알아서 알려줍니다 —
+             그때는 Radmin 으로 바꿔주세요. <b>참가는 어느 회선이든 그대로 됩니다.</b></p>
+        </div>
+      </details>
 
       <details class="setup">
         <summary>처음 한 번만 — 게임 실행 등록하기</summary>
@@ -1850,8 +1903,8 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
              <a href="/r6clan-auto.reg" download>r6clan-auto.reg</a> 를 다시 받아 실행해주세요.
              예전 파일은 배치 파일을 부르는 방식에 문제가 있었습니다.
              무엇이 넘어왔는지는 <code>C:\R6Clan\r6launch.log</code> 에 한 줄씩 남습니다.</p>
-          <p class="setup-warn">방장이 <b>내 Radmin 주소</b>를 적어두지 않으면
-             참가자는 어디로 붙을지 모릅니다. 위쪽 칸에 한 번만 적어두세요.
+          <p class="setup-warn">공인 IP 방식이면 적어둘 것이 없습니다.
+             Radmin 방식을 쓰는 방장만 위쪽 칸에 주소를 한 번 적어두세요.
              게임이 다른 곳에 깔려 있으면 <code>r6launch.bat</code> 을 메모장으로 열어
              <b>GAME</b> 경로만 고치면 됩니다. 기본 등록으로 되돌리려면
              <b>r6clan.reg</b> 를 다시 실행하세요.</p>
@@ -1896,8 +1949,8 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
           <ul class="opt-list">
             <li><b>ANNOUNCE SERVER</b> <span>체크</span> — 이게 켜져 있어야 방장의 방이
                 다른 사람 <kbd>JOIN GAME</kbd> 목록에 뜹니다</li>
-            <li><b>INTERNET / LAN</b> <span>LAN</span> — Radmin 이 랜처럼 이어주므로
-                (튀면 INTERNET 도 해보세요)</li>
+            <li><b>INTERNET / LAN</b> <span>INTERNET</span> — 공인 IP 로 곧장 붙으므로
+                (Radmin 방식이면 LAN 도 해보세요)</li>
             <li><b>BEHIND FIREWALL</b> <span>NO</span> — YES 로 두면 느려집니다.
                 대신 아래 포트를 열어주세요</li>
             <li><b>JOIN PORT</b> <span>2346</span> · <b>ANNOUNCE PORT</b> <span>2347</span> ·

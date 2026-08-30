@@ -1,4 +1,4 @@
-import { q, tx, body, methodGuard, currentUser, requireUser } from './_lib.js';
+import { q, tx, body, methodGuard, currentUser, requireUser, clientIp, isReachableIp } from './_lib.js';
 
 /**
  * 런쳐. 1번방부터 8번방까지, 방마다 최대 16명이 모여 이야기를 나누고
@@ -21,6 +21,17 @@ const IDLE_MS = 3 * 60 * 1000;
  */
 export const VPN_NETWORK = 'rainbowsix12345';
 export const VPN_PASSWORD = '987654';
+
+/**
+ * 서로를 찾는 방법.
+ *   auto   — 사이트가 읽은 공인 IP 로 곧장 붙는다. 설치할 것이 없다.
+ *   radmin — Radmin VPN 을 켜고 그 안의 주소(26.…)로 붙는다.
+ *
+ * auto 는 방장 쪽 공유기에 UDP 2346 이 열려 있어야 한다(r6upnp.bat 이 열어준다).
+ * 통신사가 공인 IP 를 주지 않는 회선이면 auto 로 방장을 할 수 없어 radmin 을 쓴다.
+ */
+export const CONN_MODES = ['auto', 'radmin'];
+const DEFAULT_MODE = 'auto';
 
 const MAX_MSG = 200;
 /** 방마다 남겨두는 대화 수 */
@@ -50,6 +61,8 @@ async function ensureTables() {
   await q(`ALTER TABLE room_state ADD COLUMN IF NOT EXISTS address TEXT`);
   // 한 번 적은 주소는 계정에 남겨 다음부터 자동으로 채운다
   await q(`ALTER TABLE players ADD COLUMN IF NOT EXISTS radmin_ip TEXT`);
+  // 어느 주소로 서로를 찾을지. 'auto' = 사이트가 읽은 공인 IP, 'radmin' = 직접 적어둔 주소
+  await q(`ALTER TABLE players ADD COLUMN IF NOT EXISTS conn_mode TEXT`);
   await q(`
     CREATE TABLE IF NOT EXISTS room_messages (
       id     BIGSERIAL PRIMARY KEY,
@@ -176,14 +189,22 @@ export default async function handler(req, res) {
 
       // 방장이 지난번에 적어둔 주소를 미리 채워준다
       let savedAddress = null;
+      let connMode = DEFAULT_MODE;
       if (me) {
-        const rows = await q(`SELECT radmin_ip FROM players WHERE handle = $1`, [me.handle]);
-        savedAddress = rows.length ? rows[0].radmin_ip : null;
+        const rows = await q(`SELECT radmin_ip, conn_mode FROM players WHERE handle = $1`, [me.handle]);
+        if (rows.length) {
+          savedAddress = rows[0].radmin_ip;
+          connMode = rows[0].conn_mode || DEFAULT_MODE;
+        }
       }
+
+      // 지금 이 사람이 어느 주소에서 들어왔는지. 방장이 되면 이 주소로 사람들이 찾아온다.
+      const publicIp = clientIp(req);
 
       res.setHeader('Cache-Control', 'no-store');
       return res.status(200).json({
-        rooms, messages, savedAddress,
+        rooms, messages, savedAddress, connMode, publicIp,
+        publicIpUsable: isReachableIp(publicIp),
         myRoom: mine ? mine.room : null,
         capacity: ROOM_CAPACITY,
         network: VPN_NETWORK,
@@ -294,13 +315,43 @@ async function say(req, res) {
   res.status(200).json({ ok: true });
 }
 
-/** 내 Radmin 주소를 계정에 적어둔다. 방장이 되면 이 주소로 사람들이 찾아온다. */
+/**
+ * 서로를 어떻게 찾을지 정한다.
+ * auto 면 사이트가 읽은 공인 IP 를 쓰므로 적을 것이 없고,
+ * radmin 이면 Radmin 창에 보이는 내 주소를 적어둔다.
+ */
 async function setIp(req, res) {
   const me = await requireUser(req, res);
   if (!me) return;
-  const address = cleanAddress(body(req).address);
-  await q(`UPDATE players SET radmin_ip = $1 WHERE handle = $2`, [address, me]);
-  res.status(200).json({ ok: true, address });
+  const b = body(req);
+
+  const mode = b.mode === undefined ? null : String(b.mode);
+  if (mode !== null && !CONN_MODES.includes(mode)) {
+    return res.status(400).json({ error: '없는 접속 방식입니다.' });
+  }
+
+  const address = cleanAddress(b.address);
+  if (mode === 'radmin' && !address) {
+    return res.status(400).json({ error: 'Radmin 주소를 적어주세요.' });
+  }
+
+  // 방식만 바꿀 때는 적어둔 Radmin 주소를 건드리지 않는다.
+  // 공인 IP 로 갔다가 돌아왔을 때 다시 적게 만들 이유가 없다.
+  if (mode !== null && !address) {
+    await q(`UPDATE players SET conn_mode = $1 WHERE handle = $2`, [mode, me]);
+  } else if (mode === null) {
+    await q(`UPDATE players SET radmin_ip = $1 WHERE handle = $2`, [address, me]);
+  } else {
+    await q(`UPDATE players SET radmin_ip = $1, conn_mode = $2 WHERE handle = $3`,
+      [address, mode, me]);
+  }
+
+  const rows = await q(`SELECT radmin_ip FROM players WHERE handle = $1`, [me]);
+  res.status(200).json({
+    ok: true,
+    address: rows.length ? rows[0].radmin_ip : address,
+    mode: mode || undefined,
+  });
 }
 
 /* ---------- 방장이 하는 일 ---------- */
@@ -384,13 +435,36 @@ async function start(req, res) {
   const me = await requireUser(req, res);
   if (!me) return;
 
-  // 주소는 있으면 좋고 없어도 된다. 대개는 JOIN GAME 목록에 방장의 방이 떠서
-  // 주소를 몰라도 들어갈 수 있다. 목록이 안 뜨는 사람을 위한 뒷길일 뿐이다.
-  const address = cleanAddress(body(req).address);
-
   const rows = await q(`SELECT room FROM room_members WHERE handle = $1`, [me]);
   if (!rows.length) return res.status(400).json({ error: '먼저 방에 들어가주세요.' });
   const room = rows[0].room;
+
+  // 사람들이 찾아올 주소를 정한다. 방식은 각자 계정에 적혀 있다.
+  const who = await q(`SELECT radmin_ip, conn_mode FROM players WHERE handle = $1`, [me]);
+  const mode = (who.length && who[0].conn_mode) || DEFAULT_MODE;
+  let address;
+
+  if (mode === 'radmin') {
+    // 창에서 새로 적어 보냈으면 그것으로 갈아끼운다
+    address = cleanAddress(body(req).address) || (who.length ? who[0].radmin_ip : null);
+    if (!address) {
+      return res.status(400).json({ error: 'Radmin 주소를 적어야 사람들이 찾아올 수 있습니다.' });
+    }
+    await q(`UPDATE players SET radmin_ip = $1 WHERE handle = $2`, [address, me]);
+  } else {
+    address = clientIp(req);
+    if (!address) {
+      return res.status(400).json({
+        error: '접속 주소를 읽지 못했습니다. Radmin 방식으로 바꿔서 해주세요.',
+      });
+    }
+    if (!isReachableIp(address)) {
+      return res.status(400).json({
+        error: `이 인터넷 회선(${address})은 밖에서 찾아올 수 없는 주소를 씁니다. `
+             + '방장을 하려면 Radmin 방식으로 바꿔주세요. (참가는 그대로 됩니다)',
+      });
+    }
+  }
 
   const first = await q(
     `SELECT handle FROM room_members WHERE room = $1 ORDER BY joined_at, handle LIMIT 1`, [room]
@@ -407,9 +481,6 @@ async function start(req, res) {
         SET running = true, started_at = $2, started_by = $3, address = $4`,
     [room, now, me, address]
   );
-  if (address) await q(`UPDATE players SET radmin_ip = $1 WHERE handle = $2`, [address, me]);
-  await system(room, address
-    ? `${me} 님이 게임을 실행했습니다 · 접속 주소 ${address}`
-    : `${me} 님이 게임을 실행했습니다. JOIN GAME 목록에서 찾아 들어가세요.`);
-  res.status(200).json({ ok: true, room, startedAt: now, address });
+  await system(room, `${me} 님이 게임을 실행했습니다 · 접속 주소 ${address}`);
+  res.status(200).json({ ok: true, room, startedAt: now, address, mode });
 }

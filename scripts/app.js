@@ -22,6 +22,9 @@ let rooms = [];             // 런쳐 방 8개
 let myRoom = null;          // 내가 들어가 있는 방 번호
 let roomMsgs = [];          // 그 방의 대화
 let savedAddress = null;    // 내가 지난번에 적어둔 Radmin 주소
+let connMode = 'auto';      // 서로를 찾는 방법: 'auto'(공인 IP) | 'radmin'
+let publicIp = null;        // 사이트가 읽은 내 공인 IP
+let publicIpUsable = false; // 그 주소로 밖에서 찾아올 수 있는가 (CGNAT 이면 false)
 let leavingOnPurpose = false;  // 내가 눌러서 나가는 중인가 (강퇴와 구분하려고)
 let vpn = { network: '', password: null };  // Radmin 네트워크 안내 (비밀번호는 로그인해야 온다)
 
@@ -211,6 +214,9 @@ async function loadRooms() {
     myRoom = d.myRoom || null;
     roomMsgs = d.messages || [];
     savedAddress = d.savedAddress || null;
+    connMode = d.connMode || 'auto';
+    publicIp = d.publicIp || null;
+    publicIpUsable = !!d.publicIpUsable;
     vpn = { network: d.network || '', password: d.networkPw || null };
   } catch { rooms = []; myRoom = null; roomMsgs = []; }
 
@@ -2059,6 +2065,10 @@ function isHost(r) {
 
 /** Radmin 네트워크 안내. 비밀번호는 로그인한 사람에게만 보인다. */
 function renderVpnBar() {
+  const bar = document.getElementById('vpnBar');
+  // Radmin 방식을 쓰는 사람에게만 보여준다. 공인 IP 로 바로 붙는 사람에게는
+  // 켤 일이 없는 프로그램 안내가 남아 있으면 헷갈린다.
+  if (bar) bar.style.display = (connMode === 'radmin') ? 'flex' : 'none';
   const name = document.getElementById('vpnName');
   const wrap = document.getElementById('vpnPwWrap');
   const pw = document.getElementById('vpnPw');
@@ -2086,29 +2096,93 @@ function maybePlayRoomCountdown() {
 }
 
 /** 내 Radmin 주소 — 로그인한 사람에게만 보인다 */
+/** 지금 방식으로 사람들이 나에게 찾아올 주소 */
+function myConnAddress() {
+  return connMode === 'radmin' ? savedAddress : publicIp;
+}
+
 function renderMyIp() {
   const bar = document.getElementById('myIpBar');
   const val = document.getElementById('myIpValue');
   const btn = document.getElementById('myIpEdit');
+  const kind = document.getElementById('myIpKind');
+  const note = document.getElementById('myIpNote');
   if (!bar || !val || !btn) return;
+
   bar.style.display = isLoggedIn() ? 'flex' : 'none';
-  val.textContent = savedAddress || '아직 없음';
-  btn.textContent = savedAddress ? '수정' : '적기';
+  const addr = myConnAddress();
+  val.textContent = addr || '아직 없음';
+  btn.textContent = '방식 바꾸기';
+  if (kind) kind.textContent = connMode === 'radmin' ? 'Radmin' : '공인 IP · 자동';
+
+  if (!note) return;
+  note.classList.toggle('warn', connMode === 'auto' && !publicIpUsable);
+  if (connMode === 'radmin') {
+    note.textContent = addr
+      ? 'Radmin VPN 을 켜둔 채로 실행해야 합니다.'
+      : 'Radmin 창의 내 주소(26.…)를 적어주세요.';
+  } else if (!publicIpUsable) {
+    note.textContent = '이 회선은 밖에서 찾아올 수 없는 주소입니다 · 방장을 하려면 Radmin 방식으로 바꿔주세요.';
+  } else {
+    note.textContent = '적을 것이 없습니다 · 방장을 하려면 공유기에 UDP 2346 을 열어두세요.';
+  }
 }
 
+/**
+ * 서로를 어떻게 찾을지 고르는 창.
+ *
+ * 공인 IP 는 사이트가 알아서 읽으므로 적을 것이 없고 설치할 것도 없다.
+ * 다만 방장을 하려면 공유기에 문이 열려 있어야 하고, 통신사가 공인 IP 를
+ * 주지 않는 회선은 방장을 할 수 없다. 그때 Radmin 을 쓴다.
+ */
 function showIpModal() {
+  const auto = connMode !== 'radmin';
   openModal(`
     <button class="modal-x" onclick="closeModal()">✕</button>
-    <h3>내 Radmin 주소</h3>
-    <div class="foot-note" style="margin-top:0;">Radmin VPN 창에서 내 이름 옆에 있는
-      <b>26.으로 시작하는 주소</b>를 적어주세요. 한 번만 적어두면 됩니다.</div>
-    <label>내 주소</label>
-    <input type="text" id="ipValue" maxlength="21" autocomplete="off"
-           placeholder="예: 26.131.188.239" value="${esc(savedAddress || '')}">
+    <h3>접속 방식</h3>
+    <div class="foot-note" style="margin-top:0;">방장이 되었을 때 사람들이
+      나를 어떻게 찾아올지 고릅니다.</div>
+
+    <label class="pick-row${auto ? ' on' : ''}" id="pickAuto">
+      <input type="radio" name="connMode" value="auto" ${auto ? 'checked' : ''}>
+      <span class="pick-body">
+        <b>공인 IP · 자동</b>
+        <em>설치할 것 없음 · 사이트가 읽은 주소
+          ${publicIp ? `<code>${esc(publicIp)}</code>` : '(아직 못 읽음)'}
+          ${publicIp && !publicIpUsable
+            ? '<br><b class="warn">이 회선은 밖에서 찾아올 수 없어 방장을 할 수 없습니다.</b>'
+            : '<br>방장을 하려면 공유기에 UDP 2346 을 열어두세요 (r6upnp.bat).'}</em>
+      </span>
+    </label>
+
+    <label class="pick-row${auto ? '' : ' on'}" id="pickRadmin">
+      <input type="radio" name="connMode" value="radmin" ${auto ? '' : 'checked'}>
+      <span class="pick-body">
+        <b>Radmin VPN</b>
+        <em>Radmin 을 켜고 그 안의 주소로 붙습니다 · 공유기를 못 여는 회선에서도 됩니다</em>
+      </span>
+    </label>
+
+    <div id="radminBox" style="display:${auto ? 'none' : 'block'};">
+      <label>Radmin 창에 보이는 내 주소</label>
+      <input type="text" id="ipValue" maxlength="21" autocomplete="off"
+             placeholder="예: 26.131.188.239" value="${esc(savedAddress || '')}">
+    </div>
+
     <div class="modal-error" id="ipErr"></div>
-    <button class="btn" id="ipSubmit">저장</button>
-    <div class="foot-note">방장이 되면 사람들이 이 주소로 찾아 들어옵니다.
-      컴퓨터를 바꾸지 않는 한 주소는 그대로입니다.</div>`);
+    <button class="btn" id="ipSubmit">저장</button>`);
+
+  const box = document.getElementById('radminBox');
+  document.querySelectorAll('input[name="connMode"]').forEach(el => {
+    el.addEventListener('change', () => {
+      const radmin = el.value === 'radmin' && el.checked;
+      box.style.display = radmin ? 'block' : 'none';
+      document.getElementById('pickAuto').classList.toggle('on', !radmin);
+      document.getElementById('pickRadmin').classList.toggle('on', radmin);
+      if (radmin) document.getElementById('ipValue').focus();
+    });
+  });
+
   const go = () => saveMyIp();
   document.getElementById('ipSubmit').addEventListener('click', go);
   document.getElementById('ipValue').addEventListener('keydown', e => {
@@ -2117,15 +2191,22 @@ function showIpModal() {
 }
 
 async function saveMyIp() {
+  const picked = document.querySelector('input[name="connMode"]:checked');
+  const mode = picked ? picked.value : 'auto';
   const input = document.getElementById('ipValue');
   const err = document.getElementById('ipErr');
   if (err) err.textContent = '';
   try {
-    const d = await apiPost('/api/room', { action: 'setIp', address: input.value.trim() });
+    const d = await apiPost('/api/room', {
+      action: 'setIp', mode, address: input ? input.value.trim() : '',
+    });
     savedAddress = d.address || null;
+    connMode = mode;
     closeModal();
-    renderMyIp();
-    showToast(savedAddress ? `내 주소를 ${savedAddress} 로 저장했습니다.` : '내 주소를 지웠습니다.');
+    renderLauncher();
+    showToast(mode === 'radmin'
+      ? `Radmin 주소 ${savedAddress} 로 접속합니다.`
+      : '공인 IP 로 접속합니다. 적을 것이 없습니다.');
   } catch (e) {
     if (err) err.textContent = e.message;
   }
@@ -2279,6 +2360,8 @@ function renderRoomView(r) {
  * 아직 없으면 그때 한 번 받는다 — 사람들이 찾아올 주소이므로 꼭 있어야 한다.
  */
 function startFlow() {
+  // 공인 IP 방식은 서버가 알아서 읽으므로 물어볼 것이 없다.
+  if (connMode !== 'radmin') { startRoom(''); return; }
   if (savedAddress) { startRoom(savedAddress); return; }
   showStartModal();
 }
@@ -2442,20 +2525,20 @@ async function startRoom(known) {
   const err = document.getElementById('startErr');
   const address = known !== undefined ? known : (input ? input.value.trim() : '');
   if (err) err.textContent = '';
-  if (!address && !confirm(
-    '주소를 적지 않으면 사람들이 자동으로 들어오지 못합니다.\n\n'
-    + '여러 방이 함께 열려 있을 때 JOIN GAME 목록만으로는 어느 방인지 가릴 수 없어,\n'
-    + '각자 목록에서 방 번호를 보고 직접 골라야 합니다.\n\n그래도 실행할까요?')) {
+  if (connMode === 'radmin' && !address) {
+    const msg = 'Radmin 주소를 적지 않으면 사람들이 찾아올 수 없습니다.';
+    if (err) err.textContent = msg; else showToast(msg);
     return;
   }
   try {
     const d = await apiPost('/api/room', { action: 'start', address });
     closeModal();
-    savedAddress = address || savedAddress;
+    if (connMode === 'radmin') savedAddress = address || savedAddress;
     await loadRooms();
     renderLauncher();
     // 3·2·1 을 세고 게임을 띄운다. 방에 있는 사람들도 같은 시각에 맞춰 함께 센다.
-    playCountdown(d.startedAt || Date.now(), () => launchGame(address, 'create'));
+    // 서버가 정한 주소를 그대로 쓴다 (공인 IP 방식이면 서버만 알고 있다).
+    playCountdown(d.startedAt || Date.now(), () => launchGame(d.address, 'create'));
   } catch (e) {
     if (err) err.textContent = e.message;
     else showToast(e.message);
