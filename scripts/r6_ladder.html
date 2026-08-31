@@ -1105,10 +1105,19 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .dl-d b{ color:var(--text-primary); font-weight:var(--fw-medium); }
 /* ④ 는 내려받을 파일이 아니라 게임 설정이라, 목록이 통째로 줄 안에 들어간다 */
 .dl-row.dl-block{ display:block; }
+/* 내용이 길어 접어둔다 — 눌러서 펴는 줄임을 세모로 알린다 */
 .dl-head{
   display:flex; align-items:center; gap:var(--sp-3);
-  flex-wrap:wrap; margin-bottom:var(--sp-2);
+  flex-wrap:wrap; cursor:pointer; list-style:none;
 }
+.dl-head::-webkit-details-marker{ display:none; }
+.dl-head::after{
+  content:'▾'; color:var(--text-tertiary); transition:transform .15s ease;
+}
+.dl-block[open] > .dl-head{ margin-bottom:var(--sp-3); }
+.dl-block[open] > .dl-head::after{ transform:rotate(180deg); }
+.dl-head:hover .dl-t{ color:var(--accent); }
+.dl-head:focus-visible{ outline:none; box-shadow:var(--shadow-focus); border-radius:var(--radius-sm); }
 .dl-t{ flex:none; color:var(--text-primary); font-weight:var(--fw-medium); }
 .dl-tag{
   flex:none; font-family:var(--font-mono); font-size:var(--fs-footnote);
@@ -1898,14 +1907,11 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
             <b>내 컴퓨터</b>의 윈도우 방화벽을 엽니다. 안 열면 접속이 느립니다.</span>
         </div>
 
-        <div class="dl-row dl-block">
-          <div class="dl-head">
+        <details class="dl-row dl-block">
+          <summary class="dl-head">
             <span class="dl-n">4</span>
-            <span class="dl-t">게임 안에서 맞춰둘 설정</span>
-            <span class="dl-tag">MULTIPLAYER OPTIONS</span>
-            <span class="dl-d">게임 › <kbd>MULTIPLAYER</kbd> › <kbd>MULTIPLAYER OPTIONS</kbd> ·
-              <b>회원 모두 같은 값</b>이어야 서로를 찾습니다.</span>
-          </div>
+            <span class="dl-t">MULTIPLAYER OPTIONS 설정</span>
+          </summary>
           <ul class="opt-list">
             <li><b>ANNOUNCE SERVER</b> <span>해제</span> — <b>꺼두세요.</b> 켜두면 방이
                 모두의 <kbd>JOIN GAME</kbd> 목록에 떠서, 런쳐를 거치지 않고도 아무나
@@ -1932,7 +1938,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
           <p class="setup-warn">그래도 목록에서 들어오게 하고 싶다면 ANNOUNCE 를 켜두시면
              됩니다. 다만 여러 방이 동시에 열리면 목록에 다 떠서
              <b>엉뚱한 방에 들어가는 일</b>이 생깁니다.</p>
-        </div>
+        </details>
 
         <div class="dl-row dl-host" data-mode="auto">
           <span class="dl-n">＋</span>
