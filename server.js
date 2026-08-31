@@ -17,7 +17,6 @@ import post from './api/post.js';
 import season from './api/season.js';
 import attendance from './api/attendance.js';
 import room from './api/room.js';
-import ping from './api/ping.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -32,7 +31,6 @@ const wrap = (fn) => (req, res) => {
   });
 };
 
-app.all('/api/ping', wrap(ping));
 app.all('/api/state', wrap(state));
 app.all('/api/account', wrap(account));
 app.all('/api/match', wrap(match));
