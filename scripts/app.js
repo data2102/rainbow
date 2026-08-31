@@ -256,6 +256,7 @@ function applyRooms(d) {
   lobbyMsgs = d.lobbyMessages || [];
   capacityMin = d.capacityMin || capacityMin;
   maxTitle = d.maxTitle || maxTitle;
+  updatePingFloor();
 
   // 내가 누르지 않았는데 방에서 빠졌다면 알려준다
   if (before && !myRoom && !leavingOnPurpose) {
@@ -2166,25 +2167,43 @@ function roomName(r) { return r && r.title ? r.title : `${r ? r.room : ''}번방
  * 값이 없으면(방금 들어왔거나 소식이 끊겼으면) 빈 칸만 보여준다.
  */
 /**
- * 회선 상태를 다섯 칸으로.
+ * 지금 이 자리에서 가장 빠른 사람의 값.
  *
- * 기준은 게임 핑이 아니라 웹 왕복에 맞춘다. 게임 핑이라면 80ms 도 느린 축이지만,
- * 이 값은 브라우저가 서버에 다녀오는 시간이라 좋은 회선이라도 100~300ms 는
- * 예사다. 게임 핑 기준을 그대로 쓰는 바람에 멀쩡한 PC 들이 다 빨간불이 됐다.
+ * 절대 시간으로 등급을 매기면 모두가 같은 색이 된다. 이 값에는 각자의 회선
+ * 말고도 서버까지의 거리와 서버가 깨어나는 시간이 함께 들어 있는데, 그 몫은
+ * 모두에게 똑같이 얹히기 때문이다. 실제로 넷이 1565·1731·1934ms 로 나란히
+ * 움직였다 — 회선이 아니라 공통된 무엇을 재고 있었다는 뜻이다.
+ *
+ * 그래서 지금 가장 빠른 사람을 바닥으로 삼고, 그보다 얼마나 더 걸리는지로
+ * 등급을 매긴다. 공통된 몫이 빠지고 사람 사이의 차이만 남는다. 알고 싶은
+ * 것도 원래 "누가 힘들어하는가"이지 절대 시간이 아니다.
  */
+let pingFloor = null;
+
+function updatePingFloor() {
+  const vals = [];
+  for (const r of rooms) for (const s of (r.seats || [])) if (s && s.rtt != null) vals.push(s.rtt);
+  for (const w of waiting) if (w && typeof w === 'object' && w.rtt != null) vals.push(w.rtt);
+  pingFloor = vals.length ? Math.min(...vals) : null;
+}
+
+/** 회선 상태를 다섯 칸으로. 가장 빠른 사람보다 얼마나 뒤처지는지로 매긴다. */
 function pingBars(ms) {
+  const floor = pingFloor == null ? ms : Math.min(pingFloor, ms);
+  const over = ms == null ? null : ms - floor;
   let on = 0, tone = 'g';
-  if (ms == null)     { on = 0; tone = ''; }
-  else if (ms < 250)  { on = 5; tone = 'g'; }
-  else if (ms < 500)  { on = 4; tone = 'g'; }
-  else if (ms < 900)  { on = 3; tone = 'o'; }
-  else if (ms < 1500) { on = 2; tone = 'o'; }
-  else                { on = 1; tone = 'r'; }
+  if (over == null)     { on = 0; tone = ''; }
+  else if (over < 150)  { on = 5; tone = 'g'; }
+  else if (over < 400)  { on = 4; tone = 'g'; }
+  else if (over < 900)  { on = 3; tone = 'o'; }
+  else if (over < 1800) { on = 2; tone = 'o'; }
+  else                  { on = 1; tone = 'r'; }
   const bars = [1, 2, 3, 4, 5]
     .map(i => `<i class="${i <= on ? 'on' : ''}"></i>`).join('');
   const tip = ms == null
     ? '아직 재지 못했습니다'
-    : `사이트까지 왕복 ${ms}ms · 게임 안에서 서로에게 가는 핑은 아닙니다`;
+    : `사이트까지 왕복 ${ms}ms · 가장 빠른 사람보다 ${over}ms 더 걸립니다`
+      + ' · 게임 안에서 서로에게 가는 핑은 아닙니다';
   return `<span class="ping ${tone}" title="${tip}">${bars}</span>`
     + `<span class="ping-ms">${ms == null ? '—' : ms + 'ms'}</span>`;
 }
