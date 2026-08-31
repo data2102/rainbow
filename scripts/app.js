@@ -2015,6 +2015,7 @@ async function launchGame(address, mode) {
   } catch { /* noop */ }
 
   window.location.href = url;
+  startPlaying();
 
   showToast(mode === 'create'
     ? '게임을 켭니다 · 로비에서 사람들을 기다려주세요.'
@@ -2706,12 +2707,45 @@ function initLauncherEvents() {
   // 런쳐를 보고 있는 동안만 계속 받아온다. 이 요청이 자리를 지키는 신호도 된다.
   const panel = document.getElementById('tab-launcher');
   if (!panel) return;
+  let last = 0;
   setInterval(async () => {
     if (!panel.classList.contains('active') || !isLoggedIn()) return;
+    const gap = playing() ? PLAYING_POLL_MS : 2000;
+    if (Date.now() - last < gap) return;
+    last = Date.now();
     await loadRooms();
     renderLauncher();
     maybePlayRoomCountdown();
-  }, 2000);
+  }, 500);
+}
+
+/**
+ * 게임이 켜져 있는 동안에는 천천히 받아온다.
+ *
+ * 레인보우식스는 전체화면을 독차지하는 옛 게임이라, 켜고 나면 Alt+Tab 으로
+ * 빠져나와 이 화면을 닫을 수가 없다. 그래서 스스로 물러난다 — 2초마다 묻던
+ * 것을 1분에 한 번으로 줄인다. 자리를 지키는 신호이기도 하므로 아주 끊지는
+ * 않는다(3분 잠잠하면 방에서 빠진다). 화면으로 돌아오면 곧바로 원래대로.
+ */
+const PLAYING_POLL_MS = 60000;
+const PLAYING_MAX_MS = 6 * 60 * 60 * 1000;   // 켜둔 채 잊어버려도 언젠가는 풀린다
+let playingAt = 0;
+
+function playing() {
+  if (!playingAt) return false;
+  if (Date.now() - playingAt > PLAYING_MAX_MS) { playingAt = 0; return false; }
+  return true;
+}
+
+function startPlaying() { playingAt = Date.now(); }
+function stopPlaying() { playingAt = 0; }
+
+function initPlayingWatch() {
+  // 게임을 끄고 브라우저로 돌아온 순간이 곧 "다시 보고 있다"는 신호다
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) stopPlaying(); });
+  window.addEventListener('focus', stopPlaying);
+  window.addEventListener('pointerdown', stopPlaying);
+  window.addEventListener('keydown', stopPlaying);
 }
 
 /* ---------- 경기 기록 ---------- */
@@ -2907,6 +2941,7 @@ async function boot() {
   initBoardEvents();
   initScheduleEvents();
   initLauncherEvents();
+  initPlayingWatch();
   initSeatMenu();
   initMonthPickers();
   renderAuthBar();
