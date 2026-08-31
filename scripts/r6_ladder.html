@@ -1134,6 +1134,29 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   margin-top:var(--sp-3); padding-top:var(--sp-3); border-top:1px solid var(--border);
 }
 
+/* 방이 다른 창에 떠 있을 때 바닥 창에 남는 한 줄 */
+.lc-away{
+  display:flex; align-items:center; gap:var(--sp-3); flex-wrap:wrap;
+  border:1px solid var(--success); border-radius:var(--radius-md);
+  background:var(--success-bg); padding:var(--sp-3) var(--sp-4);
+}
+.away-dot{
+  flex:none; width:8px; height:8px; border-radius:50%;
+  background:var(--success); animation:awayPulse 1.6s ease-in-out infinite;
+}
+@keyframes awayPulse{ 50%{ opacity:.25; } }
+.away-t{ flex:1 1 auto; min-width:0; font-size:var(--fs-footnote); color:var(--text-primary); }
+
+/* 방만 띄운 창 — 머리글과 다른 메뉴는 접는다 */
+.room-only #app > header,
+.room-only .tabs,
+.room-only #tab-launcher .vpn-bar,
+.room-only #tab-launcher .dl-box,
+.room-only #tab-launcher .panel-head,
+.room-only #lcRooms,
+.room-only #lcAway{ display:none !important; }
+.room-only .tab-panel:not(#tab-launcher){ display:none !important; }
+
 .setup{
   border:1px solid var(--border); border-radius:var(--radius-md);
   background:var(--surface-sunken); margin-bottom:var(--sp-5);
@@ -1951,6 +1974,13 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
       <div class="lc-gate" id="lcGate" style="display:none;">
         로그인하면 방에 들어갈 수 있습니다.
         <button type="button" class="auth-btn" id="lcLoginBtn">로그인</button>
+      </div>
+
+      <div class="lc-away" id="lcAway" style="display:none;">
+        <span class="away-dot"></span>
+        <span class="away-t" id="lcAwayText"></span>
+        <button type="button" class="btn-mini btn-approve" id="lcAwayOpen">방 창 다시 열기</button>
+        <button type="button" class="btn-mini btn-edit" id="lcAwayLeave">나가기</button>
       </div>
 
       <div id="lcRooms" style="display:none;">

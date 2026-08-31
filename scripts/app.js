@@ -2109,6 +2109,40 @@ function myRoomData() {
   return myRoom ? rooms.find(r => r.room === myRoom) || null : null;
 }
 
+/**
+ * 방을 따로 띄운 창.
+ *
+ * 방 안에서 이야기를 나누는 동안에도 순위를 보고 리폿을 쓸 수 있어야 해서,
+ * 방은 같은 페이지를 ?room=N 으로 다시 열어 따로 둔다. 그 창에서는 방만
+ * 보이고 나머지 메뉴는 접는다.
+ *
+ * 두 창이 같은 방을 동시에 그리면 카운트다운이 두 번 돌고 게임도 두 번
+ * 켜진다. 그래서 방 창은 살아있다는 표시를 남기고, 바닥 창은 그 표시가
+ * 싱싱하면 방 화면 대신 "다른 창에 있습니다" 안내만 내놓는다.
+ */
+const POPUP_KEY = 'r6-room-win';
+const POPUP_FRESH_MS = 8000;
+const roomParam = Number(new URLSearchParams(location.search).get('room')) || 0;
+const isRoomWindow = roomParam > 0;
+let roomWin = null;
+
+function markRoomWindow() {
+  try { localStorage.setItem(POPUP_KEY, String(Date.now())); } catch { /* noop */ }
+}
+
+function clearRoomWindow() {
+  try { localStorage.removeItem(POPUP_KEY); } catch { /* noop */ }
+}
+
+/** 바닥 창에서: 방을 띄운 창이 아직 살아 있는가 */
+function roomWindowAlive() {
+  if (isRoomWindow) return false;
+  if (roomWin && !roomWin.closed) return true;
+  try {
+    return Date.now() - Number(localStorage.getItem(POPUP_KEY) || 0) < POPUP_FRESH_MS;
+  } catch { return false; }
+}
+
 function isHost(r) {
   return !!(r && me && r.host === me.handle);
 }
@@ -2173,6 +2207,7 @@ function maybePlayRoomCountdown() {
     cdPlayedAt = r.startedAt;
     return;
   }
+  if (roomWindowAlive()) return;                          // 방 창이 대신 센다
   const panel = document.getElementById('tab-launcher');
   if (!panel || !panel.classList.contains('active')) return;
   playCountdown(r.startedAt, () => launchGame(r.address, 'join'));
@@ -2336,12 +2371,26 @@ function renderLauncher() {
   if (!gate || !grid || !view) return;
 
   const here = myRoomData();
+  // 방이 다른 창에 떠 있으면 여기서는 그리지 않는다. 같은 방을 두 번 그리면
+  // 카운트다운도 두 번 돌아 게임이 두 번 켜진다.
+  const elsewhere = !!here && roomWindowAlive();
   gate.style.display = isLoggedIn() ? 'none' : 'block';
   grid.style.display = isLoggedIn() && !here ? 'block' : 'none';
-  view.style.display = here ? 'block' : 'none';
+  view.style.display = here && !elsewhere ? 'block' : 'none';
+  renderAwayBar(elsewhere ? here : null);
 
   if (isLoggedIn() && !here) renderRoomGrid();
-  if (here) renderRoomView(here);
+  if (here && !elsewhere) renderRoomView(here);
+}
+
+/** 방이 다른 창에 있을 때, 바닥 창에 남겨두는 한 줄. */
+function renderAwayBar(r) {
+  const bar = document.getElementById('lcAway');
+  if (!bar) return;
+  bar.style.display = r ? 'flex' : 'none';
+  if (!r) return;
+  const t = document.getElementById('lcAwayText');
+  if (t) t.textContent = `${r.room}번방에 다른 창으로 들어가 있습니다 · ${r.members.length}명`;
 }
 
 function renderRoomGrid() {
@@ -2531,11 +2580,33 @@ function hhmm(ts) {
 
 async function enterRoom(room) {
   if (!isLoggedIn()) { showLoginModal(); return; }
+  if (openRoomWindow(room)) return;   // 새 창이 열렸으면 들어가는 일도 그 창이 한다
   try {
     await apiPost('/api/room', { action: 'enter', room });
     await loadRooms();
     renderLauncher();
   } catch (e) { showToast(e.message); }
+}
+
+/**
+ * 방을 새 창으로 띄운다.
+ *
+ * 팝업이 막혀 있으면 열리지 않는다. 그때는 예전처럼 이 자리에서 방을 열어야
+ * 하므로 false 를 돌려준다 — 막혔다고 방에 못 들어가면 안 된다.
+ */
+function openRoomWindow(room) {
+  let w = null;
+  try {
+    w = window.open(`/?room=${room}`, `r6room${room}`,
+      'popup=yes,width=1040,height=820,menubar=no,toolbar=no,location=no');
+  } catch { /* 브라우저가 막았다 */ }
+  if (!w) {
+    showToast('팝업이 막혀 있어 이 화면에서 방을 엽니다 · 주소창의 팝업 허용을 켜주세요.');
+    return false;
+  }
+  roomWin = w;
+  try { w.focus(); } catch { /* noop */ }
+  return true;
 }
 
 async function leaveRoom() {
@@ -2691,6 +2762,20 @@ function initLauncherEvents() {
   const ipEdit = document.getElementById('myIpEdit');
   if (ipEdit) ipEdit.addEventListener('click', showIpModal);
 
+  const reopen = document.getElementById('lcAwayOpen');
+  if (reopen) reopen.addEventListener('click', () => {
+    const r = myRoomData();
+    if (r) openRoomWindow(r.room);
+  });
+  const awayLeave = document.getElementById('lcAwayLeave');
+  if (awayLeave) awayLeave.addEventListener('click', () => {
+    // 창은 스스로 닫지 못하니(열어준 창만 닫을 수 있다) 표시를 지워 둘을 떼어놓는다
+    try { if (roomWin && !roomWin.closed) roomWin.close(); } catch { /* noop */ }
+    roomWin = null;
+    clearRoomWindow();
+    leaveRoom();
+  });
+
   const copy = document.getElementById('addrCopy');
   if (copy) copy.addEventListener('click', async () => {
     const v = document.getElementById('addrValue');
@@ -2713,6 +2798,7 @@ function initLauncherEvents() {
     const gap = playing() ? PLAYING_POLL_MS : 2000;
     if (Date.now() - last < gap) return;
     last = Date.now();
+    if (isRoomWindow) markRoomWindow();
     await loadRooms();
     renderLauncher();
     maybePlayRoomCountdown();
@@ -2930,6 +3016,25 @@ function showFatal(msg) {
   if (el) { el.textContent = msg; el.style.display = 'block'; }
 }
 
+/**
+ * 방만 띄운 창의 채비.
+ *
+ * 화면은 방 하나로 좁히고, 순위·출석 같은 나머지는 받아오지도 않는다.
+ * 창을 닫으면 방에서도 나간다 — 목록에 유령이 남지 않도록.
+ */
+async function bootRoomWindow() {
+  document.documentElement.classList.add('room-only');
+  document.title = `${roomParam}번방 · RAINBOWSIX RANK`;
+  markRoomWindow();
+  activateTab('launcher');
+  if (!isLoggedIn()) { renderLauncher(); showLoginModal(); return; }
+  try {
+    if (myRoom !== roomParam) await apiPost('/api/room', { action: 'enter', room: roomParam });
+    await loadRooms();
+  } catch (e) { showToast(e.message); }
+  renderLauncher();
+}
+
 async function boot() {
   initTheme();
   initTabs();
@@ -2949,6 +3054,23 @@ async function boot() {
     // 표를 먼저 확인해야 첫 화면부터 로그인한 사람으로 그려진다
     await restoreLogin();
     renderAuthBar();
+    if (isRoomWindow) {
+      await loadRooms();
+      await bootRoomWindow();
+      window.addEventListener('pagehide', () => {
+        clearRoomWindow();
+        // 창을 닫는 중이라 응답을 기다릴 수 없다. keepalive 로 보내두고 끝낸다.
+        // 이 요청이 못 가더라도 3분 뒤 서버가 알아서 자리를 비운다.
+        try {
+          fetch('/api/room', {
+            method: 'POST', keepalive: true,
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + authToken },
+            body: JSON.stringify({ action: 'leave' }),
+          });
+        } catch { /* noop */ }
+      });
+      return;
+    }
     await refreshAll();
     // 초기 비밀번호를 그대로 쓰거나 이메일이 없으면 여기서도 창이 떠야 한다
     if (me) runRequiredSetup();
