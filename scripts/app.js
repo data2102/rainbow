@@ -2192,7 +2192,9 @@ function renderMyIp() {
   if (!bar || !val || !btn) return;
 
   const mode = shownMode();
-  bar.style.display = isLoggedIn() ? 'flex' : 'none';
+  const on = isLoggedIn();
+  bar.style.display = on ? 'flex' : 'none';
+  if (note) note.style.display = on ? 'block' : 'none';
   const addr = myConnAddress();
   val.textContent = addr || '아직 없음';
   // 방식을 고를 게 없으면 버튼은 주소를 적는 일만 한다

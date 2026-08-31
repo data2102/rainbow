@@ -1057,7 +1057,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   margin-bottom:var(--sp-2); flex-wrap:wrap;
 }
 /* 이름 폭을 맞춰야 값이 세로로 가지런히 선다 */
-.vpn-line > .vpn-k{ flex:none; width:64px; }
+.vpn-line > .vpn-k{ flex:none; width:80px; }
 .vpn-stack .vpn-note{ display:block; margin-top:var(--sp-3); }
 /* 좁은 화면에서 경로가 길어 한 줄을 넘길 수 있다 */
 .vpn-line .vpn-path{ white-space:normal; }
@@ -1848,15 +1848,13 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
           <span class="vpn-k">비밀번호</span>
           <code class="vpn-v" id="vpnPw"></code>
         </div>
-        <div class="vpn-note">이 네트워크에 먼저 들어와 있어야 게임이 서로를 봅니다.</div>
-      </div>
-
-      <div class="vpn-bar" id="myIpBar" style="display:none;">
-        <span class="vpn-k">내 접속 주소</span>
-        <code class="vpn-v" id="myIpValue"></code>
-        <span class="vpn-path" id="myIpKind"></span>
-        <button type="button" class="btn-mini btn-edit" id="myIpEdit">방식 바꾸기</button>
-        <span class="vpn-note" id="myIpNote"></span>
+        <div class="vpn-line" id="myIpBar" style="display:none;">
+          <span class="vpn-k">내 접속 주소</span>
+          <code class="vpn-v" id="myIpValue"></code>
+          <span class="vpn-path" id="myIpKind"></span>
+          <button type="button" class="btn-mini btn-edit" id="myIpEdit">방식 바꾸기</button>
+        </div>
+        <div class="vpn-note" id="myIpNote" style="display:none;"></div>
       </div>
 
       <div class="dl-box">
@@ -4368,7 +4366,9 @@ function renderMyIp() {
   if (!bar || !val || !btn) return;
 
   const mode = shownMode();
-  bar.style.display = isLoggedIn() ? 'flex' : 'none';
+  const on = isLoggedIn();
+  bar.style.display = on ? 'flex' : 'none';
+  if (note) note.style.display = on ? 'block' : 'none';
   const addr = myConnAddress();
   val.textContent = addr || '아직 없음';
   // 방식을 고를 게 없으면 버튼은 주소를 적는 일만 한다
