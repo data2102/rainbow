@@ -218,7 +218,9 @@ async function loadRooms() {
     publicIp = d.publicIp || null;
     publicIpUsable = !!d.publicIpUsable;
     vpn = { network: d.network || '', password: d.networkPw || null };
-  } catch { rooms = []; myRoom = null; roomMsgs = []; }
+    waiting = d.waiting || [];
+    capacityMin = d.capacityMin || capacityMin;
+  } catch { rooms = []; myRoom = null; roomMsgs = []; waiting = []; }
 
   // 내가 누르지 않았는데 방에서 빠졌다면 알려준다
   if (before && !myRoom && !leavingOnPurpose) {
@@ -2045,6 +2047,11 @@ async function copyText(text) {
 }
 
 const ROOM_CAPACITY = 16;
+let capacityMin = 2;
+let waiting = [];
+
+/** 이 방의 정원. 방장이 따로 정하지 않았으면 기본값. */
+function capOf(r) { return r && r.cap ? r.cap : ROOM_CAPACITY; }
 
 /* ---------- 출발 카운트다운 ---------- */
 
@@ -2379,8 +2386,19 @@ function renderLauncher() {
   view.style.display = here && !elsewhere ? 'block' : 'none';
   renderAwayBar(elsewhere ? here : null);
 
-  if (isLoggedIn() && !here) renderRoomGrid();
+  if (isLoggedIn() && !here) { renderRoomGrid(); renderWaiting(); }
   if (here && !elsewhere) renderRoomView(here);
+}
+
+/** 방 목록 옆에 지금 런쳐를 보고 있는 사람들. 방에 들어간 사람은 빠진다. */
+function renderWaiting() {
+  const box = document.getElementById('waitList');
+  const n = document.getElementById('waitCount');
+  if (!box) return;
+  if (n) n.textContent = String(waiting.length);
+  box.innerHTML = waiting.length
+    ? waiting.map(h => `<div class="wait-row${me && h === me.handle ? ' me' : ''}">${esc(h)}</div>`).join('')
+    : '<div class="wait-empty">아직 아무도 없습니다.</div>';
 }
 
 /** 방이 다른 창에 있을 때, 바닥 창에 남겨두는 한 줄. */
@@ -2397,15 +2415,26 @@ function renderRoomGrid() {
   const box = document.getElementById('roomGrid');
   if (!box) return;
   box.innerHTML = rooms.map(r => {
-    const full = r.members.length >= ROOM_CAPACITY;
+    const cap = capOf(r);
+    const full = r.members.length >= cap;
     // 방장을 뺀 나머지를 몇 명만 보여준다. 다 적으면 카드가 넘친다.
     const rest = r.members.slice(1);
     const shown = rest.slice(0, 3).join(', ') + (rest.length > 3 ? ` 외 ${rest.length - 3}명` : '');
+    // 인원수에 마우스를 얹거나 누르면 누가 있는지 펼쳐 보여준다
+    const who = r.members.length
+      ? r.members.map((h, i) => `<span class="who-i">${i === 0 ? '방장' : i + 1}</span>${esc(h)}`)
+          .map(x => `<div class="who-row">${x}</div>`).join('')
+      : '<div class="who-empty">아직 아무도 없습니다.</div>';
     return `<div class="room-card${r.running ? ' live' : ''}${full ? ' full' : ''}">
       <div class="room-card-h">
         <span class="room-no">${r.room}번방</span>
         ${r.running ? '<span class="room-live">실행 중</span>' : ''}
-        <span class="room-n">${r.members.length} / ${ROOM_CAPACITY}</span>
+        <button type="button" class="room-n" data-who="${r.room}"
+                aria-expanded="false">${r.members.length} / ${cap}</button>
+        <div class="who-pop" data-whopop="${r.room}" hidden>
+          <div class="who-h">${r.room}번방 · ${r.members.length} / ${cap}</div>
+          ${who}
+        </div>
       </div>
       <div class="room-card-mid">
         <button type="button" class="room-enter" data-enter="${r.room}" ${full ? 'disabled' : ''}>
@@ -2430,7 +2459,8 @@ function renderRoomView(r) {
   const run = document.getElementById('roomRun');
   if (title) title.textContent = `${r.room}번방`;
   if (role) role.textContent = host ? '방장' : '참가자';
-  if (count) count.textContent = `${r.members.length} / ${ROOM_CAPACITY}`;
+  if (count) count.textContent = `${r.members.length} / ${capOf(r)}`;
+  renderCap(r, host);
   if (run) run.textContent = r.running ? '실행 중' : '';
 
   const seats = document.getElementById('roomSeats');
@@ -2576,6 +2606,102 @@ function renderChatLog() {
 function hhmm(ts) {
   const d = new Date(ts);
   return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+/**
+ * 방 정원 조절.
+ *
+ * 손잡이를 놓는 순간에만 서버로 보낸다 — 끌고 가는 동안 보내면 한 번 옮길
+ * 때마다 요청이 열댓 번 나간다. 끄는 중에는 2초마다 오는 새 값이 손잡이를
+ * 낚아채지 않도록 그대로 둔다.
+ */
+let capDragging = false;
+
+function renderCap(r, host) {
+  const box = document.getElementById('roomCap');
+  const range = document.getElementById('capRange');
+  const out = document.getElementById('capOut');
+  const note = document.getElementById('capNote');
+  if (!box || !range || !out) return;
+
+  box.style.display = 'flex';
+  range.min = String(capacityMin);
+  range.max = String(ROOM_CAPACITY);
+  range.disabled = !host;
+  if (!capDragging) range.value = String(capOf(r));
+  out.textContent = `${range.value}명`;
+  if (note) {
+    note.textContent = host
+      ? `${capacityMin}명부터 ${ROOM_CAPACITY}명까지 · 이미 들어온 ${r.members.length}명보다 적게는 줄일 수 없습니다.`
+      : '방장이 정한 정원입니다.';
+  }
+}
+
+async function saveCap(cap) {
+  try {
+    await apiPost('/api/room', { action: 'setCap', cap });
+  } catch (e) { showToast(e.message); }
+  await loadRooms();
+  renderLauncher();
+}
+
+function initCapEvents() {
+  const range = document.getElementById('capRange');
+  const out = document.getElementById('capOut');
+  if (!range) return;
+  const show = () => { if (out) out.textContent = `${range.value}명`; };
+  range.addEventListener('pointerdown', () => { capDragging = true; });
+  range.addEventListener('keydown', () => { capDragging = true; });
+  range.addEventListener('input', show);
+  range.addEventListener('change', () => {
+    capDragging = false;
+    show();
+    saveCap(Number(range.value));
+  });
+  range.addEventListener('blur', () => { capDragging = false; });
+}
+
+/**
+ * 방 카드의 인원수 — 얹으면 펴지고 치우면 접힌다.
+ * 손가락으로 보는 사람도 있으니 눌러도 열리게 두고, 밖을 누르면 닫는다.
+ */
+function initWhoEvents() {
+  const grid = document.getElementById('roomGrid');
+  if (!grid) return;
+
+  const popFor = (btn) => btn.parentElement.querySelector(`[data-whopop="${btn.dataset.who}"]`);
+  const closeAll = () => grid.querySelectorAll('[data-whopop]').forEach(p => {
+    p.hidden = true;
+    const b = p.parentElement.querySelector('[data-who]');
+    if (b) b.setAttribute('aria-expanded', 'false');
+  });
+
+  grid.addEventListener('pointerover', (e) => {
+    const btn = e.target.closest('[data-who]');
+    if (!btn) return;
+    closeAll();
+    const pop = popFor(btn);
+    if (pop) { pop.hidden = false; btn.setAttribute('aria-expanded', 'true'); }
+  });
+  grid.addEventListener('pointerout', (e) => {
+    const head = e.target.closest('.room-card-h');
+    if (!head) return;
+    // 목록 위로 옮겨간 것뿐이면 닫지 않는다
+    if (e.relatedTarget && head.contains(e.relatedTarget)) return;
+    closeAll();
+  });
+  grid.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-who]');
+    if (!btn) return;
+    const pop = popFor(btn);
+    if (!pop) return;
+    const open = !pop.hidden;
+    closeAll();
+    if (!open) { pop.hidden = false; btn.setAttribute('aria-expanded', 'true'); }
+  });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.room-card-h')) closeAll();
+  });
 }
 
 async function enterRoom(room) {
@@ -3046,6 +3172,8 @@ async function boot() {
   initBoardEvents();
   initScheduleEvents();
   initLauncherEvents();
+  initCapEvents();
+  initWhoEvents();
   initPlayingWatch();
   initSeatMenu();
   initMonthPickers();

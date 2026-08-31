@@ -10,6 +10,8 @@ import { q, tx, body, methodGuard, currentUser, requireUser, clientIp, isReachab
 
 export const ROOM_COUNT = 8;
 export const ROOM_CAPACITY = 16;
+/** 방장이 고를 수 있는 정원의 아래끝. 혼자서는 게임이 안 되니 둘부터다. */
+export const ROOM_CAPACITY_MIN = 2;
 
 /** 이 시간 동안 아무 신호가 없으면 나간 것으로 본다 (브라우저를 그냥 닫는 경우) */
 const IDLE_MS = 3 * 60 * 1000;
@@ -76,6 +78,14 @@ async function ensureTables() {
       ts     BIGINT NOT NULL
     )`);
   await q(`CREATE INDEX IF NOT EXISTS idx_room_msg ON room_messages (room, id)`);
+  // 방장이 정한 정원. 비어 있으면 기본값(16명)을 쓴다.
+  await q(`ALTER TABLE room_state ADD COLUMN IF NOT EXISTS cap INTEGER`);
+  // 로그인한 채 런쳐를 보고 있는 사람들. 방에 들어가기 전 대기실이다.
+  await q(`
+    CREATE TABLE IF NOT EXISTS lobby (
+      handle    TEXT PRIMARY KEY,
+      last_seen BIGINT NOT NULL
+    )`);
   ensured = true;
 }
 
@@ -98,6 +108,15 @@ export function cleanAddress(v) {
   return s;
 }
 
+/** 방장이 적어 보낸 정원을 2~16 사이로 다듬는다. */
+export function cleanCap(v) {
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < ROOM_CAPACITY_MIN || n > ROOM_CAPACITY) {
+    throw new Error(`정원은 ${ROOM_CAPACITY_MIN}명부터 ${ROOM_CAPACITY}명까지 정할 수 있습니다.`);
+  }
+  return n;
+}
+
 function checkRoom(n) {
   const room = Number(n);
   if (!Number.isInteger(room) || room < 1 || room > ROOM_COUNT) {
@@ -116,13 +135,32 @@ async function sweepIdle() {
   if (gone.length) await closeEmptyRooms();
 }
 
+/** 런쳐를 떠난 지 오래된 사람은 대기실에서도 지운다. */
+async function sweepLobby() {
+  await q(`DELETE FROM lobby WHERE last_seen < $1`, [Date.now() - IDLE_MS]);
+}
+
+/** 지금 런쳐를 보고 있는데 아직 방에 안 들어간 사람들. */
+async function lobbyList() {
+  const rows = await q(
+    `SELECT l.handle FROM lobby l
+      WHERE l.last_seen >= $1
+        AND l.handle NOT IN (SELECT handle FROM room_members)
+      ORDER BY l.last_seen DESC, l.handle`,
+    [Date.now() - IDLE_MS]
+  );
+  return rows.map(r => r.handle);
+}
+
 /** 아무도 없는 방은 대화와 실행 상태를 지운다. 다음 사람이 빈 방에서 시작하도록. */
 async function closeEmptyRooms() {
   await q(`
     DELETE FROM room_messages
      WHERE room NOT IN (SELECT DISTINCT room FROM room_members)`);
+  // 정원도 함께 푼다 — 다음에 방을 여는 사람이 자기 인원에 맞춰 다시 정한다
   await q(`
-    UPDATE room_state SET running = false, started_at = NULL, started_by = NULL, address = NULL
+    UPDATE room_state
+        SET running = false, started_at = NULL, started_by = NULL, address = NULL, cap = NULL
      WHERE room NOT IN (SELECT DISTINCT room FROM room_members)`);
 }
 
@@ -155,6 +193,7 @@ async function listRooms() {
       room,
       members,
       host: members[0] || null,
+      cap: st && st.cap ? Number(st.cap) : ROOM_CAPACITY,
       running: !!(st && st.running),
       startedAt: st && st.started_at ? Number(st.started_at) : null,
       address: st && st.address ? st.address : null,
@@ -172,9 +211,17 @@ export default async function handler(req, res) {
       const me = await currentUser(req);
       // 목록을 읽는 것 자체가 "아직 있다"는 신호다
       if (me) {
-        await q(`UPDATE room_members SET last_seen = $1 WHERE handle = $2`, [Date.now(), me.handle]);
+        const now = Date.now();
+        await q(`UPDATE room_members SET last_seen = $1 WHERE handle = $2`, [now, me.handle]);
+        // 방에 있든 없든 런쳐를 보고 있다는 표시는 남긴다
+        await q(
+          `INSERT INTO lobby (handle, last_seen) VALUES ($1, $2)
+             ON CONFLICT (handle) DO UPDATE SET last_seen = EXCLUDED.last_seen`,
+          [me.handle, now]
+        );
       }
       await sweepIdle();
+      await sweepLobby();
 
       const rooms = await listRooms();
       const mine = me ? rooms.find(r => r.members.includes(me.handle)) : null;
@@ -210,7 +257,9 @@ export default async function handler(req, res) {
         rooms, messages, savedAddress, connMode, publicIp,
         publicIpUsable: isReachableIp(publicIp),
         myRoom: mine ? mine.room : null,
+        waiting: await lobbyList(),
         capacity: ROOM_CAPACITY,
+        capacityMin: ROOM_CAPACITY_MIN,
         network: VPN_NETWORK,
         networkPw: me ? VPN_PASSWORD : null,
       });
@@ -226,6 +275,7 @@ export default async function handler(req, res) {
       case 'giveHost': return await giveHost(req, res);
       case 'kick':     return await kick(req, res);
       case 'report':   return await report(req, res);
+      case 'setCap':   return await setCap(req, res);
       default:      return res.status(400).json({ error: '알 수 없는 요청입니다.' });
     }
   } catch (e) {
@@ -252,7 +302,9 @@ async function enter(req, res) {
     const { rows: n } = await c.query(
       `SELECT count(*)::int AS n FROM room_members WHERE room = $1`, [room]
     );
-    if (n[0].n >= ROOM_CAPACITY) return { full: true };
+    const { rows: capRow } = await c.query(`SELECT cap FROM room_state WHERE room = $1`, [room]);
+    const cap = capRow.length && capRow[0].cap ? Number(capRow[0].cap) : ROOM_CAPACITY;
+    if (n[0].n >= cap) return { full: true, cap };
 
     // 다른 방에 있었다면 그 방에서는 나온다
     const { rows: before } = await c.query(
@@ -266,7 +318,7 @@ async function enter(req, res) {
     return { left: before.length ? before[0].room : null, first: n[0].n === 0 };
   });
 
-  if (out.full) return res.status(400).json({ error: `${room}번방은 정원(${ROOM_CAPACITY}명)이 찼습니다.` });
+  if (out.full) return res.status(400).json({ error: `${room}번방은 정원(${out.cap}명)이 찼습니다.` });
   if (!out.already) {
     if (out.left) await system(out.left, `${me} 님이 나갔습니다.`);
     await system(room, out.first ? `${me} 님이 방을 열었습니다. (방장)` : `${me} 님이 들어왔습니다.`);
@@ -292,6 +344,40 @@ async function leave(req, res) {
   else await closeEmptyRooms();
 
   res.status(200).json({ ok: true });
+}
+
+/**
+ * 방장이 정원을 정한다.
+ *
+ * 이미 들어와 있는 사람보다 적게는 줄일 수 없다. 줄이자고 남을 밀어내면
+ * 누가 나가야 하는지 아무도 납득하지 못한다 — 내보내려면 강퇴를 쓴다.
+ */
+async function setCap(req, res) {
+  const me = await requireUser(req, res);
+  if (!me) return;
+  const cap = cleanCap(body(req).cap);
+
+  const out = await tx(async (c) => {
+    const { rows: seats } = await c.query(
+      `SELECT room, handle FROM room_members WHERE room =
+         (SELECT room FROM room_members WHERE handle = $1)
+        ORDER BY joined_at, handle`, [me]
+    );
+    if (!seats.length) throw new Error('방에 들어와 있지 않습니다.');
+    if (seats[0].handle !== me) throw new Error('방장만 정원을 정할 수 있습니다.');
+    const room = seats[0].room;
+    if (cap < seats.length) {
+      throw new Error(`이미 ${seats.length}명이 들어와 있어 ${cap}명으로 줄일 수 없습니다.`);
+    }
+    await c.query(
+      `INSERT INTO room_state (room, cap) VALUES ($1, $2)
+         ON CONFLICT (room) DO UPDATE SET cap = EXCLUDED.cap`, [room, cap]
+    );
+    return { room };
+  });
+
+  await system(out.room, `${me} 님이 정원을 ${cap}명으로 정했습니다.`);
+  res.status(200).json({ ok: true, cap });
 }
 
 /* ---------- 대화 ---------- */
