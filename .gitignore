@@ -6,3 +6,8 @@ node_modules/
 # 내보내기/백업 JSON에는 평문 비밀번호가 들어있을 수 있으므로 저장소에 올리지 않습니다.
 ladder_backup*.json
 *.backup.json
+
+# 통합 설치 파일 재료와 결과물. 게임 파일은 공개 저장소에 올리지 않습니다.
+installer/payload/game/*
+!installer/payload/game/_README.txt
+installer/output/

@@ -36,6 +36,10 @@
 │   ├── tournament.js       GET/POST 대회 경기 기록
 │   ├── post.js             GET/POST 기능 개선 게시판
 │   └── data.js             GET/POST 내보내기·가져오기·초기화 (관리자)
+├── installer/              레인보우 식스 통합 설치 파일 만들기 (installer/README.md)
+│   ├── R6ClanSetup.iss     설치 파일 설계도 (Inno Setup)
+│   ├── build.bat           더블클릭하면 R6ClanSetup.exe 를 만듭니다
+│   └── payload/game/       완성된 게임 폴더를 넣는 자리 (저장소에 올라가지 않음)
 ├── db/schema.sql           테이블 정의
 ├── seed/ladder_seed.json   기존 데이터 (선수 29명 / 경기 41건) — 비밀번호 미포함
 ├── server.js               일반 서버용 진입점 (Vercel은 불필요)
@@ -153,6 +157,43 @@ DATABASE_URL="postgresql://..." PORT=3000 node server.js
 nginx 리버스 프록시 + Let's Encrypt(certbot)로 HTTPS를 붙이면 됩니다.
 
 ---
+
+## 통합 설치 파일
+
+런쳐 탭은 지금 `r6clan-auto.reg` · `r6launch.bat` · `r6firewall.bat` 세 개를 각자 받아
+직접 실행하게 안내합니다. 순서를 틀리거나 `r6launch.bat` 을 엉뚱한 폴더에 두는 일이 잦습니다.
+
+`installer/` 는 이것을 **실행 파일 하나**로 묶습니다.
+
+```bash
+# 1. Inno Setup 설치 (한 번만) — https://jrsoftware.org/isdl.php
+# 2. 완성된 게임 폴더의 내용을 installer/payload/game/ 에 통째로 복사
+# 3. installer/build.bat 더블클릭
+#    → installer/output/R6ClanSetup.exe
+```
+
+만들어진 설치 파일이 하는 일:
+
+| | |
+|---|---|
+| 게임 본체 | 패치·맵·스킨·타겟·사운드가 이미 적용된 폴더를 그대로 풀어놓습니다 |
+| `r6clan://` | 사이트 버튼이 게임을 켤 수 있게 등록합니다 (관리자 권한 실행 포함) |
+| 런쳐 | `C:\R6Clan\` 에 배치 파일 4종을 넣습니다 |
+| 경로 보정 | 배치 파일 안의 `GAME=` 줄을 **실제 설치 위치로 고쳐 씁니다** |
+| 방화벽 | UDP 2346~2348 과 게임 실행 파일을 윈도우 방화벽에서 엽니다 |
+
+받는 사람이 직접 해야 하는 것은 게임 안의 **MULTIPLAYER OPTIONS 설정**(런쳐 탭 4번)뿐입니다.
+
+**게임을 설치 마법사로 깔지 않는 이유:** 1998년 InstallShield 설치 프로그램은 16비트라
+64비트 윈도우에서 실행되지 않는 경우가 많습니다. 완성된 폴더를 통째로 옮기면 그 문제와
+함께 패치·덮어쓰기 순서를 틀릴 여지도 사라집니다.
+
+**배포:** 결과물은 크기 때문에 이 저장소나 Vercel 에 올릴 수 없습니다
+(`.gitignore` 가 `installer/payload/`, `installer/output/` 을 막아둡니다).
+외부 저장소에 올리고 런쳐 탭에는 링크만 거세요.
+
+자세한 절차와 막히는 곳: `installer/README.md`
+
 
 ## 게시판 (기능 개선)
 
