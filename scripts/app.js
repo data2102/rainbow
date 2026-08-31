@@ -206,10 +206,22 @@ async function loadAttendance() {
 }
 
 /** 런쳐 방 현황. 이 요청 자체가 "아직 있다"는 신호가 된다. */
+/**
+ * 사이트까지 오가는 데 걸린 시간(ms).
+ *
+ * 게임 안에서 서로에게 가는 핑이 아니라 각자 회선이 이 사이트까지 얼마나
+ * 빨리 닿는지다. 브라우저는 다른 사람과 직접 주고받을 수 없어서 게임 핑을
+ * 잴 방법이 없다. 그래도 회선이 뻗는 사람은 여기서도 느리게 나오므로,
+ * 누가 힘들어하는지 눈치채는 데는 쓸 만하다.
+ */
+let myRtt = null;
+
 async function loadRooms() {
   const before = myRoom;
   try {
-    const d = await apiGet('/api/room');
+    const t0 = performance.now();
+    const d = await apiGet('/api/room' + (myRtt == null ? '' : `?rtt=${myRtt}`));
+    myRtt = Math.round(performance.now() - t0);
     rooms = d.rooms || [];
     myRoom = d.myRoom || null;
     roomMsgs = d.messages || [];
@@ -221,6 +233,7 @@ async function loadRooms() {
     waiting = d.waiting || [];
     lobbyMsgs = d.lobbyMessages || [];
     capacityMin = d.capacityMin || capacityMin;
+    maxTitle = d.maxTitle || maxTitle;
   } catch { rooms = []; myRoom = null; roomMsgs = []; waiting = []; lobbyMsgs = []; }
 
   // 내가 누르지 않았는데 방에서 빠졌다면 알려준다
@@ -2049,6 +2062,7 @@ async function copyText(text) {
 
 const ROOM_CAPACITY = 16;
 let capacityMin = 2;
+let maxTitle = 24;
 let waiting = [];
 let lobbyMsgs = [];
 
@@ -2112,6 +2126,27 @@ function playCountdown(startedAt, onGo) {
   cdTimer = setInterval(tick, 150);
 
   box.onclick = finish;
+}
+
+/** 방장이 이름을 붙이지 않았으면 "N번방". */
+function roomName(r) { return r && r.title ? r.title : `${r ? r.room : ''}번방`; }
+
+/**
+ * 회선 상태를 다섯 칸으로. 빠를수록 많이 차고 색이 밝다.
+ * 값이 없으면(방금 들어왔거나 소식이 끊겼으면) 빈 칸만 보여준다.
+ */
+function pingBars(ms) {
+  let on = 0, tone = 'g';
+  if (ms == null) { on = 0; tone = ''; }
+  else if (ms < 80)  { on = 5; tone = 'g'; }
+  else if (ms < 150) { on = 4; tone = 'g'; }
+  else if (ms < 250) { on = 3; tone = 'o'; }
+  else if (ms < 400) { on = 2; tone = 'o'; }
+  else               { on = 1; tone = 'r'; }
+  const bars = [1, 2, 3, 4, 5]
+    .map(i => `<i class="${i <= on ? 'on' : ''}"></i>`).join('');
+  return `<span class="ping ${tone}" title="사이트까지 왕복 ${ms == null ? '—' : ms + 'ms'}">${bars}</span>`
+    + `<span class="ping-ms">${ms == null ? '—' : ms + 'ms'}</span>`;
 }
 
 function myRoomData() {
@@ -2410,7 +2445,7 @@ function renderAwayBar(r) {
   bar.style.display = r ? 'flex' : 'none';
   if (!r) return;
   const t = document.getElementById('lcAwayText');
-  if (t) t.textContent = `${r.room}번방에 다른 창으로 들어가 있습니다 · ${r.members.length}명`;
+  if (t) t.textContent = `${roomName(r)}에 다른 창으로 들어가 있습니다 · ${r.members.length}명`;
 }
 
 function renderRoomGrid() {
@@ -2429,12 +2464,12 @@ function renderRoomGrid() {
       : '<div class="who-empty">아직 아무도 없습니다.</div>';
     return `<div class="room-card${r.running ? ' live' : ''}${full ? ' full' : ''}">
       <div class="room-card-h">
-        <span class="room-no">${r.room}번방</span>
+        <span class="room-no">${esc(roomName(r))}</span>
         ${r.running ? '<span class="room-live">실행 중</span>' : ''}
         <button type="button" class="room-n" data-who="${r.room}"
                 aria-expanded="false">${r.members.length} / ${cap}</button>
         <div class="who-pop" data-whopop="${r.room}" hidden>
-          <div class="who-h">${r.room}번방 · ${r.members.length} / ${cap}</div>
+          <div class="who-h">${esc(roomName(r))} · ${r.members.length} / ${cap}</div>
           ${who}
         </div>
       </div>
@@ -2459,26 +2494,37 @@ function renderRoomView(r) {
   const role = document.getElementById('roomRole');
   const count = document.getElementById('roomCount');
   const run = document.getElementById('roomRun');
-  if (title) title.textContent = `${r.room}번방`;
+  if (title) title.textContent = roomName(r);
+  const rename = document.getElementById('roomRename');
+  if (rename) rename.style.display = host ? 'inline-flex' : 'none';
   if (role) role.textContent = host ? '방장' : '참가자';
   if (count) count.textContent = `${r.members.length} / ${capOf(r)}`;
   renderCap(r, host);
   if (run) run.textContent = r.running ? '실행 중' : '';
 
+  // 들어온 순서 그대로. 맨 앞이 방장이라 따로 세우고 나머지를 아래에 둔다.
+  const detail = r.seats && r.seats.length
+    ? r.seats
+    : r.members.map(h => ({ handle: h, rtt: null }));
+  // HOST 줄에는 번호도 방장 배지도 달지 않는다 — 머리글이 이미 말하고 있고,
+  // 좁은 칸에서 그것들이 이름을 밀어내 "L..." 처럼 잘린다.
+  const seat = (s, i) => {
+    const mine = me && s.handle === me.handle;
+    const clickable = host && !mine;
+    return `<div class="seat${mine ? ' me' : ''}${clickable ? ' pick' : ''}"
+                 data-h="${esc(s.handle)}"${clickable ? ' title="오른쪽 클릭 — 방장 넘기기 · 강퇴"' : ''}>
+      ${i === 0 ? '' : `<span class="seat-n">${i + 1}</span>`}
+      <span class="seat-id">${esc(s.handle)}</span>
+      ${pingBars(s.rtt)}
+    </div>`;
+  };
+  const hostBox = document.getElementById('roomHostSeat');
+  if (hostBox) hostBox.innerHTML = detail.length ? seat(detail[0], 0) : '';
   const seats = document.getElementById('roomSeats');
   if (seats) {
-    // 들어온 순서 그대로. 맨 위가 방장이다.
-    const canManage = host;
-    seats.innerHTML = r.members.map((h, i) => {
-      const mine = me && h === me.handle;
-      const clickable = canManage && !mine;
-      return `<div class="seat${mine ? ' me' : ''}${clickable ? ' pick' : ''}"
-                   data-h="${esc(h)}"${clickable ? ' title="오른쪽 클릭 — 방장 넘기기 · 강퇴"' : ''}>
-        <span class="seat-n">${i + 1}</span>
-        <span class="seat-id">${esc(h)}</span>
-        ${i === 0 ? '<span class="seat-badge">방장</span>' : ''}
-      </div>`;
-    }).join('');
+    seats.innerHTML = detail.length > 1
+      ? detail.slice(1).map((s, i) => seat(s, i + 1)).join('')
+      : '<div class="wait-empty">아직 아무도 없습니다.</div>';
   }
 
   // 명단은 2초마다 다시 그려진다. 열려 있는 메뉴까지 매번 닫아버리면 누를 새가
@@ -2624,27 +2670,30 @@ function hhmm(ts) {
 }
 
 /**
- * 방 정원 조절.
+ * 방 정원 고르기.
  *
- * 손잡이를 놓는 순간에만 서버로 보낸다 — 끌고 가는 동안 보내면 한 번 옮길
- * 때마다 요청이 열댓 번 나간다. 끄는 중에는 2초마다 오는 새 값이 손잡이를
- * 낚아채지 않도록 그대로 둔다.
+ * 이미 들어와 있는 사람보다 적은 숫자는 아예 목록에서 뺀다 — 고를 수 있게
+ * 두고 나서 거절하면, 왜 안 되는지 눌러본 뒤에야 알게 된다.
  */
-let capDragging = false;
-
 function renderCap(r, host) {
   const box = document.getElementById('roomCap');
-  const range = document.getElementById('capRange');
-  const out = document.getElementById('capOut');
+  const sel = document.getElementById('capSelect');
   const note = document.getElementById('capNote');
-  if (!box || !range || !out) return;
+  if (!box || !sel) return;
 
   box.style.display = 'flex';
-  range.min = String(capacityMin);
-  range.max = String(ROOM_CAPACITY);
-  range.disabled = !host;
-  if (!capDragging) range.value = String(capOf(r));
-  out.textContent = `${range.value}명`;
+  sel.disabled = !host;
+  const cur = capOf(r);
+  const floor = Math.max(capacityMin, r.members.length);
+  const want = [];
+  for (let n = capacityMin; n <= ROOM_CAPACITY; n++) if (n >= floor || n === cur) want.push(n);
+  const sig = want.join(',') + '|' + cur;
+  if (sel.dataset.sig !== sig) {
+    sel.dataset.sig = sig;
+    sel.innerHTML = want.map(n =>
+      `<option value="${n}"${n === cur ? ' selected' : ''}>${n}명</option>`).join('');
+  }
+  sel.value = String(cur);
   if (note) {
     note.textContent = host
       ? `${capacityMin}명부터 ${ROOM_CAPACITY}명까지 · 이미 들어온 ${r.members.length}명보다 적게는 줄일 수 없습니다.`
@@ -2661,19 +2710,43 @@ async function saveCap(cap) {
 }
 
 function initCapEvents() {
-  const range = document.getElementById('capRange');
-  const out = document.getElementById('capOut');
-  if (!range) return;
-  const show = () => { if (out) out.textContent = `${range.value}명`; };
-  range.addEventListener('pointerdown', () => { capDragging = true; });
-  range.addEventListener('keydown', () => { capDragging = true; });
-  range.addEventListener('input', show);
-  range.addEventListener('change', () => {
-    capDragging = false;
-    show();
-    saveCap(Number(range.value));
-  });
-  range.addEventListener('blur', () => { capDragging = false; });
+  const sel = document.getElementById('capSelect');
+  if (sel) sel.addEventListener('change', () => saveCap(Number(sel.value)));
+
+  const rename = document.getElementById('roomRename');
+  if (rename) rename.addEventListener('click', showTitleModal);
+}
+
+/** 방 이름 짓기. 비우고 저장하면 "N번방" 으로 되돌아간다. */
+function showTitleModal() {
+  const r = myRoomData();
+  if (!r) return;
+  openModal(`
+    <h3>방 이름</h3>
+    <label>이름</label>
+    <input type="text" id="titleInput" maxlength="${maxTitle}" autocomplete="off"
+           placeholder="${r.room}번방" value="${esc(r.title || '')}">
+    <div class="modal-error" id="titleErr"></div>
+    <button class="btn" id="titleSave">저장</button>
+    <div class="foot-note">비워두고 저장하면 <b>${r.room}번방</b> 으로 되돌아갑니다 ·
+      ${maxTitle}자까지 지을 수 있습니다.</div>`);
+  const input = document.getElementById('titleInput');
+  const save = document.getElementById('titleSave');
+  const err = document.getElementById('titleErr');
+  const go = async () => {
+    try {
+      await apiPost('/api/room', { action: 'setTitle', title: input ? input.value : '' });
+      closeModal();
+      await loadRooms();
+      renderLauncher();
+    } catch (e) { if (err) err.textContent = e.message; else showToast(e.message); }
+  };
+  if (save) save.addEventListener('click', go);
+  if (input) {
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+    input.focus();
+    input.select();
+  }
 }
 
 /**
@@ -3185,6 +3258,8 @@ async function bootRoomWindow() {
     await loadRooms();
   } catch (e) { showToast(e.message); }
   renderLauncher();
+  const here = myRoomData();
+  if (here) document.title = `${roomName(here)} · RAINBOWSIX RANK`;
 }
 
 async function boot() {

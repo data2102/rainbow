@@ -12,6 +12,8 @@ export const ROOM_COUNT = 8;
 export const ROOM_CAPACITY = 16;
 /** 방장이 고를 수 있는 정원의 아래끝. 혼자서는 게임이 안 되니 둘부터다. */
 export const ROOM_CAPACITY_MIN = 2;
+/** 방 이름 길이 */
+export const MAX_TITLE = 24;
 
 /** 이 시간 동안 아무 신호가 없으면 나간 것으로 본다 (브라우저를 그냥 닫는 경우) */
 const IDLE_MS = 3 * 60 * 1000;
@@ -85,6 +87,10 @@ async function ensureTables() {
   await q(`CREATE INDEX IF NOT EXISTS idx_room_msg ON room_messages (room, id)`);
   // 방장이 정한 정원. 비어 있으면 기본값(16명)을 쓴다.
   await q(`ALTER TABLE room_state ADD COLUMN IF NOT EXISTS cap INTEGER`);
+  // 방장이 붙인 이름. 비어 있으면 "N번방".
+  await q(`ALTER TABLE room_state ADD COLUMN IF NOT EXISTS title TEXT`);
+  // 각자 브라우저가 잰 사이트까지의 왕복 시간(ms). 회선이 얼마나 뻗는지 가늠하는 값이다.
+  await q(`ALTER TABLE room_members ADD COLUMN IF NOT EXISTS rtt INTEGER`);
   // 로그인한 채 런쳐를 보고 있는 사람들. 방에 들어가기 전 대기실이다.
   await q(`
     CREATE TABLE IF NOT EXISTS lobby (
@@ -120,6 +126,14 @@ export function cleanCap(v) {
     throw new Error(`정원은 ${ROOM_CAPACITY_MIN}명부터 ${ROOM_CAPACITY}명까지 정할 수 있습니다.`);
   }
   return n;
+}
+
+/** 방 이름을 다듬는다. 비우면 기본 이름("N번방")으로 돌아간다. */
+export function cleanTitle(v) {
+  const s = String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
+  if (!s) return null;
+  if (s.length > MAX_TITLE) throw new Error(`방 이름은 ${MAX_TITLE}자 이내로 지어주세요.`);
+  return s;
 }
 
 function checkRoom(n) {
@@ -165,7 +179,8 @@ async function closeEmptyRooms() {
   // 정원도 함께 푼다 — 다음에 방을 여는 사람이 자기 인원에 맞춰 다시 정한다
   await q(`
     UPDATE room_state
-        SET running = false, started_at = NULL, started_by = NULL, address = NULL, cap = NULL
+        SET running = false, started_at = NULL, started_by = NULL, address = NULL,
+            cap = NULL, title = NULL
      WHERE room <> $1 AND room NOT IN (SELECT DISTINCT room FROM room_members)`, [LOBBY]);
 }
 
@@ -199,12 +214,17 @@ async function system(room, text) {
 /** 방마다 누가 있는지. 먼저 들어온 순서대로 — 맨 앞이 방장이다. */
 async function roster() {
   const rows = await q(
-    `SELECT room, handle, joined_at FROM room_members ORDER BY room, joined_at, handle`
+    `SELECT room, handle, joined_at, rtt, last_seen FROM room_members
+      ORDER BY room, joined_at, handle`
   );
   const map = new Map();
   for (const r of rows) {
     if (!map.has(r.room)) map.set(r.room, []);
-    map.get(r.room).push(r.handle);
+    map.get(r.room).push({
+      handle: r.handle,
+      // 한참 소식이 없으면 지난 값은 못 믿는다
+      rtt: r.rtt != null && Date.now() - Number(r.last_seen) < 15000 ? Number(r.rtt) : null,
+    });
   }
   return map;
 }
@@ -214,12 +234,15 @@ async function listRooms() {
   const running = new Map(states.map(s => [s.room, s]));
   const rooms = [];
   for (let room = 1; room <= ROOM_COUNT; room++) {
-    const members = seats.get(room) || [];
+    const detail = seats.get(room) || [];
+    const members = detail.map(x => x.handle);
     const st = running.get(room);
     rooms.push({
       room,
       members,
+      seats: detail,
       host: members[0] || null,
+      title: st && st.title ? st.title : null,
       cap: st && st.cap ? Number(st.cap) : ROOM_CAPACITY,
       running: !!(st && st.running),
       startedAt: st && st.started_at ? Number(st.started_at) : null,
@@ -239,7 +262,13 @@ export default async function handler(req, res) {
       // 목록을 읽는 것 자체가 "아직 있다"는 신호다
       if (me) {
         const now = Date.now();
-        await q(`UPDATE room_members SET last_seen = $1 WHERE handle = $2`, [now, me.handle]);
+        // 브라우저가 방금 잰 왕복 시간. 터무니없는 값은 버린다.
+        const raw = Number(new URL(req.url, 'http://x').searchParams.get('rtt'));
+        const rtt = Number.isFinite(raw) && raw >= 0 && raw < 60000 ? Math.round(raw) : null;
+        await q(
+          `UPDATE room_members SET last_seen = $1, rtt = COALESCE($3, rtt) WHERE handle = $2`,
+          [now, me.handle, rtt]
+        );
         // 방에 있든 없든 런쳐를 보고 있다는 표시는 남긴다
         await q(
           `INSERT INTO lobby (handle, last_seen) VALUES ($1, $2)
@@ -280,6 +309,7 @@ export default async function handler(req, res) {
         waiting: await lobbyList(),
         capacity: ROOM_CAPACITY,
         capacityMin: ROOM_CAPACITY_MIN,
+        maxTitle: MAX_TITLE,
         network: VPN_NETWORK,
         networkPw: me ? VPN_PASSWORD : null,
       });
@@ -297,6 +327,7 @@ export default async function handler(req, res) {
       case 'report':   return await report(req, res);
       case 'setCap':   return await setCap(req, res);
       case 'sayLobby': return await sayLobby(req, res);
+      case 'setTitle': return await setTitle(req, res);
       default:      return res.status(400).json({ error: '알 수 없는 요청입니다.' });
     }
   } catch (e) {
@@ -379,26 +410,52 @@ async function setCap(req, res) {
   const cap = cleanCap(body(req).cap);
 
   const out = await tx(async (c) => {
-    const { rows: seats } = await c.query(
-      `SELECT room, handle FROM room_members WHERE room =
-         (SELECT room FROM room_members WHERE handle = $1)
-        ORDER BY joined_at, handle`, [me]
-    );
-    if (!seats.length) throw new Error('방에 들어와 있지 않습니다.');
-    if (seats[0].handle !== me) throw new Error('방장만 정원을 정할 수 있습니다.');
-    const room = seats[0].room;
-    if (cap < seats.length) {
-      throw new Error(`이미 ${seats.length}명이 들어와 있어 ${cap}명으로 줄일 수 없습니다.`);
+    const seat = await hostSeat(c, me);
+    if (cap < seat.members) {
+      throw new Error(`이미 ${seat.members}명이 들어와 있어 ${cap}명으로 줄일 수 없습니다.`);
     }
     await c.query(
       `INSERT INTO room_state (room, cap) VALUES ($1, $2)
-         ON CONFLICT (room) DO UPDATE SET cap = EXCLUDED.cap`, [room, cap]
+         ON CONFLICT (room) DO UPDATE SET cap = EXCLUDED.cap`, [seat.room, cap]
     );
-    return { room };
+    return { room: seat.room };
   });
 
   await system(out.room, `${me} 님이 정원을 ${cap}명으로 정했습니다.`);
   res.status(200).json({ ok: true, cap });
+}
+
+/** 방장이 방 이름을 짓는다. 비우면 다시 "N번방" 이 된다. */
+async function setTitle(req, res) {
+  const me = await requireUser(req, res);
+  if (!me) return;
+  const title = cleanTitle(body(req).title);
+
+  const room = await tx(async (c) => {
+    const seat = await hostSeat(c, me);
+    await c.query(
+      `INSERT INTO room_state (room, title) VALUES ($1, $2)
+         ON CONFLICT (room) DO UPDATE SET title = EXCLUDED.title`, [seat.room, title]
+    );
+    return seat.room;
+  });
+
+  await system(room, title
+    ? `${me} 님이 방 이름을 "${title}" 로 바꿨습니다.`
+    : `${me} 님이 방 이름을 되돌렸습니다.`);
+  res.status(200).json({ ok: true, title });
+}
+
+/** 지금 이 사람이 방장인 방. 아니면 그 자리에서 막는다. */
+async function hostSeat(c, me) {
+  const { rows } = await c.query(
+    `SELECT room, handle FROM room_members WHERE room =
+       (SELECT room FROM room_members WHERE handle = $1)
+      ORDER BY joined_at, handle`, [me]
+  );
+  if (!rows.length) throw new Error('방에 들어와 있지 않습니다.');
+  if (rows[0].handle !== me) throw new Error('방장만 바꿀 수 있습니다.');
+  return { room: rows[0].room, members: rows.length };
 }
 
 /* ---------- 대화 ---------- */
