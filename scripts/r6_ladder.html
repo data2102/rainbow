@@ -1103,6 +1103,20 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .dl-d{ color:var(--text-secondary); min-width:0; }
 .dl-d a{ color:var(--accent); font-weight:var(--fw-medium); }
 .dl-d b{ color:var(--text-primary); font-weight:var(--fw-medium); }
+/* ④ 는 내려받을 파일이 아니라 게임 설정이라, 목록이 통째로 줄 안에 들어간다 */
+.dl-row.dl-block{ display:block; }
+.dl-head{
+  display:flex; align-items:center; gap:var(--sp-3);
+  flex-wrap:wrap; margin-bottom:var(--sp-2);
+}
+.dl-tag{
+  flex:none; font-family:var(--font-mono); font-size:var(--fs-footnote);
+  font-weight:var(--fw-bold); color:var(--accent-strong);
+  background:var(--accent-bg); border-radius:var(--radius-sm);
+  padding:3px var(--sp-3); white-space:nowrap;
+}
+.dl-box .opt-list{ margin:0; }
+.dl-box .setup-warn{ margin:var(--sp-3) 0 0; line-height:var(--lh-body); }
 .dl-row.dl-host{ border-top:1px solid var(--border-strong); }
 .dl-row.dl-host .dl-n{ background:var(--warning-strong); }
 .dl-foot{
@@ -1128,13 +1142,13 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .setup-body ol{ margin:0 0 var(--sp-3); padding-left:1.2em; }
 .setup-body li{ margin-bottom:var(--sp-1); }
 .setup-body a{ color:var(--accent); font-weight:var(--fw-medium); }
-.setup-body code{
+.setup-body code, .dl-box .dl-block code{
   font-family:var(--font-mono); font-size:var(--fs-footnote);
   background:var(--surface); border:1px solid var(--border);
   border-radius:var(--radius-sm); padding:1px 4px; word-break:break-all;
 }
 .setup-warn{ color:var(--text-tertiary); }
-.setup-body kbd{
+.setup-body kbd, .dl-box kbd{
   font-family:var(--font-mono); font-size:var(--fs-footnote); font-weight:var(--fw-bold);
   color:var(--text-primary); background:var(--surface);
   border:1px solid var(--border-strong); border-bottom-width:2px;
@@ -1883,22 +1897,13 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
             <b>내 컴퓨터</b>의 윈도우 방화벽을 엽니다. 안 열면 접속이 느립니다.</span>
         </div>
 
-        <div class="dl-row dl-host" data-mode="auto">
-          <span class="dl-n">＋</span>
-          <a class="dl-a" href="/r6upnp.bat" download>r6upnp.bat</a>
-          <span class="dl-d"><b>지금은 안 하셔도 됩니다</b> · Radmin 을 쓰면 공유기를
-            건드릴 일이 없습니다. 나중에 <b>Radmin 없이</b> 공인 IP 로 방장을 하고 싶을 때만,
-            그때 관리자 권한으로 실행하세요.</span>
-        </div>
-
-        <div class="dl-sub" id="dlSub"></div>
-      </div>
-
-      <details class="setup">
-        <summary>게임 안에서 맞춰둘 설정 — MULTIPLAYER OPTIONS</summary>
-        <div class="setup-body">
-          <p>게임 › <kbd>MULTIPLAYER</kbd> › <kbd>MULTIPLAYER OPTIONS</kbd> 에서 아래처럼 맞춰주세요.
-             <b>회원 모두 같은 값</b>이어야 서로를 찾습니다.</p>
+        <div class="dl-row dl-block">
+          <div class="dl-head">
+            <span class="dl-n">4</span>
+            <span class="dl-tag">MULTIPLAYER OPTIONS</span>
+            <span class="dl-d">게임 › <kbd>MULTIPLAYER</kbd> › <kbd>MULTIPLAYER OPTIONS</kbd> ·
+              <b>회원 모두 같은 값</b>이어야 서로를 찾습니다.</span>
+          </div>
           <ul class="opt-list">
             <li><b>ANNOUNCE SERVER</b> <span>해제</span> — <b>꺼두세요.</b> 켜두면 방이
                 모두의 <kbd>JOIN GAME</kbd> 목록에 떠서, 런쳐를 거치지 않고도 아무나
@@ -1926,7 +1931,17 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
              됩니다. 다만 여러 방이 동시에 열리면 목록에 다 떠서
              <b>엉뚱한 방에 들어가는 일</b>이 생깁니다.</p>
         </div>
-      </details>
+
+        <div class="dl-row dl-host" data-mode="auto">
+          <span class="dl-n">＋</span>
+          <a class="dl-a" href="/r6upnp.bat" download>r6upnp.bat</a>
+          <span class="dl-d"><b>지금은 안 하셔도 됩니다</b> · Radmin 을 쓰면 공유기를
+            건드릴 일이 없습니다. 나중에 <b>Radmin 없이</b> 공인 IP 로 방장을 하고 싶을 때만,
+            그때 관리자 권한으로 실행하세요.</span>
+        </div>
+
+        <div class="dl-sub" id="dlSub"></div>
+      </div>
 
       <div class="lc-gate" id="lcGate" style="display:none;">
         로그인하면 방에 들어갈 수 있습니다.
