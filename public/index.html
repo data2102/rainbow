@@ -589,6 +589,18 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 }
 .pick-note.warn{ color:var(--danger-strong); }
 
+/* 아직 아무것도 없는 판 */
+.soon{
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:var(--sp-3); padding:var(--sp-12) var(--sp-5); text-align:center;
+}
+.soon-t{
+  font-size:clamp(32px, 7vw, var(--fs-display));
+  font-weight:var(--fw-bold); letter-spacing:var(--ls-tight);
+  color:var(--text-tertiary);
+}
+.soon-s{ font-size:var(--fs-caption); color:var(--text-tertiary); }
+
 .rules{ font-size:var(--fs-caption); color:var(--text-secondary); line-height:2; }
 .rules b{ color:var(--text-primary); font-weight:var(--fw-medium); }
 .log-empty{ color:var(--text-tertiary); font-size:var(--fs-caption); padding:var(--sp-4) 0; }
@@ -1327,8 +1339,9 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
     <button class="tab-btn" data-tab="history">③ 리폿(경기결과)</button>
     <button class="tab-btn" data-tab="attendance">④ 출석</button>
     <button class="tab-btn" data-tab="tournament">⑤ 대회</button>
-    <button class="tab-btn" data-tab="board">⑥ 게시판</button>
-    <button class="tab-btn" data-tab="launcher">⑦ 런쳐</button>
+    <button class="tab-btn" data-tab="rules">⑥ 규정(룰)</button>
+    <button class="tab-btn" data-tab="board">⑦ 게시판</button>
+    <button class="tab-btn" data-tab="launcher">⑧ 런쳐</button>
   </nav>
 
   <!-- STANDING -->
@@ -1743,6 +1756,18 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
         </div>
       </div>
 
+    </div>
+  </div>
+
+  <!-- BOARD -->
+  <!-- RULES -->
+  <div class="tab-panel" id="tab-rules">
+    <div class="panel hud-corner">
+      <h2>규정 · Rule</h2>
+      <div class="soon">
+        <div class="soon-t">준비중</div>
+        <div class="soon-s">클랜 규정을 정리해서 올릴 예정입니다.</div>
+      </div>
     </div>
   </div>
 
