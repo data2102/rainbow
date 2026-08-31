@@ -33,6 +33,8 @@ if errorlevel 1 (
     exit /b 1
 )
 
+call :findgame
+
 echo.
 echo   Opening the Windows firewall...
 echo.
@@ -69,3 +71,31 @@ echo     netsh advfirewall firewall delete rule name="Rainbow Six UDP (r6rank)"
 echo     netsh advfirewall firewall delete rule name="Rainbow Six PING (r6rank)"
 echo.
 pause
+exit /b 0
+
+:findgame
+rem  Look in the usual places. 32-bit Windows has no "Program Files (x86)"
+rem  folder at all, so a machine that runs the game fine still misses here.
+rem  Plain if/goto lines only - the "(x86)" in these paths breaks cmd's
+rem  ( ) block parsing.
+if exist "%GAME%" goto :eof
+set "SUB=Red Storm Entertainment\Tom Clancy's Rainbow Six\RainbowSix.exe"
+set "TRY=%ProgramFiles%\%SUB%"
+if exist "%TRY%" goto :usegame
+set "TRY=%ProgramFiles(x86)%\%SUB%"
+if exist "%TRY%" goto :usegame
+set "TRY=C:\Program Files\%SUB%"
+if exist "%TRY%" goto :usegame
+set "TRY=C:\Program Files (x86)\%SUB%"
+if exist "%TRY%" goto :usegame
+set "TRY=C:\Games\%SUB%"
+if exist "%TRY%" goto :usegame
+set "TRY=D:\Games\%SUB%"
+if exist "%TRY%" goto :usegame
+set "TRY=D:\%SUB%"
+if exist "%TRY%" goto :usegame
+goto :eof
+
+:usegame
+set "GAME=%TRY%"
+goto :eof

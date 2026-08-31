@@ -56,6 +56,8 @@ if "%MODE%"=="join" echo   Rainbow Six - joining host %IP%
 if "%MODE%"=="create" echo   Rainbow Six - hosting a game
 echo.
 
+call :findgame
+call :log "GAME    = %GAME%"
 if not exist "%GAME%" goto :nogame
 
 rem ---------- leave a running game alone ----------
@@ -95,12 +97,43 @@ rem ============================================================
 rem  problems - keep the window open and say why
 rem ============================================================
 
+:findgame
+rem  Look in the usual places. 32-bit Windows has no "Program Files (x86)"
+rem  at all, so a machine that runs the game fine can still fail here.
+rem  Each line is a plain if/goto - no ( ) blocks, because the "(x86)" in
+rem  these paths breaks cmd's block parsing.
+if exist "%GAME%" goto :eof
+set "SUB=Red Storm Entertainment\Tom Clancy's Rainbow Six\RainbowSix.exe"
+set "TRY=%ProgramFiles%\%SUB%"
+if exist "%TRY%" goto :usegame
+set "TRY=%ProgramFiles(x86)%\%SUB%"
+if exist "%TRY%" goto :usegame
+set "TRY=C:\Program Files\%SUB%"
+if exist "%TRY%" goto :usegame
+set "TRY=C:\Program Files (x86)\%SUB%"
+if exist "%TRY%" goto :usegame
+set "TRY=C:\Games\%SUB%"
+if exist "%TRY%" goto :usegame
+set "TRY=D:\Games\%SUB%"
+if exist "%TRY%" goto :usegame
+set "TRY=D:\%SUB%"
+if exist "%TRY%" goto :usegame
+goto :eof
+
+:usegame
+set "GAME=%TRY%"
+goto :eof
+
 :nogame
 call :log "RESULT  = game not found"
-echo   Game not found:
-echo     %GAME%
+echo   Game not found. Looked in:
+echo     %ProgramFiles%\Red Storm Entertainment\...
+echo     C:\Program Files\Red Storm Entertainment\...
+echo     C:\Program Files (x86)\Red Storm Entertainment\...
+echo     C:\Games\  and  D:\Games\
 echo.
-echo   Open this file in Notepad and fix the GAME path.
+echo   If the game is somewhere else, open this file in Notepad
+echo   and put its full path on the GAME line near the top.
 goto :stop
 
 :nodir
