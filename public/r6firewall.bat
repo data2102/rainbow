@@ -44,6 +44,14 @@ netsh advfirewall firewall delete rule name="Rainbow Six (r6rank)" >nul 2>&1
 netsh advfirewall firewall delete rule name="Rainbow Six UDP (r6rank)" >nul 2>&1
 netsh advfirewall firewall delete rule name="Rainbow Six PING (r6rank)" >nul 2>&1
 
+rem  Windows writes a BLOCK rule of its own if anyone ever pressed Cancel on
+rem  the "allow this app on the network?" popup. A block rule beats an allow
+rem  rule, so ours would sit there doing nothing. The game takes the whole
+rem  screen, so that popup is easy to miss or dismiss by accident - one
+rem  person in a group hitting Cancel is enough to make them the odd one out
+rem  who cannot see anybody. Clear every rule for the game, then put ours back.
+if exist "%GAME%" netsh advfirewall firewall delete rule name=all program="%GAME%" >nul 2>&1
+
 if exist "%GAME%" (
     netsh advfirewall firewall add rule name="Rainbow Six (r6rank)" dir=in  action=allow program="%GAME%" enable=yes profile=any >nul
     netsh advfirewall firewall add rule name="Rainbow Six (r6rank)" dir=out action=allow program="%GAME%" enable=yes profile=any >nul
