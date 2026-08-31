@@ -224,7 +224,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 3;
+const APP_VERSION = 4;
 let toldToRefresh = false;
 
 /**
@@ -2239,7 +2239,14 @@ const isRoomWindow = roomParam > 0;
 let roomWin = null;
 
 /** 방 창이 방에 못 들어갔을 때 그 자리에 남기는 안내. */
+/** 들어가는 중 안내를 걷는다. */
+function hideRoomLoad() {
+  const el = document.getElementById('roomLoad');
+  if (el) el.style.display = 'none';
+}
+
 function showRoomFail(msg) {
+  hideRoomLoad();
   const box = document.getElementById('roomFail');
   const t = document.getElementById('roomFailText');
   if (t) t.textContent = msg;
@@ -3385,6 +3392,7 @@ async function bootRoomWindow() {
     showRoomFail(e.message);
     return;
   }
+  hideRoomLoad();
   renderLauncher();
   const here = myRoomData();
   if (here) document.title = `${roomName(here)} · RAINBOWSIX RANK`;
