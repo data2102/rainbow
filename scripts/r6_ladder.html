@@ -1045,6 +1045,22 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   border-radius:var(--radius-sm); padding:2px var(--sp-3);
 }
 .vpn-pair{ display:inline-flex; align-items:center; gap:var(--sp-2); }
+/* 한 줄에 몰아넣으면 읽히지 않아 항목마다 줄을 준다 */
+.vpn-stack{ display:block; }
+.vpn-title{
+  font-size:var(--fs-caption); font-weight:var(--fw-bold);
+  color:var(--text-primary); margin-bottom:var(--sp-3);
+  padding-bottom:var(--sp-2); border-bottom:1px solid var(--border);
+}
+.vpn-line{
+  display:flex; align-items:center; gap:var(--sp-3);
+  margin-bottom:var(--sp-2); flex-wrap:wrap;
+}
+/* 이름 폭을 맞춰야 값이 세로로 가지런히 선다 */
+.vpn-line > .vpn-k{ flex:none; width:64px; }
+.vpn-stack .vpn-note{ display:block; margin-top:var(--sp-3); }
+/* 좁은 화면에서 경로가 길어 한 줄을 넘길 수 있다 */
+.vpn-line .vpn-path{ white-space:normal; }
 .vpn-path{
   font-size:var(--fs-footnote); color:var(--text-secondary);
   background:var(--surface); border:1px solid var(--border);
@@ -1818,18 +1834,21 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
       <div class="panel-head">
         <h2>런쳐 · Launcher</h2>
       </div>
-      <div class="vpn-bar" id="vpnBar" style="display:none;">
-        <span class="vpn-k">Radmin VPN</span>
-        <span class="vpn-path">Radmin 설치 › 네트워크 › 네트워크 연결</span>
-        <span class="vpn-pair">
+      <div class="vpn-bar vpn-stack" id="vpnBar" style="display:none;">
+        <div class="vpn-title">Radmin VPN 정보</div>
+        <div class="vpn-line">
+          <span class="vpn-k">설정 경로</span>
+          <span class="vpn-path">Radmin 설치 › 네트워크 › 네트워크 연결</span>
+        </div>
+        <div class="vpn-line">
           <span class="vpn-k">아이디</span>
           <code class="vpn-v" id="vpnName"></code>
-        </span>
-        <span class="vpn-pair" id="vpnPwWrap" style="display:none;">
+        </div>
+        <div class="vpn-line" id="vpnPwWrap" style="display:none;">
           <span class="vpn-k">비밀번호</span>
           <code class="vpn-v" id="vpnPw"></code>
-        </span>
-        <span class="vpn-note">이 네트워크에 먼저 들어와 있어야 게임이 서로를 봅니다.</span>
+        </div>
+        <div class="vpn-note">이 네트워크에 먼저 들어와 있어야 게임이 서로를 봅니다.</div>
       </div>
 
       <div class="vpn-bar" id="myIpBar" style="display:none;">

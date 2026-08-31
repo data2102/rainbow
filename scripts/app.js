@@ -2150,12 +2150,12 @@ function renderVpnBar() {
   const bar = document.getElementById('vpnBar');
   // Radmin 방식을 쓰는 사람에게만 보여준다. 공인 IP 로 바로 붙는 사람에게는
   // 켤 일이 없는 프로그램 안내가 남아 있으면 헷갈린다.
-  if (bar) bar.style.display = (shownMode() === 'radmin') ? 'flex' : 'none';
+  if (bar) bar.style.display = (shownMode() === 'radmin') ? 'block' : 'none';
   const name = document.getElementById('vpnName');
   const wrap = document.getElementById('vpnPwWrap');
   const pw = document.getElementById('vpnPw');
   if (name) name.textContent = vpn.network;
-  if (wrap) wrap.style.display = vpn.password ? 'inline-flex' : 'none';  // 로그인해야 온다
+  if (wrap) wrap.style.display = vpn.password ? 'flex' : 'none';  // 로그인해야 온다
   if (pw) pw.textContent = vpn.password || '';
 }
 
