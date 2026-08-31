@@ -2139,8 +2139,8 @@ function applyConnMode() {
   const sub = document.getElementById('dlSub');
   if (sub) {
     sub.innerHTML = mode === 'radmin'
-      ? '<b>①~③에 대해 최초 1회만 실행</b>하면 그 다음부터는 게임만 접속하시면 됩니다.'
-      : '<b>①~③ 은 모두</b> 하고, <b>＋ 는 방장을 할 사람만</b> 하면 됩니다 ·'
+      ? '※ <b>①~③에 대해 최초 1회만 실행</b>하면 그 다음부터는 게임만 접속하시면 됩니다.'
+      : '※ <b>①~③ 은 모두</b> 하고, <b>＋ 는 방장을 할 사람만</b> 하면 됩니다 ·'
         + ' 최초 1회만 실행하면 그 다음부터는 게임만 접속하시면 됩니다.';
   }
 }
@@ -2206,7 +2206,7 @@ function renderMyIp() {
   note.classList.toggle('must', mode === 'radmin' && !!addr);
   if (mode === 'radmin') {
     note.textContent = addr
-      ? '반드시 Radmin VPN 을 켜둔 채로 실행해야 합니다.'
+      ? '※ 반드시 Radmin VPN 을 켜둔 채로 실행해야 합니다.'
       : 'Radmin 창의 내 주소(26.…)를 적어주세요.';
   } else if (!publicIpUsable) {
     note.textContent = '이 회선은 밖에서 찾아올 수 없는 주소입니다 · 방장을 하려면 Radmin 방식으로 바꿔주세요.';

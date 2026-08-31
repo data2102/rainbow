@@ -1076,9 +1076,10 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 }
 .dl-h{
   font-size:var(--fs-caption); font-weight:var(--fw-bold);
-  color:var(--text-primary); margin-bottom:var(--sp-1);
+  color:var(--text-primary); margin-bottom:var(--sp-3);
 }
-.dl-sub{ font-size:var(--fs-footnote); color:var(--text-tertiary); margin-bottom:var(--sp-4); }
+/* 목록 아래에 붙는 마무리 한 줄이라 위쪽으로 간격을 준다 */
+.dl-sub{ font-size:var(--fs-footnote); color:var(--text-tertiary); margin-top:var(--sp-3); }
 .dl-row{
   display:flex; align-items:baseline; gap:var(--sp-3);
   padding:var(--sp-3) 0; border-top:1px solid var(--border);
@@ -1835,7 +1836,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
         <h2>런쳐 · Launcher</h2>
       </div>
       <div class="vpn-bar vpn-stack" id="vpnBar" style="display:none;">
-        <div class="vpn-title">Radmin VPN 정보</div>
+        <div class="vpn-title">■ Radmin VPN 정보</div>
         <div class="vpn-line">
           <span class="vpn-k">설정 경로</span>
           <span class="vpn-path">Radmin 설치 › 네트워크 › 네트워크 연결</span>
@@ -1859,7 +1860,6 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 
       <div class="dl-box">
         <div class="dl-h">필수사항</div>
-        <div class="dl-sub" id="dlSub"></div>
 
         <div class="dl-row">
           <span class="dl-n">1</span>
@@ -1890,6 +1890,8 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
             건드릴 일이 없습니다. 나중에 <b>Radmin 없이</b> 공인 IP 로 방장을 하고 싶을 때만,
             그때 관리자 권한으로 실행하세요.</span>
         </div>
+
+        <div class="dl-sub" id="dlSub"></div>
 
         <div class="dl-foot">모두 메모장으로 열면 무엇을 하는지 다 보입니다 ·
           자세한 설명과 되돌리는 방법은 아래 안내를 펼쳐보세요.</div>
@@ -4313,8 +4315,8 @@ function applyConnMode() {
   const sub = document.getElementById('dlSub');
   if (sub) {
     sub.innerHTML = mode === 'radmin'
-      ? '<b>①~③에 대해 최초 1회만 실행</b>하면 그 다음부터는 게임만 접속하시면 됩니다.'
-      : '<b>①~③ 은 모두</b> 하고, <b>＋ 는 방장을 할 사람만</b> 하면 됩니다 ·'
+      ? '※ <b>①~③에 대해 최초 1회만 실행</b>하면 그 다음부터는 게임만 접속하시면 됩니다.'
+      : '※ <b>①~③ 은 모두</b> 하고, <b>＋ 는 방장을 할 사람만</b> 하면 됩니다 ·'
         + ' 최초 1회만 실행하면 그 다음부터는 게임만 접속하시면 됩니다.';
   }
 }
@@ -4380,7 +4382,7 @@ function renderMyIp() {
   note.classList.toggle('must', mode === 'radmin' && !!addr);
   if (mode === 'radmin') {
     note.textContent = addr
-      ? '반드시 Radmin VPN 을 켜둔 채로 실행해야 합니다.'
+      ? '※ 반드시 Radmin VPN 을 켜둔 채로 실행해야 합니다.'
       : 'Radmin 창의 내 주소(26.…)를 적어주세요.';
   } else if (!publicIpUsable) {
     note.textContent = '이 회선은 밖에서 찾아올 수 없는 주소입니다 · 방장을 하려면 Radmin 방식으로 바꿔주세요.';
