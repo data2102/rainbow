@@ -1149,6 +1149,15 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .wait-row.me{ color:var(--accent-strong); font-weight:var(--fw-bold); }
 .wait-empty{ font-size:var(--fs-footnote); color:var(--text-tertiary); padding:var(--sp-2) 0; }
 
+/* 방에 들어가기 전, 다 같이 쓰는 대기실 대화 */
+.lobby-chat{
+  border:1px solid var(--border); border-radius:var(--radius-md);
+  background:var(--surface-sunken); padding:var(--sp-3) var(--sp-4);
+  margin-top:var(--sp-4);
+}
+/* 바깥 상자와 같은 바닥색이면 경계가 안 보인다 */
+.lobby-log{ height:180px; margin-top:var(--sp-2); background:var(--surface); }
+
 /* 인원수를 누르면 누가 있는지 */
 .room-card-h{ position:relative; }
 button.room-n{
@@ -2051,6 +2060,16 @@ button.room-n:hover{ color:var(--accent); text-decoration:underline; }
             <div class="side-h">대기 중 <span id="waitCount">0</span></div>
             <div class="wait-list" id="waitList"></div>
           </aside>
+        </div>
+
+        <div class="lobby-chat">
+          <div class="side-h">대기실 대화</div>
+          <div class="chat-log lobby-log" id="lobbyLog"></div>
+          <div class="chat-row">
+            <input type="text" id="lobbyInput" maxlength="200" autocomplete="off"
+                   placeholder="여기에 적으면 대기 중인 모두가 봅니다.">
+            <button class="btn-mini btn-approve" id="lobbySend">보내기</button>
+          </div>
         </div>
       </div>
 

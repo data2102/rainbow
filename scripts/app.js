@@ -219,8 +219,9 @@ async function loadRooms() {
     publicIpUsable = !!d.publicIpUsable;
     vpn = { network: d.network || '', password: d.networkPw || null };
     waiting = d.waiting || [];
+    lobbyMsgs = d.lobbyMessages || [];
     capacityMin = d.capacityMin || capacityMin;
-  } catch { rooms = []; myRoom = null; roomMsgs = []; waiting = []; }
+  } catch { rooms = []; myRoom = null; roomMsgs = []; waiting = []; lobbyMsgs = []; }
 
   // 내가 누르지 않았는데 방에서 빠졌다면 알려준다
   if (before && !myRoom && !leavingOnPurpose) {
@@ -2049,6 +2050,7 @@ async function copyText(text) {
 const ROOM_CAPACITY = 16;
 let capacityMin = 2;
 let waiting = [];
+let lobbyMsgs = [];
 
 /** 이 방의 정원. 방장이 따로 정하지 않았으면 기본값. */
 function capOf(r) { return r && r.cap ? r.cap : ROOM_CAPACITY; }
@@ -2386,7 +2388,7 @@ function renderLauncher() {
   view.style.display = here && !elsewhere ? 'block' : 'none';
   renderAwayBar(elsewhere ? here : null);
 
-  if (isLoggedIn() && !here) { renderRoomGrid(); renderWaiting(); }
+  if (isLoggedIn() && !here) { renderRoomGrid(); renderWaiting(); renderLobbyChat(); }
   if (here && !elsewhere) renderRoomView(here);
 }
 
@@ -2585,21 +2587,34 @@ function showStartModal() {
 }
 
 /** 대화창. 새 말이 없으면 다시 그리지 않는다 (스크롤이 튀지 않도록) */
-function renderChatLog() {
-  const box = document.getElementById('chatLog');
+function renderChatLog() { paintChat('chatLog', roomMsgs, '아직 대화가 없습니다.'); }
+
+/** 대기실 대화. 방에 들어가기 전 화면에만 있다. */
+function renderLobbyChat() {
+  paintChat('lobbyLog', lobbyMsgs, '먼저 인사를 건네보세요.');
+}
+
+/**
+ * 대화 목록을 그린다.
+ *
+ * 2초마다 다시 그리는 자리라, 달라진 게 없으면 손대지 않는다. 매번 새로
+ * 그리면 읽던 자리가 맨 아래로 튀고 글자를 끌어 옮기던 것도 풀린다.
+ */
+function paintChat(id, msgs, empty) {
+  const box = document.getElementById(id);
   if (!box) return;
-  const last = roomMsgs.length ? roomMsgs[roomMsgs.length - 1].id : 0;
+  const last = msgs.length ? msgs[msgs.length - 1].id : 0;
   if (box.dataset.last === String(last) && box.childElementCount) return;
   box.dataset.last = String(last);
 
-  box.innerHTML = roomMsgs.map(m => {
+  box.innerHTML = msgs.map(m => {
     if (!m.handle) return `<div class="chat-line chat-sys">· ${esc(m.body)}</div>`;
     const mine = me && m.handle === me.handle;
     return `<div class="chat-line">
       <span class="chat-who${mine ? ' me' : ''}">${esc(m.handle)}</span>${esc(m.body)}
       <span class="chat-t">${hhmm(m.ts)}</span>
     </div>`;
-  }).join('') || '<div class="chat-line chat-sys">· 아직 대화가 없습니다.</div>';
+  }).join('') || `<div class="chat-line chat-sys">· ${empty}</div>`;
   box.scrollTop = box.scrollHeight;
 }
 
@@ -2859,14 +2874,20 @@ async function startRoom(known) {
   }
 }
 
-async function sendChat() {
-  const input = document.getElementById('chatInput');
+async function sendChat() { await postChat('chatInput', 'say'); }
+
+/** 대기실에 한마디. 방 밖에 있는 사람들이 함께 본다. */
+async function sendLobbyChat() { await postChat('lobbyInput', 'sayLobby'); }
+
+/** 적은 말을 보낸다. 못 보냈으면 지웠던 글을 되돌려 다시 눌러볼 수 있게 한다. */
+async function postChat(inputId, action) {
+  const input = document.getElementById(inputId);
   if (!input) return;
   const text = input.value.trim();
   if (!text) return;
   input.value = '';
   try {
-    await apiPost('/api/room', { action: 'say', body: text });
+    await apiPost('/api/room', { action, body: text });
     await loadRooms();
     renderLauncher();
   } catch (e) {
@@ -2914,6 +2935,11 @@ function initLauncherEvents() {
   if (send) send.addEventListener('click', sendChat);
   const input = document.getElementById('chatInput');
   if (input) input.addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
+
+  const lsend = document.getElementById('lobbySend');
+  if (lsend) lsend.addEventListener('click', sendLobbyChat);
+  const linput = document.getElementById('lobbyInput');
+  if (linput) linput.addEventListener('keydown', e => { if (e.key === 'Enter') sendLobbyChat(); });
 
   // 런쳐를 보고 있는 동안만 계속 받아온다. 이 요청이 자리를 지키는 신호도 된다.
   const panel = document.getElementById('tab-launcher');

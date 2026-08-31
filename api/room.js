@@ -42,6 +42,11 @@ const DEFAULT_MODE = 'radmin';
 const MAX_MSG = 200;
 /** 방마다 남겨두는 대화 수 */
 const KEEP_MSG = 120;
+/**
+ * 대기실 대화도 같은 표에 담는다. 방 번호는 1번부터라 0 을 대기실 자리로 쓴다.
+ * 방과 달리 비워지는 일이 없으므로, 늘 최근 것만 남기고 덜어낸다.
+ */
+const LOBBY = 0;
 
 let ensured = false;
 async function ensureTables() {
@@ -156,12 +161,34 @@ async function lobbyList() {
 async function closeEmptyRooms() {
   await q(`
     DELETE FROM room_messages
-     WHERE room NOT IN (SELECT DISTINCT room FROM room_members)`);
+     WHERE room <> $1 AND room NOT IN (SELECT DISTINCT room FROM room_members)`, [LOBBY]);
   // 정원도 함께 푼다 — 다음에 방을 여는 사람이 자기 인원에 맞춰 다시 정한다
   await q(`
     UPDATE room_state
         SET running = false, started_at = NULL, started_by = NULL, address = NULL, cap = NULL
-     WHERE room NOT IN (SELECT DISTINCT room FROM room_members)`);
+     WHERE room <> $1 AND room NOT IN (SELECT DISTINCT room FROM room_members)`, [LOBBY]);
+}
+
+/** 대화 한 줄을 담고, 그 방에 남길 만큼만 남긴다. */
+async function push(room, handle, text) {
+  await q(`INSERT INTO room_messages (room, handle, body, ts) VALUES ($1,$2,$3,$4)`,
+    [room, handle, text, Date.now()]);
+  await q(
+    `DELETE FROM room_messages
+      WHERE room = $1 AND id NOT IN (
+        SELECT id FROM room_messages WHERE room = $1 ORDER BY id DESC LIMIT $2)`,
+    [room, KEEP_MSG]
+  );
+}
+
+/** 최근 대화. 오래된 것부터 순서대로 돌려준다. */
+async function readMsgs(room) {
+  const rows = await q(
+    `SELECT * FROM room_messages WHERE room = $1 ORDER BY id DESC LIMIT $2`, [room, KEEP_MSG]
+  );
+  return rows.reverse().map(r => ({
+    id: Number(r.id), handle: r.handle, body: r.body, ts: Number(r.ts),
+  }));
 }
 
 async function system(room, text) {
@@ -227,16 +254,9 @@ export default async function handler(req, res) {
       const mine = me ? rooms.find(r => r.members.includes(me.handle)) : null;
       // 접속 주소는 그 방에 들어와 있는 사람에게만 보인다
       for (const r of rooms) if (r !== mine) r.address = null;
-      let messages = [];
-      if (mine) {
-        const rows = await q(
-          `SELECT * FROM room_messages WHERE room = $1 ORDER BY id DESC LIMIT $2`,
-          [mine.room, KEEP_MSG]
-        );
-        messages = rows.reverse().map(r => ({
-          id: Number(r.id), handle: r.handle, body: r.body, ts: Number(r.ts),
-        }));
-      }
+      const messages = mine ? await readMsgs(mine.room) : [];
+      // 대기실 대화는 방에 있든 없든 내려보낸다 — 방에서 나오면 바로 이어 읽는다
+      const lobbyMessages = me ? await readMsgs(LOBBY) : [];
 
       // 방장이 지난번에 적어둔 주소를 미리 채워준다
       let savedAddress = null;
@@ -254,7 +274,7 @@ export default async function handler(req, res) {
 
       res.setHeader('Cache-Control', 'no-store');
       return res.status(200).json({
-        rooms, messages, savedAddress, connMode, publicIp,
+        rooms, messages, lobbyMessages, savedAddress, connMode, publicIp,
         publicIpUsable: isReachableIp(publicIp),
         myRoom: mine ? mine.room : null,
         waiting: await lobbyList(),
@@ -276,6 +296,7 @@ export default async function handler(req, res) {
       case 'kick':     return await kick(req, res);
       case 'report':   return await report(req, res);
       case 'setCap':   return await setCap(req, res);
+      case 'sayLobby': return await sayLobby(req, res);
       default:      return res.status(400).json({ error: '알 수 없는 요청입니다.' });
     }
   } catch (e) {
@@ -392,17 +413,26 @@ async function say(req, res) {
 
   const rows = await q(`SELECT room FROM room_members WHERE handle = $1`, [me]);
   if (!rows.length) return res.status(400).json({ error: '먼저 방에 들어가주세요.' });
-  const room = rows[0].room;
 
-  await q(`INSERT INTO room_messages (room, handle, body, ts) VALUES ($1,$2,$3,$4)`,
-    [room, me, text, Date.now()]);
-  // 오래된 것부터 덜어낸다
-  await q(
-    `DELETE FROM room_messages
-      WHERE room = $1 AND id NOT IN (
-        SELECT id FROM room_messages WHERE room = $1 ORDER BY id DESC LIMIT $2)`,
-    [room, KEEP_MSG]
-  );
+  await push(rows[0].room, me, text);
+  res.status(200).json({ ok: true });
+}
+
+/**
+ * 대기실 대화.
+ *
+ * 방에 들어가기 전에 서로를 부르는 자리다. 방 안에서도 보낼 수 있게 두면
+ * 어디에 쓴 말인지 헷갈리므로, 방 밖에 있는 사람만 쓴다.
+ */
+async function sayLobby(req, res) {
+  const me = await requireUser(req, res);
+  if (!me) return;
+
+  const text = String(body(req).body || '').trim();
+  if (!text) return res.status(400).json({ error: '보낼 말을 입력해주세요.' });
+  if (text.length > MAX_MSG) return res.status(400).json({ error: `${MAX_MSG}자 이내로 입력해주세요.` });
+
+  await push(LOBBY, me, text);
   res.status(200).json({ ok: true });
 }
 
