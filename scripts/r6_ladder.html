@@ -1257,6 +1257,12 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   font-size:10px; font-weight:var(--fw-bold); vertical-align:middle;
 }
 .vpn-note.warn{ color:var(--danger-strong); }
+/* 안 하면 아예 안 되는 것 — 눈에 걸리게 */
+.vpn-note.must{
+  color:var(--warning-strong); font-weight:var(--fw-bold);
+  background:var(--warning-bg); border-radius:var(--radius-pill);
+  padding:3px var(--sp-3);
+}
 
 /* 창 안의 체크 한 줄 (로그인 상태 유지) */
 .modal-box label.check-line{
@@ -1812,14 +1818,9 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
       <div class="panel-head">
         <h2>런쳐 · Launcher</h2>
       </div>
-      <div class="foot-note" style="margin-top:0;margin-bottom:14px;">
-        방에 모여 이야기를 나누고, 다 모이면 방장이 게임을 실행합니다 ·
-        방마다 <b>최대 16명</b>이고, <b>가장 먼저 들어온 사람이 방장</b>입니다.
-      </div>
-
       <div class="vpn-bar" id="vpnBar" style="display:none;">
         <span class="vpn-k">Radmin VPN</span>
-        <span class="vpn-path">네트워크 › 네트워크 연결</span>
+        <span class="vpn-path">Radmin 설치 › 네트워크 › 네트워크 연결</span>
         <span class="vpn-pair">
           <span class="vpn-k">아이디</span>
           <code class="vpn-v" id="vpnName"></code>
