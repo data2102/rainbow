@@ -97,6 +97,7 @@ async function ensureTables() {
       handle    TEXT PRIMARY KEY,
       last_seen BIGINT NOT NULL
     )`);
+  await q(`ALTER TABLE lobby ADD COLUMN IF NOT EXISTS rtt INTEGER`);
   ensured = true;
 }
 
@@ -161,14 +162,18 @@ async function sweepLobby() {
 
 /** 지금 런쳐를 보고 있는데 아직 방에 안 들어간 사람들. */
 async function lobbyList() {
+  const fresh = Date.now() - IDLE_MS;
   const rows = await q(
-    `SELECT l.handle FROM lobby l
+    `SELECT l.handle, l.rtt, l.last_seen FROM lobby l
       WHERE l.last_seen >= $1
         AND l.handle NOT IN (SELECT handle FROM room_members)
       ORDER BY l.last_seen DESC, l.handle`,
-    [Date.now() - IDLE_MS]
+    [fresh]
   );
-  return rows.map(r => r.handle);
+  return rows.map(r => ({
+    handle: r.handle,
+    rtt: r.rtt != null && Date.now() - Number(r.last_seen) < 15000 ? Number(r.rtt) : null,
+  }));
 }
 
 /** 아무도 없는 방은 대화와 실행 상태를 지운다. 다음 사람이 빈 방에서 시작하도록. */
@@ -271,9 +276,11 @@ export default async function handler(req, res) {
         );
         // 방에 있든 없든 런쳐를 보고 있다는 표시는 남긴다
         await q(
-          `INSERT INTO lobby (handle, last_seen) VALUES ($1, $2)
-             ON CONFLICT (handle) DO UPDATE SET last_seen = EXCLUDED.last_seen`,
-          [me.handle, now]
+          `INSERT INTO lobby (handle, last_seen, rtt) VALUES ($1, $2, $3)
+             ON CONFLICT (handle) DO UPDATE
+                SET last_seen = EXCLUDED.last_seen,
+                    rtt = COALESCE(EXCLUDED.rtt, lobby.rtt)`,
+          [me.handle, now, rtt]
         );
       }
       await sweepIdle();

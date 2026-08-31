@@ -2434,7 +2434,13 @@ function renderWaiting() {
   if (!box) return;
   if (n) n.textContent = String(waiting.length);
   box.innerHTML = waiting.length
-    ? waiting.map(h => `<div class="wait-row${me && h === me.handle ? ' me' : ''}">${esc(h)}</div>`).join('')
+    ? waiting.map(w => {
+        const h = typeof w === 'string' ? w : w.handle;
+        const rtt = typeof w === 'string' ? null : w.rtt;
+        return `<div class="wait-row${me && h === me.handle ? ' me' : ''}">
+          <span class="seat-id">${esc(h)}</span>${pingBars(rtt)}
+        </div>`;
+      }).join('')
     : '<div class="wait-empty">아직 아무도 없습니다.</div>';
 }
 

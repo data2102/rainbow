@@ -149,17 +149,20 @@
   --accent-bg:         #10313a;
   --on-accent:         #06232a;
 
-  --text-primary:      #e6e8ee;
-  --text-secondary:    #c5c9d3;
-  --text-tertiary:     #8a90a2;
-  --text-disabled:     #565b68;
+  --text-primary:      #edeff4;
+  --text-secondary:    #ced2dc;
+  --text-tertiary:     #9aa1b3;
+  --text-disabled:     #6b7180;
 
-  --bg:                #0f1117;
-  --surface:           #181b24;
-  --surface-sunken:    #12141b;
+  /* 화면에 따라 너무 가라앉아 보인다는 말을 듣고 한 단계씩 올렸다.
+     검정에 가깝던 바닥이 회색 쪽으로 오면서 글씨와의 대비는 그대로 두고
+     테두리만 또렷해진다. */
+  --bg:                #171a23;
+  --surface:           #212530;
+  --surface-sunken:    #1b1e27;
 
-  --border:            #1e2129;
-  --border-strong:     #262a35;
+  --border:            #2b2f3a;
+  --border-strong:     #383d4a;
 
   --warm:              #e08a63;
   --warm-bg:           #33211a;
@@ -954,7 +957,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 
 /* 왼쪽 대화, 오른쪽 접속자 명단 */
 .room-main{
-  display:grid; grid-template-columns:minmax(0,1fr) 210px;
+  display:grid; grid-template-columns:minmax(0,1fr) 260px;
   gap:var(--sp-4); align-items:start;
 }
 @media (max-width:720px){ .room-main{ grid-template-columns:minmax(0,1fr); } }
@@ -978,14 +981,21 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 #roomHostSeat{ flex:none; }
 .seat-h, .seat-hint{ flex:none; }
 .seat{
-  display:flex; align-items:center; gap:var(--sp-2);
-  padding:var(--sp-2) var(--sp-4); font-size:var(--fs-footnote);
+  display:flex; align-items:center; gap:var(--sp-2); flex-wrap:wrap;
+  padding:var(--sp-2) var(--sp-3); font-size:11px;
   color:var(--text-secondary); border-bottom:1px solid var(--border);
 }
 .seat:last-child{ border-bottom:none; }
-.seat-n{ flex:none; width:16px; color:var(--text-disabled); font-variant-numeric:tabular-nums; }
-/* 이름이 자리를 먼저 갖고, 남는 만큼 상태 막대가 오른쪽에 붙는다 */
-.seat-id{ flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.seat-n{ flex:none; width:12px; color:var(--text-disabled); font-variant-numeric:tabular-nums; }
+/* 아이디는 절대 줄이지 않는다. 자리가 모자라면 줄을 바꿔서라도 다 보여준다 —
+   말줄임으로 잘린 아이디는 누구인지 알 수 없어 쓸모가 없다. */
+.seat-id{
+  flex:1 1 auto; min-width:0;
+  /* 잘라내지 않는다 — 말줄임으로 끊긴 아이디는 누구인지 알 수 없다.
+     글씨를 줄이고 칸을 넓혀 웬만한 아이디는 한 줄에 담기고, 그래도 넘칠
+     만큼 긴 아이디만 줄을 바꿔서라도 끝까지 보여준다. */
+  overflow-wrap:anywhere; word-break:break-all; white-space:normal;
+}
 .seat-badge{
   flex:none; margin-left:auto; font-size:11px; font-weight:var(--fw-bold);
   border-radius:var(--radius-pill); padding:1px var(--sp-2);
@@ -1139,7 +1149,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 }
 
 /* 방 목록 옆에 대기 중인 사람들 */
-.lc-cols{ display:grid; grid-template-columns:1fr 200px; gap:var(--sp-4); align-items:start; }
+.lc-cols{ display:grid; grid-template-columns:minmax(0,1fr) 240px; gap:var(--sp-4); align-items:start; }
 @media (max-width:760px){ .lc-cols{ grid-template-columns:1fr; } }
 .wait-box{
   border:1px solid var(--border); border-radius:var(--radius-md);
@@ -1147,7 +1157,8 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 }
 .wait-list{ display:flex; flex-direction:column; gap:var(--sp-1); margin-top:var(--sp-2); }
 .wait-row{
-  font-size:var(--fs-footnote); color:var(--text-secondary);
+  display:flex; align-items:center; gap:var(--sp-2); flex-wrap:wrap;
+  font-size:11px; color:var(--text-secondary);
   padding:var(--sp-1) 0; word-break:break-all;
 }
 .wait-row.me{ color:var(--accent-strong); font-weight:var(--fw-bold); }
@@ -1217,7 +1228,7 @@ button.room-n:hover{ color:var(--accent); text-decoration:underline; }
 .seat-h-2{ padding-top:var(--sp-3); border-top:1px solid var(--border); }
 
 /* 회선 상태 — 다섯 칸을 채워 보여준다 */
-.ping{ display:inline-flex; align-items:flex-end; gap:2px; height:12px; margin-left:auto; }
+.ping{ flex:none; display:inline-flex; align-items:flex-end; gap:2px; height:12px; margin-left:auto; }
 .ping i{
   width:3px; background:var(--border-strong); border-radius:1px; display:block;
 }
@@ -1230,8 +1241,8 @@ button.room-n:hover{ color:var(--accent); text-decoration:underline; }
 .ping.o i.on{ background:var(--warning); }
 .ping.r i.on{ background:var(--danger); }
 .ping-ms{
-  font-size:10px; font-family:var(--font-mono); color:var(--text-tertiary);
-  margin-left:var(--sp-2); min-width:34px; text-align:right;
+  flex:none; font-size:10px; font-family:var(--font-mono); color:var(--text-tertiary);
+  margin-left:var(--sp-1); text-align:right;
 }
 
 /* 방 이름 — 길면 줄바꿈되게 둔다 */
@@ -4597,7 +4608,13 @@ function renderWaiting() {
   if (!box) return;
   if (n) n.textContent = String(waiting.length);
   box.innerHTML = waiting.length
-    ? waiting.map(h => `<div class="wait-row${me && h === me.handle ? ' me' : ''}">${esc(h)}</div>`).join('')
+    ? waiting.map(w => {
+        const h = typeof w === 'string' ? w : w.handle;
+        const rtt = typeof w === 'string' ? null : w.rtt;
+        return `<div class="wait-row${me && h === me.handle ? ' me' : ''}">
+          <span class="seat-id">${esc(h)}</span>${pingBars(rtt)}
+        </div>`;
+      }).join('')
     : '<div class="wait-empty">아직 아무도 없습니다.</div>';
 }
 
