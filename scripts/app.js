@@ -215,6 +215,26 @@ async function loadAttendance() {
  * 누가 힘들어하는지 눈치채는 데는 쓸 만하다.
  */
 let myRtt = null;
+const PING_EVERY_MS = 10000;
+let pingedAt = 0;
+
+/**
+ * 아무 일도 하지 않는 자리까지의 왕복을 잰다.
+ *
+ * 방 목록 요청으로 재던 것을 따로 뗐다. 그 요청은 서버에서 데이터베이스를
+ * 여러 번 다녀오므로 그 시간이 값의 대부분을 차지했고, 결국 사람마다 다른
+ * 회선이 아니라 "지금 사이트가 얼마나 느린가"를 재고 있었다. 그래서 회선이
+ * 멀쩡한 PC 들이 한꺼번에 빨간불이 됐다.
+ */
+async function measurePing() {
+  if (Date.now() - pingedAt < PING_EVERY_MS) return;
+  pingedAt = Date.now();
+  try {
+    const t0 = performance.now();
+    await fetch('/api/ping', { cache: 'no-store' });
+    myRtt = Math.round(performance.now() - t0);
+  } catch { /* 못 쟀으면 지난 값을 그대로 둔다 */ }
+}
 
 /**
  * 서버가 보낸 런쳐 화면을 그대로 받아 적는다.
@@ -245,13 +265,11 @@ function applyRooms(d) {
 
 async function loadRooms() {
   try {
-    const t0 = performance.now();
-    const d = await apiGet('/api/room' + (myRtt == null ? '' : `?rtt=${myRtt}`));
-    myRtt = Math.round(performance.now() - t0);
-    applyRooms(d);
+    applyRooms(await apiGet('/api/room' + (myRtt == null ? '' : `?rtt=${myRtt}`)));
   } catch {
     rooms = []; myRoom = null; roomMsgs = []; waiting = []; lobbyMsgs = [];
   }
+  measurePing();   // 다음 요청에 실어 보낼 값을 미리 재둔다
 }
 
 async function loadPosts() {
@@ -2147,17 +2165,27 @@ function roomName(r) { return r && r.title ? r.title : `${r ? r.room : ''}번방
  * 회선 상태를 다섯 칸으로. 빠를수록 많이 차고 색이 밝다.
  * 값이 없으면(방금 들어왔거나 소식이 끊겼으면) 빈 칸만 보여준다.
  */
+/**
+ * 회선 상태를 다섯 칸으로.
+ *
+ * 기준은 게임 핑이 아니라 웹 왕복에 맞춘다. 게임 핑이라면 80ms 도 느린 축이지만,
+ * 이 값은 브라우저가 서버에 다녀오는 시간이라 좋은 회선이라도 100~300ms 는
+ * 예사다. 게임 핑 기준을 그대로 쓰는 바람에 멀쩡한 PC 들이 다 빨간불이 됐다.
+ */
 function pingBars(ms) {
   let on = 0, tone = 'g';
-  if (ms == null) { on = 0; tone = ''; }
-  else if (ms < 80)  { on = 5; tone = 'g'; }
-  else if (ms < 150) { on = 4; tone = 'g'; }
-  else if (ms < 250) { on = 3; tone = 'o'; }
-  else if (ms < 400) { on = 2; tone = 'o'; }
-  else               { on = 1; tone = 'r'; }
+  if (ms == null)     { on = 0; tone = ''; }
+  else if (ms < 250)  { on = 5; tone = 'g'; }
+  else if (ms < 500)  { on = 4; tone = 'g'; }
+  else if (ms < 900)  { on = 3; tone = 'o'; }
+  else if (ms < 1500) { on = 2; tone = 'o'; }
+  else                { on = 1; tone = 'r'; }
   const bars = [1, 2, 3, 4, 5]
     .map(i => `<i class="${i <= on ? 'on' : ''}"></i>`).join('');
-  return `<span class="ping ${tone}" title="사이트까지 왕복 ${ms == null ? '—' : ms + 'ms'}">${bars}</span>`
+  const tip = ms == null
+    ? '아직 재지 못했습니다'
+    : `사이트까지 왕복 ${ms}ms · 게임 안에서 서로에게 가는 핑은 아닙니다`;
+  return `<span class="ping ${tone}" title="${tip}">${bars}</span>`
     + `<span class="ping-ms">${ms == null ? '—' : ms + 'ms'}</span>`;
 }
 
