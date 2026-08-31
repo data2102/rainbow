@@ -266,6 +266,51 @@ async function listRooms() {
   return rooms;
 }
 
+/**
+ * 지금 런쳐 화면에 필요한 것 전부.
+ *
+ * 목록을 읽을 때도, 방에 들어간 직후에도 같은 것이 필요하다. 들어가고 나서
+ * 다시 물어보면 왕복이 한 번 더 생기므로, 들어가기 응답에도 이것을 실어 보낸다.
+ */
+async function snapshot(req, me) {
+  // 서로를 기다릴 이유가 없는 것들이라 함께 보낸다.
+  // 하나씩 오가면 왕복만 네 번이라, 먼 회선에서는 그것만으로 1초가 넘는다.
+  const [rooms, lobbyMessages, waitingList, mineRows] = await Promise.all([
+    listRooms(),
+    me ? readMsgs(LOBBY) : Promise.resolve([]),
+    lobbyList(),
+    me ? q(`SELECT radmin_ip, conn_mode FROM players WHERE handle = $1`, [me.handle])
+       : Promise.resolve([]),
+  ]);
+  const mine = me ? rooms.find(r => r.members.includes(me.handle)) : null;
+  // 접속 주소는 그 방에 들어와 있는 사람에게만 보인다
+  for (const r of rooms) if (r !== mine) r.address = null;
+  const messages = mine ? await readMsgs(mine.room) : [];
+
+  // 방장이 지난번에 적어둔 주소를 미리 채워준다
+  let savedAddress = null;
+  let connMode = DEFAULT_MODE;
+  if (mineRows.length) {
+    savedAddress = mineRows[0].radmin_ip;
+    connMode = mineRows[0].conn_mode || DEFAULT_MODE;
+  }
+
+  // 지금 이 사람이 어느 주소에서 들어왔는지. 방장이 되면 이 주소로 사람들이 찾아온다.
+  const publicIp = clientIp(req);
+
+  return {
+    rooms, messages, lobbyMessages, savedAddress, connMode, publicIp,
+    publicIpUsable: isReachableIp(publicIp),
+    myRoom: mine ? mine.room : null,
+    waiting: waitingList,
+    capacity: ROOM_CAPACITY,
+    capacityMin: ROOM_CAPACITY_MIN,
+    maxTitle: MAX_TITLE,
+    network: VPN_NETWORK,
+    networkPw: me ? VPN_PASSWORD : null,
+  };
+}
+
 export default async function handler(req, res) {
   if (!methodGuard(req, res, ['GET', 'POST'])) return;
   try {
@@ -297,43 +342,8 @@ export default async function handler(req, res) {
       // 내 표시를 남긴 뒤에 쓸어야 나를 쓸어내지 않는다
       await Promise.all([sweepIdle(), sweepLobby()]);
 
-      // 방 목록·대기실 대화·대기 명단·내 주소는 서로를 기다릴 이유가 없다.
-      // 하나씩 오가면 왕복만 네 번이라, 먼 회선에서는 그것만으로 1초가 넘는다.
-      const [rooms, lobbyMessages, waitingList, mineRows] = await Promise.all([
-        listRooms(),
-        me ? readMsgs(LOBBY) : Promise.resolve([]),
-        lobbyList(),
-        me ? q(`SELECT radmin_ip, conn_mode FROM players WHERE handle = $1`, [me.handle])
-           : Promise.resolve([]),
-      ]);
-      const mine = me ? rooms.find(r => r.members.includes(me.handle)) : null;
-      // 접속 주소는 그 방에 들어와 있는 사람에게만 보인다
-      for (const r of rooms) if (r !== mine) r.address = null;
-      const messages = mine ? await readMsgs(mine.room) : [];
-
-      // 방장이 지난번에 적어둔 주소를 미리 채워준다
-      let savedAddress = null;
-      let connMode = DEFAULT_MODE;
-      if (mineRows.length) {
-        savedAddress = mineRows[0].radmin_ip;
-        connMode = mineRows[0].conn_mode || DEFAULT_MODE;
-      }
-
-      // 지금 이 사람이 어느 주소에서 들어왔는지. 방장이 되면 이 주소로 사람들이 찾아온다.
-      const publicIp = clientIp(req);
-
       res.setHeader('Cache-Control', 'no-store');
-      return res.status(200).json({
-        rooms, messages, lobbyMessages, savedAddress, connMode, publicIp,
-        publicIpUsable: isReachableIp(publicIp),
-        myRoom: mine ? mine.room : null,
-        waiting: waitingList,
-        capacity: ROOM_CAPACITY,
-        capacityMin: ROOM_CAPACITY_MIN,
-        maxTitle: MAX_TITLE,
-        network: VPN_NETWORK,
-        networkPw: me ? VPN_PASSWORD : null,
-      });
+      return res.status(200).json(await snapshot(req, me));
     }
 
     const { action } = body(req);
@@ -397,7 +407,8 @@ async function enter(req, res) {
     await system(room, out.first ? `${me} 님이 방을 열었습니다. (방장)` : `${me} 님이 들어왔습니다.`);
     if (out.left) await closeEmptyRooms();
   }
-  res.status(200).json({ ok: true, room });
+  // 들어간 직후의 화면을 함께 보낸다 — 받은 쪽이 다시 물어보지 않아도 되도록
+  res.status(200).json({ ok: true, room, ...(await snapshot(req, { handle: me })) });
 }
 
 async function leave(req, res) {

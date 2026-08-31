@@ -216,29 +216,41 @@ async function loadAttendance() {
  */
 let myRtt = null;
 
-async function loadRooms() {
+/**
+ * 서버가 보낸 런쳐 화면을 그대로 받아 적는다.
+ *
+ * 목록을 읽었을 때든 방에 막 들어갔을 때든 오는 내용이 같아서, 들어가기
+ * 응답에 실려온 것도 이 길로 흘려보낸다 — 들어가고 나서 다시 물어볼 일이 없다.
+ */
+function applyRooms(d) {
   const before = myRoom;
-  try {
-    const t0 = performance.now();
-    const d = await apiGet('/api/room' + (myRtt == null ? '' : `?rtt=${myRtt}`));
-    myRtt = Math.round(performance.now() - t0);
-    rooms = d.rooms || [];
-    myRoom = d.myRoom || null;
-    roomMsgs = d.messages || [];
-    savedAddress = d.savedAddress || null;
-    connMode = d.connMode || 'radmin';
-    publicIp = d.publicIp || null;
-    publicIpUsable = !!d.publicIpUsable;
-    vpn = { network: d.network || '', password: d.networkPw || null };
-    waiting = d.waiting || [];
-    lobbyMsgs = d.lobbyMessages || [];
-    capacityMin = d.capacityMin || capacityMin;
-    maxTitle = d.maxTitle || maxTitle;
-  } catch { rooms = []; myRoom = null; roomMsgs = []; waiting = []; lobbyMsgs = []; }
+  rooms = d.rooms || [];
+  myRoom = d.myRoom || null;
+  roomMsgs = d.messages || [];
+  savedAddress = d.savedAddress || null;
+  connMode = d.connMode || 'radmin';
+  publicIp = d.publicIp || null;
+  publicIpUsable = !!d.publicIpUsable;
+  vpn = { network: d.network || '', password: d.networkPw || null };
+  waiting = d.waiting || [];
+  lobbyMsgs = d.lobbyMessages || [];
+  capacityMin = d.capacityMin || capacityMin;
+  maxTitle = d.maxTitle || maxTitle;
 
   // 내가 누르지 않았는데 방에서 빠졌다면 알려준다
   if (before && !myRoom && !leavingOnPurpose) {
     showToast('방에서 나가게 되었습니다 · 강퇴되었거나 연결이 오래 끊겼습니다.');
+  }
+}
+
+async function loadRooms() {
+  try {
+    const t0 = performance.now();
+    const d = await apiGet('/api/room' + (myRtt == null ? '' : `?rtt=${myRtt}`));
+    myRtt = Math.round(performance.now() - t0);
+    applyRooms(d);
+  } catch {
+    rooms = []; myRoom = null; roomMsgs = []; waiting = []; lobbyMsgs = [];
   }
 }
 
@@ -2170,6 +2182,16 @@ const roomParam = Number(new URLSearchParams(location.search).get('room')) || 0;
 const isRoomWindow = roomParam > 0;
 let roomWin = null;
 
+/** 방 창이 방에 못 들어갔을 때 그 자리에 남기는 안내. */
+function showRoomFail(msg) {
+  const box = document.getElementById('roomFail');
+  const t = document.getElementById('roomFailText');
+  if (t) t.textContent = msg;
+  // 인라인 style 이 시트를 이기므로 여기서 직접 켠다
+  if (box) box.style.display = 'flex';
+  clearRoomWindow();   // 바닥 창이 이 창을 기다리지 않도록
+}
+
 function markRoomWindow() {
   try { localStorage.setItem(POPUP_KEY, String(Date.now())); } catch { /* noop */ }
 }
@@ -2802,8 +2824,7 @@ async function enterRoom(room) {
   if (!isLoggedIn()) { showLoginModal(); return; }
   if (openRoomWindow(room)) return;   // 새 창이 열렸으면 들어가는 일도 그 창이 한다
   try {
-    await apiPost('/api/room', { action: 'enter', room });
-    await loadRooms();
+    applyRooms(await apiPost('/api/room', { action: 'enter', room }));
     renderLauncher();
   } catch (e) { showToast(e.message); }
 }
@@ -3007,6 +3028,9 @@ function initLauncherEvents() {
   const ipEdit = document.getElementById('myIpEdit');
   if (ipEdit) ipEdit.addEventListener('click', showIpModal);
 
+  const failClose = document.getElementById('roomFailClose');
+  if (failClose) failClose.addEventListener('click', () => window.close());
+
   const reopen = document.getElementById('lcAwayOpen');
   if (reopen) reopen.addEventListener('click', () => {
     const r = myRoomData();
@@ -3137,6 +3161,16 @@ async function handleImportFile(e) {
 }
 
 /* ---------- 초기화 ---------- */
+
+/** 탭만 켠다 — 받아오는 일 없이 화면만 바꾼다. */
+function showTabOnly(name) {
+  const panel = document.getElementById('tab-' + name);
+  if (!panel) return false;
+  document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  panel.classList.add('active');
+  return true;
+}
 
 function activateTab(name) {
   const panel = document.getElementById('tab-' + name);
@@ -3282,16 +3316,31 @@ async function bootRoomWindow() {
   document.documentElement.classList.add('room-only');
   document.title = `${roomParam}번방 · RAINBOWSIX RANK`;
   markRoomWindow();
-  activateTab('launcher');
-  if (!isLoggedIn()) { renderLauncher(); showLoginModal(); return; }
+  // 탭만 켠다. activateTab 은 켜면서 목록을 또 받아오는데, 바로 아래에서
+  // 들어가기 응답으로 같은 것을 받으므로 왕복이 한 번 헛돈다.
+  showTabOnly('launcher');
+  if (!isLoggedIn()) { showRoomFail('로그인이 풀렸습니다 · 창을 닫고 다시 들어와주세요.'); return; }
   try {
-    if (myRoom !== roomParam) await apiPost('/api/room', { action: 'enter', room: roomParam });
-    await loadRooms();
-  } catch (e) { showToast(e.message); }
+    // 창을 열면서 이미 보내둔 것이 있으면 그것을 쓴다
+    applyRooms(await (entering || apiPost('/api/room', { action: 'enter', room: roomParam })));
+  } catch (e) {
+    // 이 창에는 방 목록이 없다. 못 들어간 이유를 여기서 말해주지 않으면
+    // 빈 화면만 남아 무슨 일이 났는지 알 수가 없다.
+    showRoomFail(e.message);
+    return;
+  }
   renderLauncher();
   const here = myRoomData();
   if (here) document.title = `${roomName(here)} · RAINBOWSIX RANK`;
 }
+
+/**
+ * 방 창이 뜨자마자 보내두는 들어가기 요청.
+ *
+ * 표는 브라우저에 이미 적혀 있으므로 내가 누구인지 확인되기를 기다릴 필요가
+ * 없다. 확인과 들어가기를 함께 보내 왕복 한 번을 아낀다.
+ */
+let entering = null;
 
 async function boot() {
   initTheme();
@@ -3311,11 +3360,18 @@ async function boot() {
   initMonthPickers();
   renderAuthBar();
   try {
+    // 방 창은 들어가기를 먼저 띄워두고 확인과 나란히 기다린다
+    if (isRoomWindow && readKey(TOKEN_KEY)) {
+      authToken = readKey(TOKEN_KEY);
+      entering = apiPost('/api/room', { action: 'enter', room: roomParam });
+      // 아래에서 await 하기 전에 실패하면 "처리되지 않은 거부"로 잡히므로
+      // 미리 한 번 받아둔다. 실제 처리는 bootRoomWindow 가 한다.
+      entering.catch(() => {});
+    }
     // 표를 먼저 확인해야 첫 화면부터 로그인한 사람으로 그려진다
     await restoreLogin();
     renderAuthBar();
     if (isRoomWindow) {
-      await loadRooms();
       await bootRoomWindow();
       window.addEventListener('pagehide', () => {
         clearRoomWindow();
