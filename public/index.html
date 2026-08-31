@@ -1858,7 +1858,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
       </div>
 
       <div class="dl-box">
-        <div class="dl-h">처음 한 번만 — 설치 파일</div>
+        <div class="dl-h">필수사항</div>
         <div class="dl-sub" id="dlSub"></div>
 
         <div class="dl-row">
@@ -4313,9 +4313,9 @@ function applyConnMode() {
   const sub = document.getElementById('dlSub');
   if (sub) {
     sub.innerHTML = mode === 'radmin'
-      ? '<b>①②③ 만 하시면 됩니다</b> · 한 번 해두면 다음부터는 그냥 들어가기만 하면 됩니다.'
-      : '<b>①②③ 은 모두</b> 하고, <b>＋ 는 방장을 할 사람만</b> 하면 됩니다 ·'
-        + ' 한 번 해두면 다음부터는 그냥 들어가기만 하면 됩니다.';
+      ? '<b>①~③에 대해 최초 1회만 실행</b>하면 그 다음부터는 게임만 접속하시면 됩니다.'
+      : '<b>①~③ 은 모두</b> 하고, <b>＋ 는 방장을 할 사람만</b> 하면 됩니다 ·'
+        + ' 최초 1회만 실행하면 그 다음부터는 게임만 접속하시면 됩니다.';
   }
 }
 
