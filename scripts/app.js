@@ -2958,21 +2958,40 @@ async function sendChat() { await postChat('chatInput', 'say'); }
 /** 대기실에 한마디. 방 밖에 있는 사람들이 함께 본다. */
 async function sendLobbyChat() { await postChat('lobbyInput', 'sayLobby'); }
 
-/** 적은 말을 보낸다. 못 보냈으면 지웠던 글을 되돌려 다시 눌러볼 수 있게 한다. */
+/**
+ * 적은 말을 보낸다.
+ *
+ * 누르자마자 내 화면에 먼저 띄운다. 서버를 다녀올 때까지 아무 일도 일어나지
+ * 않으면 안 눌린 줄 알고 또 누르게 된다. 서버가 담은 결과를 그대로 돌려주므로
+ * 다시 물어볼 필요도 없다 — 왕복 한 번으로 끝난다.
+ *
+ * 못 보냈으면 띄웠던 줄을 걷어내고 지웠던 글을 입력칸에 되돌린다.
+ */
 async function postChat(inputId, action) {
   const input = document.getElementById(inputId);
   if (!input) return;
   const text = input.value.trim();
   if (!text) return;
   input.value = '';
+
+  const lobby = action === 'sayLobby';
+  const list = lobby ? lobbyMsgs : roomMsgs;
+  const pending = { id: `p${Date.now()}`, handle: me ? me.handle : '', body: text, ts: Date.now() };
+  list.push(pending);
+  if (lobby) renderLobbyChat(); else renderChatLog();
+
   try {
-    await apiPost('/api/room', { action, body: text });
-    await loadRooms();
-    renderLauncher();
+    const d = await apiPost('/api/room', { action, body: text });
+    if (d && d.messages) {
+      if (lobby) lobbyMsgs = d.messages; else roomMsgs = d.messages;
+    }
   } catch (e) {
+    const i = list.indexOf(pending);
+    if (i >= 0) list.splice(i, 1);
     input.value = text;
     showToast(e.message);
   }
+  if (lobby) renderLobbyChat(); else renderChatLog();
 }
 
 function initLauncherEvents() {
@@ -3134,7 +3153,9 @@ function activateTab(name) {
     if (search && search.value) { search.value = ''; }
     renderStanding();
   }
-  if (name === 'history') refreshAll();
+  // 그 탭이 쓰는 것만 받아온다. 리폿 하나 보자고 출석·대회·게시판까지
+  // 새로 받으면 왕복이 일곱 번 이어져 탭이 늦게 열린다.
+  if (name === 'history') loadState().then(() => { renderHistory(); renderStanding(); renderTop5(); });
   if (name === 'attendance') { loadAttendance().then(renderAttendance); }
   if (name === 'launcher') { loadRooms().then(renderLauncher); }
 }
@@ -3214,14 +3235,18 @@ function initAdminEvents() {
   });
 }
 
+/**
+ * 화면에 필요한 것을 모두 받아온다.
+ *
+ * 하나씩 기다리면 일곱 번의 왕복이 줄줄이 이어져, 왕복 한 번이 200ms 인
+ * 회선에서는 그것만으로 1초가 넘는다. 서로 기댈 것이 없는 요청들이므로
+ * 한꺼번에 보낸다. 하나가 실패해도 나머지는 그려야 하니 결과는 따지지 않는다.
+ */
 async function refreshAll() {
-  await loadState();
-  await loadSeasons();
-  await loadAttendance();
-  await loadTournament();
-  await loadPosts();
-  await loadRooms();
-  await loadAccounts();
+  await Promise.allSettled([
+    loadState(), loadSeasons(), loadAttendance(),
+    loadTournament(), loadPosts(), loadRooms(), loadAccounts(),
+  ]);
   renderAll();
 }
 

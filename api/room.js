@@ -51,6 +51,13 @@ const KEEP_MSG = 120;
 const LOBBY = 0;
 
 let ensured = false;
+/**
+ * 표가 없으면 만든다. 새 인스턴스가 처음 깨어날 때 한 번만 돈다.
+ *
+ * 예전에는 문장마다 따로 보내 열두 번을 오갔다. 왕복 한 번이 200ms 인
+ * 회선에서는 그것만으로 2초가 넘어, 오랜만에 들어온 사람이 첫 클릭에서
+ * 한참을 기다렸다. 서로 기댈 것이 없는 문장들이라 한 번에 보낸다.
+ */
 async function ensureTables() {
   if (ensured) return;
   await q(`
@@ -60,44 +67,46 @@ async function ensureTables() {
       joined_at BIGINT NOT NULL,
       last_seen BIGINT NOT NULL,
       PRIMARY KEY (room, handle)
-    )`);
-  // 한 사람이 두 방에 동시에 있을 수는 없다
-  await q(`CREATE UNIQUE INDEX IF NOT EXISTS idx_room_one ON room_members (handle)`);
-  await q(`
+    );
+    -- 한 사람이 두 방에 동시에 있을 수는 없다
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_room_one ON room_members (handle);
+    -- 각자 브라우저가 잰 사이트까지의 왕복 시간(ms)
+    ALTER TABLE room_members ADD COLUMN IF NOT EXISTS rtt INTEGER;
+
     CREATE TABLE IF NOT EXISTS room_state (
       room       INTEGER PRIMARY KEY,
       running    BOOLEAN NOT NULL DEFAULT false,
       started_at BIGINT,
       started_by TEXT
-    )`);
-  // 방장의 Radmin 주소. 방을 연 사람이 어디에 있는지 알려주는 값이다.
-  await q(`ALTER TABLE room_state ADD COLUMN IF NOT EXISTS address TEXT`);
-  // 한 번 적은 주소는 계정에 남겨 다음부터 자동으로 채운다
-  await q(`ALTER TABLE players ADD COLUMN IF NOT EXISTS radmin_ip TEXT`);
-  // 어느 주소로 서로를 찾을지. 'auto' = 사이트가 읽은 공인 IP, 'radmin' = 직접 적어둔 주소
-  await q(`ALTER TABLE players ADD COLUMN IF NOT EXISTS conn_mode TEXT`);
-  await q(`
+    );
+    -- 방장의 Radmin 주소. 방을 연 사람이 어디에 있는지 알려주는 값이다.
+    ALTER TABLE room_state ADD COLUMN IF NOT EXISTS address TEXT;
+    -- 방장이 정한 정원. 비어 있으면 기본값(16명)을 쓴다.
+    ALTER TABLE room_state ADD COLUMN IF NOT EXISTS cap INTEGER;
+    -- 방장이 붙인 이름. 비어 있으면 "N번방".
+    ALTER TABLE room_state ADD COLUMN IF NOT EXISTS title TEXT;
+
+    -- 한 번 적은 주소는 계정에 남겨 다음부터 자동으로 채운다
+    ALTER TABLE players ADD COLUMN IF NOT EXISTS radmin_ip TEXT;
+    -- 'auto' = 사이트가 읽은 공인 IP, 'radmin' = 직접 적어둔 주소
+    ALTER TABLE players ADD COLUMN IF NOT EXISTS conn_mode TEXT;
+
     CREATE TABLE IF NOT EXISTS room_messages (
       id     BIGSERIAL PRIMARY KEY,
       room   INTEGER NOT NULL,
       handle TEXT,
       body   TEXT NOT NULL,
       ts     BIGINT NOT NULL
-    )`);
-  await q(`CREATE INDEX IF NOT EXISTS idx_room_msg ON room_messages (room, id)`);
-  // 방장이 정한 정원. 비어 있으면 기본값(16명)을 쓴다.
-  await q(`ALTER TABLE room_state ADD COLUMN IF NOT EXISTS cap INTEGER`);
-  // 방장이 붙인 이름. 비어 있으면 "N번방".
-  await q(`ALTER TABLE room_state ADD COLUMN IF NOT EXISTS title TEXT`);
-  // 각자 브라우저가 잰 사이트까지의 왕복 시간(ms). 회선이 얼마나 뻗는지 가늠하는 값이다.
-  await q(`ALTER TABLE room_members ADD COLUMN IF NOT EXISTS rtt INTEGER`);
-  // 로그인한 채 런쳐를 보고 있는 사람들. 방에 들어가기 전 대기실이다.
-  await q(`
+    );
+    CREATE INDEX IF NOT EXISTS idx_room_msg ON room_messages (room, id);
+
+    -- 로그인한 채 런쳐를 보고 있는 사람들. 방에 들어가기 전 대기실이다.
     CREATE TABLE IF NOT EXISTS lobby (
       handle    TEXT PRIMARY KEY,
       last_seen BIGINT NOT NULL
-    )`);
-  await q(`ALTER TABLE lobby ADD COLUMN IF NOT EXISTS rtt INTEGER`);
+    );
+    ALTER TABLE lobby ADD COLUMN IF NOT EXISTS rtt INTEGER;
+  `);
   ensured = true;
 }
 
@@ -268,41 +277,46 @@ export default async function handler(req, res) {
       if (me) {
         const now = Date.now();
         // 브라우저가 방금 잰 왕복 시간. 터무니없는 값은 버린다.
-        const raw = Number(new URL(req.url, 'http://x').searchParams.get('rtt'));
-        const rtt = Number.isFinite(raw) && raw >= 0 && raw < 60000 ? Math.round(raw) : null;
-        await q(
-          `UPDATE room_members SET last_seen = $1, rtt = COALESCE($3, rtt) WHERE handle = $2`,
-          [now, me.handle, rtt]
-        );
-        // 방에 있든 없든 런쳐를 보고 있다는 표시는 남긴다
-        await q(
-          `INSERT INTO lobby (handle, last_seen, rtt) VALUES ($1, $2, $3)
-             ON CONFLICT (handle) DO UPDATE
-                SET last_seen = EXCLUDED.last_seen,
-                    rtt = COALESCE(EXCLUDED.rtt, lobby.rtt)`,
-          [me.handle, now, rtt]
-        );
+        // 값이 아예 없을 때를 먼저 걸러야 한다 — Number(null) 은 0 이라,
+        // 그냥 넘기면 재본 적도 없는 사람이 0ms 로 기록된다.
+        const raw = new URL(req.url, 'http://x').searchParams.get('rtt');
+        const n = raw == null || raw === '' ? NaN : Number(raw);
+        const rtt = Number.isFinite(n) && n >= 0 && n < 60000 ? Math.round(n) : null;
+        // 자리 지킴과 대기실 표시는 서로 기댈 것이 없으니 함께 보낸다
+        await Promise.all([
+          q(`UPDATE room_members SET last_seen = $1, rtt = COALESCE($3, rtt) WHERE handle = $2`,
+            [now, me.handle, rtt]),
+          // 방에 있든 없든 런쳐를 보고 있다는 표시는 남긴다
+          q(`INSERT INTO lobby (handle, last_seen, rtt) VALUES ($1, $2, $3)
+               ON CONFLICT (handle) DO UPDATE
+                  SET last_seen = EXCLUDED.last_seen,
+                      rtt = COALESCE(EXCLUDED.rtt, lobby.rtt)`,
+            [me.handle, now, rtt]),
+        ]);
       }
-      await sweepIdle();
-      await sweepLobby();
+      // 내 표시를 남긴 뒤에 쓸어야 나를 쓸어내지 않는다
+      await Promise.all([sweepIdle(), sweepLobby()]);
 
-      const rooms = await listRooms();
+      // 방 목록·대기실 대화·대기 명단·내 주소는 서로를 기다릴 이유가 없다.
+      // 하나씩 오가면 왕복만 네 번이라, 먼 회선에서는 그것만으로 1초가 넘는다.
+      const [rooms, lobbyMessages, waitingList, mineRows] = await Promise.all([
+        listRooms(),
+        me ? readMsgs(LOBBY) : Promise.resolve([]),
+        lobbyList(),
+        me ? q(`SELECT radmin_ip, conn_mode FROM players WHERE handle = $1`, [me.handle])
+           : Promise.resolve([]),
+      ]);
       const mine = me ? rooms.find(r => r.members.includes(me.handle)) : null;
       // 접속 주소는 그 방에 들어와 있는 사람에게만 보인다
       for (const r of rooms) if (r !== mine) r.address = null;
       const messages = mine ? await readMsgs(mine.room) : [];
-      // 대기실 대화는 방에 있든 없든 내려보낸다 — 방에서 나오면 바로 이어 읽는다
-      const lobbyMessages = me ? await readMsgs(LOBBY) : [];
 
       // 방장이 지난번에 적어둔 주소를 미리 채워준다
       let savedAddress = null;
       let connMode = DEFAULT_MODE;
-      if (me) {
-        const rows = await q(`SELECT radmin_ip, conn_mode FROM players WHERE handle = $1`, [me.handle]);
-        if (rows.length) {
-          savedAddress = rows[0].radmin_ip;
-          connMode = rows[0].conn_mode || DEFAULT_MODE;
-        }
+      if (mineRows.length) {
+        savedAddress = mineRows[0].radmin_ip;
+        connMode = mineRows[0].conn_mode || DEFAULT_MODE;
       }
 
       // 지금 이 사람이 어느 주소에서 들어왔는지. 방장이 되면 이 주소로 사람들이 찾아온다.
@@ -313,7 +327,7 @@ export default async function handler(req, res) {
         rooms, messages, lobbyMessages, savedAddress, connMode, publicIp,
         publicIpUsable: isReachableIp(publicIp),
         myRoom: mine ? mine.room : null,
-        waiting: await lobbyList(),
+        waiting: waitingList,
         capacity: ROOM_CAPACITY,
         capacityMin: ROOM_CAPACITY_MIN,
         maxTitle: MAX_TITLE,
@@ -478,8 +492,10 @@ async function say(req, res) {
   const rows = await q(`SELECT room FROM room_members WHERE handle = $1`, [me]);
   if (!rows.length) return res.status(400).json({ error: '먼저 방에 들어가주세요.' });
 
-  await push(rows[0].room, me, text);
-  res.status(200).json({ ok: true });
+  const room = rows[0].room;
+  await push(room, me, text);
+  // 방금 담은 것까지 함께 돌려준다 — 보낸 쪽이 다시 물어보지 않아도 되도록
+  res.status(200).json({ ok: true, messages: await readMsgs(room) });
 }
 
 /**
@@ -497,7 +513,7 @@ async function sayLobby(req, res) {
   if (text.length > MAX_MSG) return res.status(400).json({ error: `${MAX_MSG}자 이내로 입력해주세요.` });
 
   await push(LOBBY, me, text);
-  res.status(200).json({ ok: true });
+  res.status(200).json({ ok: true, messages: await readMsgs(LOBBY) });
 }
 
 /**
