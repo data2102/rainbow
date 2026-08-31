@@ -219,6 +219,15 @@ const PING_EVERY_MS = 10000;
 let pingedAt = 0;
 
 /**
+ * 이 화면이 회선을 재는 방식의 판 번호. 서버의 것과 같아야 값이 받아들여진다.
+ * 새로고침하지 않은 사람은 옛 판으로 재고 있으므로, 서버가 그 값을 버리고
+ * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
+ */
+const PING_VERSION = 3;
+const APP_VERSION = 3;
+let toldToRefresh = false;
+
+/**
  * 회선이 얼마나 빨리 닿는지를 잰다.
  *
  * 작은 파일 하나를 받아오는 시간이다. 이 파일은 서버 프로그램을 거치지 않고
@@ -261,6 +270,7 @@ function applyRooms(d) {
   lobbyMsgs = d.lobbyMessages || [];
   capacityMin = d.capacityMin || capacityMin;
   maxTitle = d.maxTitle || maxTitle;
+  if (d.appVersion && d.appVersion !== APP_VERSION) noticeNewVersion();
 
   // 내가 누르지 않았는데 방에서 빠졌다면 알려준다
   if (before && !myRoom && !leavingOnPurpose) {
@@ -268,9 +278,23 @@ function applyRooms(d) {
   }
 }
 
+/**
+ * 사이트가 바뀌었는데 이 화면만 예전 것일 때.
+ *
+ * 켜둔 채로 며칠을 두는 사람이 많다. 그 화면은 예전 코드를 계속 돌리므로
+ * 새로 고친 부분이 그 사람에게만 안 보인다. 한 번만 알려준다 — 2초마다
+ * 다시 뜨면 그게 더 성가시다.
+ */
+function noticeNewVersion() {
+  if (toldToRefresh) return;
+  toldToRefresh = true;
+  showToast('사이트가 새로 바뀌었습니다 · 새로고침(F5) 해주세요.');
+}
+
 async function loadRooms() {
   try {
-    applyRooms(await apiGet('/api/room' + (myRtt == null ? '' : `?rtt=${myRtt}`)));
+    applyRooms(await apiGet(
+      `/api/room?pv=${PING_VERSION}` + (myRtt == null ? '' : `&rtt=${myRtt}`)));
   } catch {
     rooms = []; myRoom = null; roomMsgs = []; waiting = []; lobbyMsgs = [];
   }

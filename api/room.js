@@ -15,6 +15,20 @@ export const ROOM_CAPACITY_MIN = 2;
 /** 방 이름 길이 */
 export const MAX_TITLE = 24;
 
+/**
+ * 회선을 재는 방식의 판 번호.
+ *
+ * 재는 방법을 바꿀 때마다 올린다. 브라우저를 새로고침하지 않은 사람은 예전
+ * 방식으로 잰 값을 계속 올려보내는데, 그 값을 그대로 섞으면 같은 화면에서
+ * 어떤 사람은 새 잣대로, 어떤 사람은 옛 잣대로 재어진 값이 나란히 놓인다.
+ * 판이 다르면 값을 받지 않고 비워둔다 — 틀린 값을 보여주느니 아직 못 쟀다고
+ * 말하는 편이 낫다. 새로고침하면 곧바로 제 값이 들어온다.
+ */
+export const PING_VERSION = 3;
+
+/** 사이트가 바뀌었는지 브라우저가 알아채는 표. 배포할 때마다 올린다. */
+export const APP_VERSION = 3;
+
 /** 이 시간 동안 아무 신호가 없으면 나간 것으로 본다 (브라우저를 그냥 닫는 경우) */
 const IDLE_MS = 3 * 60 * 1000;
 
@@ -306,6 +320,8 @@ async function snapshot(req, me) {
     capacity: ROOM_CAPACITY,
     capacityMin: ROOM_CAPACITY_MIN,
     maxTitle: MAX_TITLE,
+    pingVersion: PING_VERSION,
+    appVersion: APP_VERSION,
     network: VPN_NETWORK,
     networkPw: me ? VPN_PASSWORD : null,
   };
@@ -324,18 +340,24 @@ export default async function handler(req, res) {
         // 브라우저가 방금 잰 왕복 시간. 터무니없는 값은 버린다.
         // 값이 아예 없을 때를 먼저 걸러야 한다 — Number(null) 은 0 이라,
         // 그냥 넘기면 재본 적도 없는 사람이 0ms 로 기록된다.
-        const raw = new URL(req.url, 'http://x').searchParams.get('rtt');
-        const n = raw == null || raw === '' ? NaN : Number(raw);
+        const url = new URL(req.url, 'http://x');
+        const raw = url.searchParams.get('rtt');
+        // 지금 쓰는 방식으로 잰 값만 받는다
+        const same = Number(url.searchParams.get('pv')) === PING_VERSION;
+        const n = !same || raw == null || raw === '' ? NaN : Number(raw);
         const rtt = Number.isFinite(n) && n >= 0 && n < 60000 ? Math.round(n) : null;
         // 자리 지킴과 대기실 표시는 서로 기댈 것이 없으니 함께 보낸다
         await Promise.all([
-          q(`UPDATE room_members SET last_seen = $1, rtt = COALESCE($3, rtt) WHERE handle = $2`,
+          // 예전 방식으로 재던 사람은 값을 비워 "아직 못 쟀음"으로 되돌린다
+          q(same
+            ? `UPDATE room_members SET last_seen = $1, rtt = COALESCE($3, rtt) WHERE handle = $2`
+            : `UPDATE room_members SET last_seen = $1, rtt = $3 WHERE handle = $2`,
             [now, me.handle, rtt]),
           // 방에 있든 없든 런쳐를 보고 있다는 표시는 남긴다
           q(`INSERT INTO lobby (handle, last_seen, rtt) VALUES ($1, $2, $3)
                ON CONFLICT (handle) DO UPDATE
                   SET last_seen = EXCLUDED.last_seen,
-                      rtt = COALESCE(EXCLUDED.rtt, lobby.rtt)`,
+                      rtt = ${same ? 'COALESCE(EXCLUDED.rtt, lobby.rtt)' : 'EXCLUDED.rtt'}`,
             [me.handle, now, rtt]),
         ]);
       }
