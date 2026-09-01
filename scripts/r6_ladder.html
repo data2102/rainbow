@@ -1608,6 +1608,7 @@ if (/[?&]room=\d+/.test(location.search)) {
               <th data-key="handle">ID</th>
               <th data-key="clan">Clan</th>
               <th data-key="point">Point</th>
+              <th data-key="game">Game</th>
               <th data-key="win">Win</th>
               <th data-key="loss">Loss</th>
               <th data-key="ratio">Ratio</th>
@@ -1633,7 +1634,7 @@ if (/[?&]room=\d+/.test(location.search)) {
         <h2>Most Point Top 5</h2>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Rank</th><th>ID</th><th>Clan</th><th>Point</th><th>Win</th><th>Loss</th></tr></thead>
+            <thead><tr><th>Rank</th><th>ID</th><th>Clan</th><th>Point</th><th>Game</th><th>Win</th><th>Loss</th></tr></thead>
             <tbody id="topPointBody"></tbody>
           </table>
         </div>
@@ -1642,7 +1643,7 @@ if (/[?&]room=\d+/.test(location.search)) {
         <h2>Most Wins Top 5</h2>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Rank</th><th>ID</th><th>Clan</th><th>Win</th><th>Loss</th><th>Ratio</th></tr></thead>
+            <thead><tr><th>Rank</th><th>ID</th><th>Clan</th><th>Game</th><th>Win</th><th>Loss</th><th>Ratio</th></tr></thead>
             <tbody id="topWinBody"></tbody>
           </table>
         </div>
@@ -1653,7 +1654,7 @@ if (/[?&]room=\d+/.test(location.search)) {
       <h2>Best Ratio Top 5</h2>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Rank</th><th>ID</th><th>Clan</th><th>Ratio</th><th>Win</th><th>Loss</th><th>경기</th></tr></thead>
+          <thead><tr><th>Rank</th><th>ID</th><th>Clan</th><th>Ratio</th><th>Game</th><th>Win</th><th>Loss</th></tr></thead>
           <tbody id="topRatioBody"></tbody>
         </table>
       </div>
@@ -1667,7 +1668,7 @@ if (/[?&]room=\d+/.test(location.search)) {
       <div class="table-wrap">
         <table>
           <thead>
-            <tr><th>Rank</th><th>Clan</th><th>인원</th><th>Point</th><th>Win</th><th>Loss</th><th>Ratio</th></tr>
+            <tr><th>Rank</th><th>Clan</th><th>인원</th><th>Point</th><th>Game</th><th>Win</th><th>Loss</th><th>Ratio</th></tr>
           </thead>
           <tbody id="clanBody"></tbody>
         </table>

@@ -351,6 +351,7 @@ function sortedPlayers() {
       case 'handle': return sortDir * a.handle.toLowerCase().localeCompare(b.handle.toLowerCase());
       case 'clan':   return sortDir * a.clan.toLowerCase().localeCompare(b.clan.toLowerCase());
       case 'point':  av = a.point; bv = b.point; break;
+      case 'game':   av = a.wins + a.losses; bv = b.wins + b.losses; break;
       case 'win':    av = a.wins; bv = b.wins; break;
       case 'loss':   av = a.losses; bv = b.losses; break;
       case 'ratio':  av = ratio(a); bv = ratio(b); break;
@@ -386,12 +387,13 @@ function renderStanding() {
       <td>${esc(p.handle)}</td>
       <td class="clan-tag">${esc(p.clan)}</td>
       <td>${p.point}</td>
+      <td>${p.wins + p.losses}</td>
       <td class="win-txt">${p.wins}</td>
       <td class="loss-txt">${p.losses}</td>
       <td>${ratio(p)}%</td>
       <td>${streakCell}</td>
     </tr>`;
-  }).join('') || '<tr><td colspan="8" class="log-empty">검색 결과 없음</td></tr>';
+  }).join('') || '<tr><td colspan="9" class="log-empty">검색 결과 없음</td></tr>';
 
   document.querySelectorAll('#standingTable th').forEach(th => {
     th.classList.toggle('sorted', th.dataset.key === sortKey);
@@ -406,11 +408,13 @@ function renderTop5() {
   document.getElementById('topPointBody').innerHTML = byPoint.map((p, i) => `
     <tr><td class="rank-cell ${medalClass(i + 1)}">${i + 1}</td><td>${esc(p.handle)}</td>
     <td class="clan-tag">${esc(p.clan)}</td><td>${p.point}</td>
+    <td>${p.wins + p.losses}</td>
     <td class="win-txt">${p.wins}</td><td class="loss-txt">${p.losses}</td></tr>`).join('');
 
   document.getElementById('topWinBody').innerHTML = byWin.map((p, i) => `
     <tr><td class="rank-cell ${medalClass(i + 1)}">${i + 1}</td><td>${esc(p.handle)}</td>
     <td class="clan-tag">${esc(p.clan)}</td>
+    <td>${p.wins + p.losses}</td>
     <td class="win-txt">${p.wins}</td><td class="loss-txt">${p.losses}</td><td>${ratio(p)}%</td></tr>`).join('');
 
   // 승률은 경기를 치른 선수만 대상으로 한다. 0전 0승이 100%로 잡히거나
@@ -428,8 +432,8 @@ function renderTop5() {
       <tr><td class="rank-cell ${medalClass(i + 1)}">${i + 1}</td><td>${esc(p.handle)}</td>
       <td class="clan-tag">${esc(p.clan)}</td>
       <td>${ratio(p)}%</td>
-      <td class="win-txt">${p.wins}</td><td class="loss-txt">${p.losses}</td>
-      <td>${p.wins + p.losses}</td></tr>`).join('')
+      <td>${p.wins + p.losses}</td>
+      <td class="win-txt">${p.wins}</td><td class="loss-txt">${p.losses}</td></tr>`).join('')
       || '<tr><td colspan="7" class="log-empty">아직 경기 기록이 없습니다.</td></tr>';
   }
 }
@@ -476,11 +480,12 @@ function renderClanTop() {
       <td class="clan-tag" style="font-size:15px;">${esc(c.clan)}</td>
       <td>${c.members}명</td>
       <td>${c.point}</td>
+      <td>${total}</td>
       <td class="win-txt">${c.wins}</td>
       <td class="loss-txt">${c.losses}</td>
       <td>${rate}%</td>
     </tr>`;
-  }).join('') || '<tr><td colspan="7" class="log-empty">클랜에 소속된 선수가 없습니다.</td></tr>';
+  }).join('') || '<tr><td colspan="8" class="log-empty">클랜에 소속된 선수가 없습니다.</td></tr>';
 
   const tied = list.some(c => c.tied);
   note.innerHTML = '소속 선수들의 포인트·승·패를 합산했습니다 · 포인트 합계가 높은 순 · 클랜이 없는 선수(<b>-</b>)는 제외'
