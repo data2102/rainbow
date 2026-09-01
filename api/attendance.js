@@ -10,7 +10,7 @@ export const HOUR_SLOTS = [6, 7, 8, 9, 10, 11, 12, 1];
 /**
  * 시간대 대신 고르는 두 가지.
  * 칸이 숫자라서 시간과 겹치지 않는 값을 골라 자리로 쓴다.
- * 이 둘은 시간대와 함께 고를 수 없다 — "불참인데 8시" 같은 것은 뜻이 없다.
+ * 한 사람이 고를 수 있는 칸은 하루에 하나뿐이다.
  */
 export const SLOT_UNSURE = 0;   // 미정
 export const SLOT_ABSENT = -1;  // 불참
@@ -76,6 +76,15 @@ async function ensureTable() {
     await q(`ALTER TABLE play_schedule DROP CONSTRAINT IF EXISTS play_schedule_pkey`);
     await q(`ALTER TABLE play_schedule ADD PRIMARY KEY (day, handle, slot)`);
   }
+
+  // 한 사람은 하루에 한 칸만 고른다. 예전에는 여러 칸을 켤 수 있었으므로
+  // 남아 있는 중복을 먼저 정리하고 — 먼저 고른 것을 남긴다 — DB 로 막는다.
+  await q(`
+    DELETE FROM play_schedule a
+     USING play_schedule b
+     WHERE a.day = b.day AND a.handle = b.handle AND a.ctid > b.ctid`);
+  await q(`CREATE UNIQUE INDEX IF NOT EXISTS idx_sched_one
+             ON play_schedule (day, handle)`);
   ensured = true;
 }
 
@@ -172,9 +181,10 @@ async function setSchedule(res, handle, slots) {
     ? [...new Set(slots.map(Number))].filter(n => SLOTS.includes(n))
     : [];
 
-  // 미정·불참은 혼자 서야 한다. 화면에서도 막지만 여기서도 정리해둔다.
+  // 한 사람은 한 칸만 고른다. 화면에서도 막지만 여기서도 잘라둔다 —
+  // 미정·불참이 섞여 오면 그것부터 남긴다 ("불참인데 8시"는 뜻이 없다).
   const special = picked.find(n => SPECIAL_SLOTS.includes(n));
-  if (special !== undefined) picked = [special];
+  picked = special !== undefined ? [special] : picked.slice(0, 1);
 
   const day = playDay();
   await tx(async (c) => {

@@ -224,7 +224,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 13;
+const APP_VERSION = 14;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -1044,6 +1044,11 @@ function renderSlotSummary() {
     if (roster.has(r.handle) && bySlot.has(r.slot)) bySlot.get(r.slot).push(r.handle);
   }
 
+  // 아무 칸도 고르지 않은 사람. 미정·불참은 대답한 것이므로 여기 넣지 않는다.
+  const voted = new Set(playSchedule.map(r => r.handle));
+  const idle = players.filter(p => !voted.has(p.handle))
+    .sort((a, b) => a.handle.localeCompare(b.handle));
+
   el.innerHTML = playSlots.map(slot => {
     const names = bySlot.get(slot).sort((a, b) => a.localeCompare(b));
     // 미정·불참은 시간대 두 칸을 합친 너비로 둔다. 시간대가 아니므로
@@ -1059,7 +1064,20 @@ function renderSlotSummary() {
         ? names.map(h => `<span class="slot-name">${esc(h)}</span>`).join('')
         : '<span class="slot-none">아직 없음</span>'}</div>
     </div>`;
-  }).join('');
+  }).join('')
+  // 미정·불참 두 칸을 합친 너비로 맨 아래에 붙인다
+  + `<div class="slot-col novote">
+      <div class="slot-col-h">
+        <span class="slot-col-t">미투표자 현황</span>
+        <span class="slot-col-n">${idle.length}명</span>
+      </div>
+      ${idle.length
+        ? `<div class="novote-grid">${idle.map(p =>
+            `<div class="nv-row"><span class="nv-id">${esc(p.handle)}</span>`
+            + `<span class="nv-clan">${esc(p.clan && p.clan !== '-' ? p.clan : '')}</span></div>`
+          ).join('')}</div>`
+        : '<span class="slot-none">모두 투표했습니다.</span>'}
+    </div>`;
 }
 
 /** 로그인한 계정의 시간대를 체크하는 줄 */
@@ -1102,16 +1120,9 @@ async function toggleSlot(slot) {
   const handle = me.handle;
   const on = new Set(scheduleMap().get(handle) || []);
 
-  // 미정·불참은 혼자 선다. 시간대를 고르면 그 둘은 풀리고,
-  // 그 둘을 고르면 시간대가 모두 풀린다 — "불참인데 8시"는 뜻이 없다.
-  let next;
-  if (isSpecialSlot(slot)) {
-    next = on.has(slot) ? [] : [slot];
-  } else {
-    const hours = new Set([...on].filter(s => !isSpecialSlot(s)));
-    if (hours.has(slot)) hours.delete(slot); else hours.add(slot);
-    next = [...hours];
-  }
+  // 한 사람은 한 칸만 고른다. 다른 칸을 누르면 먼저 것이 풀리고,
+  // 켜진 칸을 다시 누르면 아무것도 안 고른 상태(미투표)로 돌아간다.
+  const next = on.has(slot) ? [] : [slot];
 
   // 먼저 화면에 반영하고, 실패하면 되돌린다
   const before = playSchedule;

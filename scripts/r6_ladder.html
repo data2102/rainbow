@@ -498,6 +498,29 @@ tbody tr:hover td{ background:var(--surface-sunken); }
 }
 .slot-none{ font-size:var(--fs-caption); color:var(--text-tertiary); }
 
+/* 미투표자 — 시간대가 아니므로 맨 아래 한 줄을 통째로 쓴다 (미정+불참 너비).
+   이름이 스무 개 넘게 늘어설 수 있어, 칸을 맞춰 세워 표처럼 읽히게 한다.
+   선을 긋지 않아도 세로가 맞으면 표로 읽힌다. */
+.slot-col.novote{
+  grid-column:1 / -1; min-height:0;
+  border-style:dashed; background:var(--surface-sunken);
+}
+.slot-col.novote .slot-col-t{ color:var(--text-secondary); font-size:var(--fs-subhead); }
+.novote-grid{
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr));
+  gap:0 var(--sp-6);
+}
+.nv-row{
+  display:flex; align-items:baseline; gap:var(--sp-3);
+  font-size:var(--fs-caption); padding:var(--sp-2) 0;
+  border-bottom:1px solid transparent;   /* 줄 높이를 표처럼 고르게 */
+}
+.nv-id{ color:var(--text-primary); font-weight:var(--fw-medium); }
+.nv-clan{
+  margin-left:auto; font-size:var(--fs-footnote); color:var(--text-tertiary);
+  white-space:nowrap;
+}
+
 .slot-divider{ border-top:1px solid var(--border); margin:var(--sp-6) 0 var(--sp-5); }
 
 .slot-board{
@@ -1972,7 +1995,8 @@ if (/[?&]room=\d+/.test(location.search)) {
       </div>
       <div class="foot-note" style="margin-top:0;margin-bottom:14px;">
         오늘 들어올 시간대를 체크해두면 누가 언제 접속하는지 서로 볼 수 있습니다 ·
-        아직 모르겠으면 <b>미정</b>, 오늘 못 오면 <b>불참</b>을 눌러주세요 (그 둘은 시간대와 함께 고를 수 없습니다) ·
+        <b>한 사람이 한 칸만</b> 고를 수 있고, 다른 칸을 누르면 먼저 고른 칸이 풀립니다 ·
+        아직 모르겠으면 <b>미정</b>, 오늘 못 오면 <b>불참</b>을 눌러주세요 ·
         <b>매일 아침 7시에 초기화</b>됩니다 (0시~7시 사이에는 전날 체크가 그대로 보입니다).
       </div>
       <div class="mine" id="slotMine"></div>
