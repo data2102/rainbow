@@ -310,6 +310,9 @@ h1{
 .tab-btn{
   /* 글자가 잘리거나 두 줄로 접히지 않도록 라벨 너비를 먼저 확보하고 남는 공간을 나눈다 */
   flex:1 1 auto; min-width:max-content; white-space:nowrap;
+  /* (준비중)이 아랫줄로 내려가도 메뉴 이름은 줄마다 가운데에 선다.
+     한 줄짜리 메뉴도 두 줄짜리와 높이가 같아지므로 세로로도 가운데를 잡는다. */
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
   text-align:center; cursor:pointer;
   background:transparent; border:none; border-radius:var(--radius-md);
   padding:var(--sp-3) var(--sp-3);
@@ -320,10 +323,11 @@ h1{
 .tab-btn:hover{ color:var(--text-primary); background:var(--surface-sunken); }
 .tab-btn.active{ background:var(--accent); color:var(--on-accent); font-weight:var(--fw-bold); }
 .tab-btn:focus-visible{ outline:none; box-shadow:var(--shadow-focus); }
-/* 아직 다듬는 중인 메뉴. 메뉴 이름을 밀어내지 않도록 작게 옆에 붙인다. */
+/* 아직 다듬는 중인 메뉴. 메뉴 이름 아래에 작게 한 줄 내려 붙인다. */
 .tab-wip{
-  margin-left:4px; font-size:10px; font-weight:var(--fw-regular);
-  color:var(--text-disabled); vertical-align:1px;
+  display:block; margin-top:1px;
+  font-size:10px; line-height:1.3; font-weight:var(--fw-regular);
+  color:var(--text-disabled);
 }
 .tab-btn.active .tab-wip{ color:var(--on-accent); opacity:.75; }
 .tab-panel{ display:none; }
