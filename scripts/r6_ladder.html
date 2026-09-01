@@ -859,23 +859,58 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 }
 .tsec-sub{ font-size:var(--fs-footnote); color:var(--text-tertiary); margin:0 0 var(--sp-4); }
 
+/* 규정은 절마다 판을 따로 세운다. 밋밋한 표가 줄줄이 이어지면 어디서
+   무엇이 끝나는지 안 보인다 — 머리에 색을 주어 절의 경계를 세운다. */
+.rule-card{
+  border:1px solid var(--border-strong); border-radius:var(--radius-lg);
+  background:var(--surface); overflow:hidden;
+  margin-bottom:var(--sp-6);
+}
+.rule-card:last-child{ margin-bottom:0; }
+.rule-card-h{
+  display:flex; align-items:center; gap:var(--sp-3);
+  padding:var(--sp-4) var(--sp-5);
+  background:var(--accent-bg); border-bottom:1px solid var(--border-strong);
+  font-size:var(--fs-subhead); font-weight:var(--fw-bold);
+  color:var(--text-primary); letter-spacing:var(--ls-tight);
+}
+.rule-card-h::before{
+  content:''; flex:none; width:4px; height:18px;
+  border-radius:2px; background:var(--accent);
+}
+.rule-card .table-wrap{ padding:0 var(--sp-5) var(--sp-4); }
+
 /* 규정 표. 순위표와 달리 칸에 문장이 들어가므로 nowrap 과 정렬 손잡이를 푼다. */
 .rule-table th{ cursor:default; }
 .rule-table th:hover{ color:var(--text-tertiary); }
 .rule-table td{
   white-space:normal; vertical-align:top;
   line-height:var(--lh-body); color:var(--text-secondary);
+  padding-top:var(--sp-4); padding-bottom:var(--sp-4);
 }
+/* 줄마다 바탕을 번갈아 두면 긴 줄이 옆줄로 새지 않는다 */
+.rule-table tbody tr:nth-child(even) td{ background:var(--surface-sunken); }
+.rule-table tbody tr:hover td{ background:var(--accent-bg); }
 .rule-table td b{ color:var(--text-primary); font-weight:var(--fw-bold); }
-.rule-table .rt-no{ width:36px; text-align:center; color:var(--text-tertiary); }
+.rule-table .rt-no{ width:56px; text-align:center; }
 .rule-table .rt-item{
   width:150px; white-space:nowrap;
-  color:var(--text-primary); font-weight:var(--fw-medium);
+  color:var(--text-primary); font-weight:var(--fw-bold);
+}
+/* 구분 번호는 동그란 표로. 잿빛 숫자는 표 안에서 사라진다. */
+.rt-badge{
+  display:inline-flex; align-items:center; justify-content:center;
+  min-width:24px; height:24px; padding:0 6px; border-radius:var(--radius-pill);
+  background:var(--accent); color:var(--on-accent);
+  font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+  font-variant-numeric:tabular-nums;
 }
 @media (max-width:640px){
   /* 좁은 화면에서는 항목 이름이 줄바꿈되더라도 내용 칸을 살린다 */
   .rule-table .rt-item{ width:96px; white-space:normal; }
-  .rule-table .rt-no{ width:26px; padding-left:0; padding-right:0; }
+  .rule-table .rt-no{ width:40px; padding-left:0; padding-right:0; }
+  .rule-card .table-wrap{ padding:0 var(--sp-3) var(--sp-3); }
+  .rule-card-h{ padding:var(--sp-4); }
 }
 
 /* 예시는 규칙 아래에 한 줄 내려 붙인다. 글로만 적힌 규칙은 "그래서 몇 대 몇?"
@@ -894,13 +929,16 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   color:var(--warm); font-size:var(--fs-footnote); line-height:var(--lh-body);
 }
 
-/* 한 절 안에서 갈라지는 작은 제목 (예: 깍두기) */
+/* 한 절 안에서 갈라지는 작은 제목 (예: 깍두기). 판 안이므로 판 너비를
+   그대로 쓰는 띠로 두어 위 표와 아래 표를 끊는다. */
 .rule-sub{
-  margin:var(--sp-6) 0 var(--sp-3);
+  margin:0; padding:var(--sp-3) var(--sp-5);
+  background:var(--surface-sunken);
+  border-top:1px solid var(--border); border-bottom:1px solid var(--border);
   font-size:var(--fs-caption); font-weight:var(--fw-bold);
-  color:var(--text-secondary);
-  padding-left:var(--sp-3); border-left:3px solid var(--border-strong);
+  color:var(--text-primary);
 }
+@media (max-width:640px){ .rule-sub{ padding:var(--sp-3) var(--sp-4); } }
 
 .team-cards{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:var(--sp-3); }
 .team-card{
@@ -2209,20 +2247,21 @@ if (/[?&]room=\d+/.test(location.search)) {
   <div class="tab-panel" id="tab-rules">
     <div class="panel hud-corner">
       <h2>규정 · Rule</h2>
-      <div class="tsec">
-        <div class="tsec-h">■ 팀 구성</div>
+
+      <div class="rule-card">
+        <div class="rule-card-h">팀 구성</div>
         <div class="table-wrap">
           <table class="rule-table">
-            <thead><tr><th class="rt-no">#</th><th class="rt-item">상황</th><th>규칙과 예시</th></tr></thead>
+            <thead><tr><th class="rt-no">구분</th><th class="rt-item">상황</th><th>규칙과 예시</th></tr></thead>
             <tbody>
               <tr>
-                <td class="rt-no">1</td>
+                <td class="rt-no"><span class="rt-badge">1</span></td>
                 <td class="rt-item">짝수로 시작</td>
                 <td>나눠서 <b>그대로 진행</b>합니다.
                     <span class="rule-ex">14명 → 7 : 7</span></td>
               </tr>
               <tr>
-                <td class="rt-no">2</td>
+                <td class="rt-no"><span class="rt-badge">2</span></td>
                 <td class="rt-item">홀수로 시작</td>
                 <td>남는 한 명은 <b>무조건 호스트 반대편</b>에 붙습니다.
                     호스트 쪽이 인원 우위를 갖지 않습니다.
@@ -2230,13 +2269,13 @@ if (/[?&]room=\d+/.test(location.search)) {
                     <span class="rule-note">※ 호스트 변경 시 변경된 호스트 기준 반대팀에서 게임 진행</span></td>
               </tr>
               <tr>
-                <td class="rt-no">3</td>
+                <td class="rt-no"><span class="rt-badge">3</span></td>
                 <td class="rt-item">홀수인데 한 명 더 들어옴</td>
                 <td>숫자가 맞아떨어지므로 <b>그대로 진행</b>합니다.
                     <span class="rule-ex">15명 + 1명 = 16명 → 8 : 8</span></td>
               </tr>
               <tr>
-                <td class="rt-no">4</td>
+                <td class="rt-no"><span class="rt-badge">4</span></td>
                 <td class="rt-item">짝수인데 한 명 더 들어옴</td>
                 <td>늦게 온 분은 <b>무조건 호스트 반대편</b>으로 갑니다. 이 분이 <b>깍두기</b>입니다.
                     <span class="rule-ex">14명(7 : 7) + 1명 → 호스트 팀 7 : 반대 팀 8</span></td>
@@ -2248,15 +2287,15 @@ if (/[?&]room=\d+/.test(location.search)) {
         <div class="rule-sub">깍두기 — 늦게 들어와 숫자를 맞춰주는 분</div>
         <div class="table-wrap">
           <table class="rule-table">
-            <thead><tr><th class="rt-no">#</th><th class="rt-item">항목</th><th>규칙과 예시</th></tr></thead>
+            <thead><tr><th class="rt-no">구분</th><th class="rt-item">항목</th><th>규칙과 예시</th></tr></thead>
             <tbody>
               <tr>
-                <td class="rt-no">1</td>
+                <td class="rt-no"><span class="rt-badge">1</span></td>
                 <td class="rt-item">서는 자리</td>
                 <td>언제나 <b>호스트의 반대편</b>입니다.</td>
               </tr>
               <tr>
-                <td class="rt-no">2</td>
+                <td class="rt-no"><span class="rt-badge">2</span></td>
                 <td class="rt-item">호스트가 바뀌면</td>
                 <td>첫수 · 중수 · 막수마다 호스트가 바뀌면 깍두기도 <b>그때마다 반대편으로 옮깁니다</b>.
                     <span class="rule-ex">첫수 호스트 A팀 → 깍두기 B팀 &nbsp;/&nbsp;
@@ -2264,14 +2303,14 @@ if (/[?&]room=\d+/.test(location.search)) {
                       막수 호스트 A팀 → 깍두기 B팀</span></td>
               </tr>
               <tr>
-                <td class="rt-no">3</td>
+                <td class="rt-no"><span class="rt-badge">3</span></td>
                 <td class="rt-item">점수</td>
                 <td>이기든 지든 <b>+1점</b>만 받습니다. <b>승·패·경기 수에는 들어가지 않습니다</b> —
                     중간에 들어왔으므로 그만큼의 페널티입니다.
                     <span class="rule-ex">깍두기가 이긴 팀이어도 +3점이 아니라 +1점</span></td>
               </tr>
               <tr>
-                <td class="rt-no">4</td>
+                <td class="rt-no"><span class="rt-badge">4</span></td>
                 <td class="rt-item">기록하는 법</td>
                 <td><b>③ 리폿</b> 페이지에서 승리 팀 · 패배 팀에 넣지 말고
                     <b>LATE TEAM · 지각 팀</b>에 넣어주세요. 점수는 자동으로 +1점만 붙습니다.</td>
@@ -2281,27 +2320,26 @@ if (/[?&]room=\d+/.test(location.search)) {
         </div>
       </div>
 
-      <div class="tsec">
-        <div class="tsec-h">■ 랜덤팀 구성</div>
-        <div class="tsec-sub">랜덤 팀을 다시 돌리는 기준</div>
+      <div class="rule-card">
+        <div class="rule-card-h">랜덤팀 구성</div>
         <div class="table-wrap">
           <table class="rule-table">
-            <thead><tr><th class="rt-no">#</th><th class="rt-item">항목</th><th>규칙과 예시</th></tr></thead>
+            <thead><tr><th class="rt-no">구분</th><th class="rt-item">항목</th><th>규칙과 예시</th></tr></thead>
             <tbody>
               <tr>
-                <td class="rt-no">1</td>
+                <td class="rt-no"><span class="rt-badge">1</span></td>
                 <td class="rt-item">기본</td>
                 <td>랜덤 팀을 돌리는 방식은 <b>지금까지와 같습니다</b>.</td>
               </tr>
               <tr>
-                <td class="rt-no">2</td>
+                <td class="rt-no"><span class="rt-badge">2</span></td>
                 <td class="rt-item">다시 돌리는 경우</td>
                 <td>팀이 한쪽으로 쏠린 것이 <b>모두가 납득할 정도</b>일 때에 한해,
                     <b>전원 동의</b>하에 <b>1회만</b> 다시 돌립니다.
                     <span class="rule-ex">상위권이 한 팀에 몰려 모두가 "이건 아니다" 할 때 → 동의 후 1회 재추첨</span></td>
               </tr>
               <tr>
-                <td class="rt-no">3</td>
+                <td class="rt-no"><span class="rt-badge">3</span></td>
                 <td class="rt-item">동의가 없을 때</td>
                 <td>불편하더라도 <b>그대로 진행</b>합니다. 2회 이상 다시 돌리지 않습니다.</td>
               </tr>
@@ -2310,22 +2348,21 @@ if (/[?&]room=\d+/.test(location.search)) {
         </div>
       </div>
 
-      <div class="tsec">
-        <div class="tsec-h">■ 세부 규정</div>
-        <div class="tsec-sub">서로 스트레스받지 않기 위한 약속</div>
+      <div class="rule-card">
+        <div class="rule-card-h">세부 규정</div>
         <div class="table-wrap">
           <table class="rule-table">
-            <thead><tr><th class="rt-no">#</th><th class="rt-item">항목</th><th>규칙과 예시</th></tr></thead>
+            <thead><tr><th class="rt-no">구분</th><th class="rt-item">항목</th><th>규칙과 예시</th></tr></thead>
             <tbody>
               <tr>
-                <td class="rt-no">1</td>
+                <td class="rt-no"><span class="rt-badge">1</span></td>
                 <td class="rt-item">프랙</td>
                 <td><b>팀당 1명만 6프랙</b>이 가능합니다.
                     룸이든 난간이든 각 팀에서 합의해 <b>1명만</b> 6프랙을 허용합니다.
                     <span class="rule-ex">A팀 6프랙 1명 · B팀 6프랙 1명 (O) &nbsp;/&nbsp; A팀 6프랙 2명 (X)</span></td>
               </tr>
               <tr>
-                <td class="rt-no">2</td>
+                <td class="rt-no"><span class="rt-badge">2</span></td>
                 <td class="rt-item">권총</td>
                 <td>시작할 때 쏘는 권총이 위협적이라 스트레스를 받는다는 의견이 있었습니다.
                     무조건 안 된다는 뜻은 아니지만, 꼭 <b>하늘에 쏴서</b> 팀원이 다치지 않게 해주세요.
@@ -2336,32 +2373,31 @@ if (/[?&]room=\d+/.test(location.search)) {
         </div>
       </div>
 
-      <div class="tsec">
-        <div class="tsec-h">■ D. 공지 전달</div>
-        <div class="tsec-sub">공지가 전달되지 않거나 못 읽는 분들을 위해</div>
+      <div class="rule-card">
+        <div class="rule-card-h">공지 전달</div>
         <div class="table-wrap">
           <table class="rule-table">
-            <thead><tr><th class="rt-no">#</th><th class="rt-item">항목</th><th>내용</th></tr></thead>
+            <thead><tr><th class="rt-no">구분</th><th class="rt-item">항목</th><th>내용</th></tr></thead>
             <tbody>
               <tr>
-                <td class="rt-no">1</td>
+                <td class="rt-no"><span class="rt-badge">1</span></td>
                 <td class="rt-item">OK(FVC)</td>
                 <td>공지가 전달되지 않을 경우 <b>현정님</b>이 빠르게 소통해주시기로 했습니다.</td>
               </tr>
               <tr>
-                <td class="rt-no">2</td>
+                <td class="rt-no"><span class="rt-badge">2</span></td>
                 <td class="rt-item">회의 참석</td>
                 <td>다른 팀도 빠르게 전달할 수 있도록
                     <b>로터스-티얼님 / 성남-구짜비님 / 레나님</b>은
                     다음 기본 회의에 꼭 참석해 함께 의논해주세요.</td>
               </tr>
               <tr>
-                <td class="rt-no">3</td>
+                <td class="rt-no"><span class="rt-badge">3</span></td>
                 <td class="rt-item">제안</td>
                 <td>공지를 빠르게 전달하자는 취지로 <b>현정님</b>이 제안해주셨습니다.</td>
               </tr>
               <tr>
-                <td class="rt-no">4</td>
+                <td class="rt-no"><span class="rt-badge">4</span></td>
                 <td class="rt-item">회의는 열려 있습니다</td>
                 <td>회의는 <b>모든 분이 참석 가능</b>합니다.
                     다만 여러 의견을 모아 <b>결정하는 일은 소수</b>로 진행합니다.</td>
