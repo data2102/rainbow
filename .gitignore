@@ -7,7 +7,11 @@ node_modules/
 ladder_backup*.json
 *.backup.json
 
-# 통합 설치 파일 재료와 결과물. 게임 파일은 공개 저장소에 올리지 않습니다.
+# 통합 설치 파일 재료와 결과물.
+# 게임·스킨 파일은 용량도 크고 공개 저장소에 올릴 것이 아니므로 막아둡니다.
+# 각 폴더의 _README.txt(무엇을 넣는지 적은 안내문)만 저장소에 남깁니다.
 installer/payload/game/*
-!installer/payload/game/_README.txt
+installer/payload/skin/*
+installer/payload/extra/*
+!installer/payload/*/_README.txt
 installer/output/

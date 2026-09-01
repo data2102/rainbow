@@ -39,7 +39,7 @@
 ├── installer/              레인보우 식스 통합 설치 파일 만들기 (installer/README.md)
 │   ├── R6ClanSetup.iss     설치 파일 설계도 (Inno Setup)
 │   ├── build.bat           더블클릭하면 R6ClanSetup.exe 를 만듭니다
-│   └── payload/game/       완성된 게임 폴더를 넣는 자리 (저장소에 올라가지 않음)
+│   └── payload/            재료를 넣는 자리 — game/ skin/ extra/ (저장소에 올라가지 않음)
 ├── db/schema.sql           테이블 정의
 ├── seed/ladder_seed.json   기존 데이터 (선수 29명 / 경기 41건) — 비밀번호 미포함
 ├── server.js               일반 서버용 진입점 (Vercel은 불필요)
@@ -161,34 +161,41 @@ nginx 리버스 프록시 + Let's Encrypt(certbot)로 HTTPS를 붙이면 됩니�
 ## 통합 설치 파일
 
 런쳐 탭은 지금 `r6clan-auto.reg` · `r6launch.bat` · `r6firewall.bat` 세 개를 각자 받아
-직접 실행하게 안내합니다. 순서를 틀리거나 `r6launch.bat` 을 엉뚱한 폴더에 두는 일이 잦습니다.
+직접 실행하게 안내합니다. 게임 자체도 설치 파일 압축 해제 → HonestEngine 적용 →
+스킨 폴더 덮어쓰기를 손으로 해야 합니다. 순서를 틀리는 일이 잦습니다.
 
 `installer/` 는 이것을 **실행 파일 하나**로 묶습니다.
 
 ```bash
 # 1. Inno Setup 설치 (한 번만) — https://jrsoftware.org/isdl.php
-# 2. 완성된 게임 폴더의 내용을 installer/payload/game/ 에 통째로 복사
+# 2. installer/payload/ 의 세 폴더를 채운다
+#      game/   r6setup101a.part01.exe · part02.rar · part03.rar
+#      skin/   레나스킨_V2 안의 내용물 (character save sound texture)
+#      extra/  (선택) 게임 폴더에 얹을 것 — dgVoodoo2 · DDrawCompat · 추가 맵
 # 3. installer/build.bat 더블클릭
 #    → installer/output/R6ClanSetup.exe
 ```
 
-만들어진 설치 파일이 하는 일:
+만들어진 설치 파일이 밟는 순서 — **손으로 하던 것과 같고, 바꾸면 안 됩니다**:
 
-| | |
-|---|---|
-| 게임 본체 | 패치·맵·스킨·타겟·사운드가 이미 적용된 폴더를 그대로 풀어놓습니다 |
-| `r6clan://` | 사이트 버튼이 게임을 켤 수 있게 등록합니다 (관리자 권한 실행 포함) |
-| 런쳐 | `C:\R6Clan\` 에 배치 파일 4종을 넣습니다 |
-| 경로 보정 | 배치 파일 안의 `GAME=` 줄을 **실제 설치 위치로 고쳐 씁니다** |
-| 방화벽 | UDP 2346~2348 과 게임 실행 파일을 윈도우 방화벽에서 엽니다 |
+| | 하는 일 | 왜 이 자리인가 |
+|---|---|---|
+| 1 | 압축 풀기 | 게임 본체 (약 226MB) |
+| 2 | `regsetup.exe` | 게임의 `data` 경로를 HKLM 에 등록. **없으면 3번이 실패** |
+| 3 | `HonestEngine.exe` → Install | 1.04 → 6.13. 게임 위치를 2번이 쓴 값에서 읽음 |
+| 4 | 레나스킨 V2 → `data` | **3번 뒤여야 함.** HonestEngine 이 `data\sound` 를 건드림 |
+| 5 | 클랜 설정 | `r6clan://` · `C:\R6Clan\` 런쳐 · 방화벽 UDP 2346~2348 |
 
-받는 사람이 직접 해야 하는 것은 게임 안의 **MULTIPLAYER OPTIONS 설정**(런쳐 탭 4번)뿐입니다.
+덤으로 게임을 관리자 권한 실행으로 등록하고, 배치 파일 안의 `GAME=` 줄을 실제 설치
+위치로 고쳐 쓰며, 덮어쓴 원본을 `게임폴더\R6Clan_Backup\` 에 챙겨둡니다.
 
-**게임을 설치 마법사로 깔지 않는 이유:** 1998년 InstallShield 설치 프로그램은 16비트라
-64비트 윈도우에서 실행되지 않는 경우가 많습니다. 완성된 폴더를 통째로 옮기면 그 문제와
-함께 패치·덮어쓰기 순서를 틀릴 여지도 사라집니다.
+**게임 설치 파일은 InstallShield 가 아니라 RAR 자동 압축 해제 파일**이라 스위치로
+조용히 풀 수 있습니다(`-s2 -y -d<경로>`). 안 풀렸으면 직접 풀도록 다시 띄웁니다.
 
-**배포:** 결과물은 크기 때문에 이 저장소나 Vercel 에 올릴 수 없습니다
+**남는 수동 작업은 두 가지뿐입니다:** 설치 중 HonestEngine 창의 `[Install]` 클릭 한 번,
+그리고 게임 안의 MULTIPLAYER OPTIONS 설정(런쳐 탭 4번).
+
+**배포:** 결과물(약 75MB)은 이 저장소나 Vercel 에 올릴 수 없습니다
 (`.gitignore` 가 `installer/payload/`, `installer/output/` 을 막아둡니다).
 외부 저장소에 올리고 런쳐 탭에는 링크만 거세요.
 
