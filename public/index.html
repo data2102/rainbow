@@ -1876,7 +1876,7 @@ if (/[?&]room=\d+/.test(location.search)) {
         </div>
       </div>
       <div class="late-box">
-        <div class="side-label late-label">늦은 참석자<span class="pick-n" id="lateCount">0명</span><button type="button" class="pick-clear" id="lateClear" hidden>초기화</button></div>
+        <div class="side-label late-label">LATE TEAM · 지각 팀<span class="pick-n" id="lateCount">0명</span><button type="button" class="pick-clear" id="lateClear" hidden>초기화</button></div>
         <div class="foot-note late-why">
           인원이 맞지 않아 뒤늦게 합류한 사람 · <b>경기 수·승·패에 넣지 않고</b> 점수만 +1 드립니다.
         </div>
@@ -2694,7 +2694,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 12;
+const APP_VERSION = 13;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
