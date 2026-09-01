@@ -877,6 +877,13 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   color:var(--text-secondary); font-size:var(--fs-footnote);
   font-variant-numeric:tabular-nums; line-height:var(--lh-body);
 }
+/* 규칙에 붙는 단서 (※). 예시 상자와 달리 상자를 두르지 않는다 —
+   덧붙이는 말이지 보여주는 값이 아니다. */
+.rule-note{
+  display:block; margin-top:var(--sp-2);
+  color:var(--warm); font-size:var(--fs-footnote); line-height:var(--lh-body);
+}
+
 /* 한 절 안에서 갈라지는 작은 제목 (예: 깍두기) */
 .rule-sub{
   margin:var(--sp-6) 0 var(--sp-3);
@@ -2192,13 +2199,8 @@ if (/[?&]room=\d+/.test(location.search)) {
   <div class="tab-panel" id="tab-rules">
     <div class="panel hud-corner">
       <h2>규정 · Rule</h2>
-      <div class="foot-note" style="margin-top:0;margin-bottom:var(--sp-6);">
-        모두 함께 즐겁게 하기 위해 회의에서 합의한 내용입니다 · 규정이 바뀌면 이 페이지에 올립니다.
-      </div>
-
       <div class="tsec">
-        <div class="tsec-h">■ A. 게임 시작과 늦게 들어온 분</div>
-        <div class="tsec-sub">인원이 몇 명이냐에 따라 나누는 방법이 갈립니다</div>
+        <div class="tsec-h">■ 팀 구성</div>
         <div class="table-wrap">
           <table class="rule-table">
             <thead><tr><th class="rt-no">#</th><th class="rt-item">상황</th><th>규칙과 예시</th></tr></thead>
@@ -2214,7 +2216,8 @@ if (/[?&]room=\d+/.test(location.search)) {
                 <td class="rt-item">홀수로 시작</td>
                 <td>남는 한 명은 <b>무조건 호스트 반대편</b>에 붙습니다.
                     호스트 쪽이 인원 우위를 갖지 않습니다.
-                    <span class="rule-ex">15명 → 호스트 팀 7 : 반대 팀 8</span></td>
+                    <span class="rule-ex">15명 → 호스트 팀 7 : 반대 팀 8</span>
+                    <span class="rule-note">※ 호스트 변경 시 변경된 호스트 기준 반대팀에서 게임 진행</span></td>
               </tr>
               <tr>
                 <td class="rt-no">3</td>
@@ -2269,7 +2272,7 @@ if (/[?&]room=\d+/.test(location.search)) {
       </div>
 
       <div class="tsec">
-        <div class="tsec-h">■ B. 팀 짜기</div>
+        <div class="tsec-h">■ 랜덤팀 구성</div>
         <div class="tsec-sub">랜덤 팀을 다시 돌리는 기준</div>
         <div class="table-wrap">
           <table class="rule-table">
@@ -2298,7 +2301,7 @@ if (/[?&]room=\d+/.test(location.search)) {
       </div>
 
       <div class="tsec">
-        <div class="tsec-h">■ C. 프랙 및 권총</div>
+        <div class="tsec-h">■ 세부 규정</div>
         <div class="tsec-sub">서로 스트레스받지 않기 위한 약속</div>
         <div class="table-wrap">
           <table class="rule-table">
@@ -2315,12 +2318,8 @@ if (/[?&]room=\d+/.test(location.search)) {
                 <td class="rt-no">2</td>
                 <td class="rt-item">권총</td>
                 <td>시작할 때 쏘는 권총이 위협적이라 스트레스를 받는다는 의견이 있었습니다.
-                    무조건 안 된다는 뜻은 아니지만, 꼭 <b>하늘에 쏴서</b> 팀원이 다치지 않게 해주세요.</td>
-              </tr>
-              <tr>
-                <td class="rt-no">3</td>
-                <td class="rt-item">팀원이 다쳤을 때</td>
-                <td>권총에 팀원이 다치면 <b>그 사람은 이후 권총 금지</b>입니다.</td>
+                    무조건 안 된다는 뜻은 아니지만, 꼭 <b>하늘에 쏴서</b> 팀원이 다치지 않게 해주세요.
+                    <span class="rule-note">※ 권총으로 인해 팀원이 데미지를 입을 경우 그 사람은 이후 권총 금지입니다</span></td>
               </tr>
             </tbody>
           </table>
