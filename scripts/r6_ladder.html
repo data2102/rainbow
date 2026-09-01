@@ -868,6 +868,23 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   .rule-table .rt-no{ width:26px; padding-left:0; padding-right:0; }
 }
 
+/* 예시는 규칙 아래에 한 줄 내려 붙인다. 글로만 적힌 규칙은 "그래서 몇 대 몇?"
+   이 안 그려지는데, 숫자를 하나 보여주면 그 자리에서 끝난다. */
+.rule-ex{
+  display:block; margin-top:var(--sp-2);
+  padding:var(--sp-2) var(--sp-3); border-radius:var(--radius-sm);
+  background:var(--surface-sunken); border-left:2px solid var(--accent);
+  color:var(--text-secondary); font-size:var(--fs-footnote);
+  font-variant-numeric:tabular-nums; line-height:var(--lh-body);
+}
+/* 한 절 안에서 갈라지는 작은 제목 (예: 깍두기) */
+.rule-sub{
+  margin:var(--sp-6) 0 var(--sp-3);
+  font-size:var(--fs-caption); font-weight:var(--fw-bold);
+  color:var(--text-secondary);
+  padding-left:var(--sp-3); border-left:3px solid var(--border-strong);
+}
+
 .team-cards{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:var(--sp-3); }
 .team-card{
   border:1px solid var(--border); border-radius:var(--radius-md);
@@ -2180,22 +2197,100 @@ if (/[?&]room=\d+/.test(location.search)) {
       </div>
 
       <div class="tsec">
-        <div class="tsec-h">■ 팀 편성</div>
-        <div class="tsec-sub">랜덤 팀을 다시 돌리는 기준</div>
+        <div class="tsec-h">■ A. 게임 시작과 늦게 들어온 분</div>
+        <div class="tsec-sub">인원이 몇 명이냐에 따라 나누는 방법이 갈립니다</div>
         <div class="table-wrap">
           <table class="rule-table">
-            <thead><tr><th class="rt-no">#</th><th class="rt-item">항목</th><th>내용</th></tr></thead>
+            <thead><tr><th class="rt-no">#</th><th class="rt-item">상황</th><th>규칙과 예시</th></tr></thead>
             <tbody>
               <tr>
                 <td class="rt-no">1</td>
-                <td class="rt-item">다시 돌리는 경우</td>
-                <td>팀이 한쪽으로 쏠린 것이 <b>모두가 납득할 정도</b>일 때에 한해,
-                    <b>전원 동의</b>하에 <b>1회만</b> 랜덤 팀을 다시 돌립니다.</td>
+                <td class="rt-item">짝수로 시작</td>
+                <td>나눠서 <b>그대로 진행</b>합니다.
+                    <span class="rule-ex">14명 → 7 : 7</span></td>
               </tr>
               <tr>
                 <td class="rt-no">2</td>
+                <td class="rt-item">홀수로 시작</td>
+                <td>남는 한 명은 <b>무조건 호스트 반대편</b>에 붙습니다.
+                    호스트 쪽이 인원 우위를 갖지 않습니다.
+                    <span class="rule-ex">15명 → 호스트 팀 7 : 반대 팀 8</span></td>
+              </tr>
+              <tr>
+                <td class="rt-no">3</td>
+                <td class="rt-item">홀수인데 한 명 더 들어옴</td>
+                <td>숫자가 맞아떨어지므로 <b>그대로 진행</b>합니다.
+                    <span class="rule-ex">15명 + 1명 = 16명 → 8 : 8</span></td>
+              </tr>
+              <tr>
+                <td class="rt-no">4</td>
+                <td class="rt-item">짝수인데 한 명 더 들어옴</td>
+                <td>늦게 온 분은 <b>무조건 호스트 반대편</b>으로 갑니다. 이 분이 <b>깍두기</b>입니다.
+                    <span class="rule-ex">14명(7 : 7) + 1명 → 호스트 팀 7 : 반대 팀 8</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="rule-sub">깍두기 — 늦게 들어와 숫자를 맞춰주는 분</div>
+        <div class="table-wrap">
+          <table class="rule-table">
+            <thead><tr><th class="rt-no">#</th><th class="rt-item">항목</th><th>규칙과 예시</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="rt-no">1</td>
+                <td class="rt-item">서는 자리</td>
+                <td>언제나 <b>호스트의 반대편</b>입니다.</td>
+              </tr>
+              <tr>
+                <td class="rt-no">2</td>
+                <td class="rt-item">호스트가 바뀌면</td>
+                <td>첫수 · 중수 · 막수마다 호스트가 바뀌면 깍두기도 <b>그때마다 반대편으로 옮깁니다</b>.
+                    <span class="rule-ex">첫수 호스트 A팀 → 깍두기 B팀 &nbsp;/&nbsp;
+                      중수 호스트 B팀 → 깍두기 A팀 &nbsp;/&nbsp;
+                      막수 호스트 A팀 → 깍두기 B팀</span></td>
+              </tr>
+              <tr>
+                <td class="rt-no">3</td>
+                <td class="rt-item">점수</td>
+                <td>이기든 지든 <b>+1점</b>만 받습니다. <b>승·패·경기 수에는 들어가지 않습니다</b> —
+                    중간에 들어왔으므로 그만큼의 페널티입니다.
+                    <span class="rule-ex">깍두기가 이긴 팀이어도 +3점이 아니라 +1점</span></td>
+              </tr>
+              <tr>
+                <td class="rt-no">4</td>
+                <td class="rt-item">기록하는 법</td>
+                <td><b>③ 리폿</b> 페이지에서 승리 팀 · 패배 팀에 넣지 말고
+                    <b>LATE TEAM · 지각 팀</b>에 넣어주세요. 점수는 자동으로 +1점만 붙습니다.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="tsec">
+        <div class="tsec-h">■ B. 팀 짜기</div>
+        <div class="tsec-sub">랜덤 팀을 다시 돌리는 기준</div>
+        <div class="table-wrap">
+          <table class="rule-table">
+            <thead><tr><th class="rt-no">#</th><th class="rt-item">항목</th><th>규칙과 예시</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="rt-no">1</td>
+                <td class="rt-item">기본</td>
+                <td>랜덤 팀을 돌리는 방식은 <b>지금까지와 같습니다</b>.</td>
+              </tr>
+              <tr>
+                <td class="rt-no">2</td>
+                <td class="rt-item">다시 돌리는 경우</td>
+                <td>팀이 한쪽으로 쏠린 것이 <b>모두가 납득할 정도</b>일 때에 한해,
+                    <b>전원 동의</b>하에 <b>1회만</b> 다시 돌립니다.
+                    <span class="rule-ex">상위권이 한 팀에 몰려 모두가 "이건 아니다" 할 때 → 동의 후 1회 재추첨</span></td>
+              </tr>
+              <tr>
+                <td class="rt-no">3</td>
                 <td class="rt-item">동의가 없을 때</td>
-                <td>불편하더라도 <b>그대로 진행</b>합니다.</td>
+                <td>불편하더라도 <b>그대로 진행</b>합니다. 2회 이상 다시 돌리지 않습니다.</td>
               </tr>
             </tbody>
           </table>
@@ -2207,13 +2302,14 @@ if (/[?&]room=\d+/.test(location.search)) {
         <div class="tsec-sub">서로 스트레스받지 않기 위한 약속</div>
         <div class="table-wrap">
           <table class="rule-table">
-            <thead><tr><th class="rt-no">#</th><th class="rt-item">항목</th><th>내용</th></tr></thead>
+            <thead><tr><th class="rt-no">#</th><th class="rt-item">항목</th><th>규칙과 예시</th></tr></thead>
             <tbody>
               <tr>
                 <td class="rt-no">1</td>
                 <td class="rt-item">프랙</td>
                 <td><b>팀당 1명만 6프랙</b>이 가능합니다.
-                    룸이든 난간이든 각 팀에서 합의해 <b>1명만</b> 6프랙을 허용합니다.</td>
+                    룸이든 난간이든 각 팀에서 합의해 <b>1명만</b> 6프랙을 허용합니다.
+                    <span class="rule-ex">A팀 6프랙 1명 · B팀 6프랙 1명 (O) &nbsp;/&nbsp; A팀 6프랙 2명 (X)</span></td>
               </tr>
               <tr>
                 <td class="rt-no">2</td>
