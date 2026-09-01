@@ -224,7 +224,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 4;
+const APP_VERSION = 5;
 let toldToRefresh = false;
 
 /**
@@ -271,6 +271,8 @@ function applyRooms(d) {
   capacityMin = d.capacityMin || capacityMin;
   maxTitle = d.maxTitle || maxTitle;
   if (d.appVersion && d.appVersion !== APP_VERSION) noticeNewVersion();
+  countUnread();
+  renderRoomJump();
 
   // 내가 누르지 않았는데 방에서 빠졌다면 알려준다
   if (before && !myRoom && !leavingOnPurpose) {
@@ -2239,6 +2241,50 @@ const isRoomWindow = roomParam > 0;
 let roomWin = null;
 
 /** 방 창이 방에 못 들어갔을 때 그 자리에 남기는 안내. */
+/**
+ * 방 창 제목에 안 읽은 대화 수를 적는다.
+ *
+ * 방은 따로 떠 있고 사람들은 ALT+TAB 으로 오간다. 순위를 보는 동안 방에서
+ * 누가 불러도 알 길이 없어, 게임 시작을 놓치는 일이 생겼다. 창 제목에
+ * 숫자를 얹으면 작업표시줄과 ALT+TAB 미리보기에 그대로 나온다.
+ *
+ * 창을 보고 있을 때는 세지 않는다 — 눈앞에 있는 것을 안 읽었다고 할 수 없다.
+ */
+let seenMsgId = 0;
+let unreadMsgs = 0;
+
+function roomWindowTitle() {
+  const here = myRoomData();
+  const name = here ? roomName(here) : `${roomParam}번방`;
+  document.title = (unreadMsgs ? `(${unreadMsgs}) ` : '') + `${name} · RAINBOWSIX RANK`;
+}
+
+/** 새 대화를 세어 제목에 반영한다. 방 창에서만 돈다. */
+function countUnread() {
+  if (!isRoomWindow) return;
+  const mine = me ? me.handle : null;
+  let last = seenMsgId;
+  let added = 0;
+  for (const m of roomMsgs) {
+    if (m.id <= seenMsgId) continue;
+    if (m.id > last) last = m.id;
+    if (!m.handle || m.handle === mine) continue;   // 시스템 알림과 내 말은 뺀다
+    added += 1;
+  }
+  seenMsgId = last;
+  if (document.hasFocus()) unreadMsgs = 0;
+  else unreadMsgs += added;
+  roomWindowTitle();
+}
+
+/** 창을 다시 보면 숫자를 지운다. */
+function initUnreadWatch() {
+  if (!isRoomWindow) return;
+  const clear = () => { unreadMsgs = 0; roomWindowTitle(); };
+  window.addEventListener('focus', clear);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) clear(); });
+}
+
 /** 들어가는 중 안내를 걷는다. */
 function hideRoomLoad() {
   const el = document.getElementById('roomLoad');
@@ -2255,8 +2301,36 @@ function showRoomFail(msg) {
   clearRoomWindow();   // 바닥 창이 이 창을 기다리지 않도록
 }
 
+/**
+ * 방 창이 살아있다는 표시.
+ *
+ * 시각만 적던 것을 방 이름과 인원까지 함께 적는다. 바닥 창은 런쳐 탭을
+ * 보고 있을 때만 방 목록을 받아오므로, 순위나 리폿을 보는 동안에는 방이
+ * 어떻게 돌아가는지 알 길이 없었다. 방 창이 스스로 적어두면 바닥 창은
+ * 서버를 한 번도 더 두드리지 않고 머리글 표시를 최신으로 지킬 수 있다.
+ */
 function markRoomWindow() {
-  try { localStorage.setItem(POPUP_KEY, String(Date.now())); } catch { /* noop */ }
+  const here = myRoomData();
+  try {
+    localStorage.setItem(POPUP_KEY, JSON.stringify({
+      t: Date.now(),
+      room: here ? here.room : roomParam,
+      name: here ? roomName(here) : `${roomParam}번방`,
+      n: here ? here.members.length : 0,
+    }));
+  } catch { /* noop */ }
+}
+
+/** 방 창이 적어둔 것. 싱싱하지 않으면 없는 셈 친다. */
+function roomWindowInfo() {
+  try {
+    const raw = localStorage.getItem(POPUP_KEY);
+    if (!raw) return null;
+    // 예전 판은 시각 하나만 적어두었다
+    const d = raw.charAt(0) === '{' ? JSON.parse(raw) : { t: Number(raw) };
+    if (!d || !(Date.now() - Number(d.t) < POPUP_FRESH_MS)) return null;
+    return d;
+  } catch { return null; }
 }
 
 function clearRoomWindow() {
@@ -2267,9 +2341,7 @@ function clearRoomWindow() {
 function roomWindowAlive() {
   if (isRoomWindow) return false;
   if (roomWin && !roomWin.closed) return true;
-  try {
-    return Date.now() - Number(localStorage.getItem(POPUP_KEY) || 0) < POPUP_FRESH_MS;
-  } catch { return false; }
+  return !!roomWindowInfo();
 }
 
 function isHost(r) {
@@ -2527,6 +2599,48 @@ function renderWaiting() {
         </div>`;
       }).join('')
     : '<div class="wait-empty">아직 아무도 없습니다.</div>';
+}
+
+/**
+ * 머리글의 "방으로 돌아가기" 표시.
+ *
+ * 어느 탭을 보고 있든 눈에 있어야 한다. 예전에는 런쳐 탭에만 안내가 있어,
+ * 순위를 보다가 방으로 돌아가려면 런쳐까지 들렀다 가야 했다.
+ * 누르면 이미 떠 있는 방 창을 앞으로 가져온다 — 같은 이름으로 열면
+ * 브라우저가 새 창을 만들지 않고 그 창을 되돌려준다.
+ */
+function renderRoomJump() {
+  const btn = document.getElementById('roomJump');
+  if (!btn) return;
+  if (isRoomWindow) { btn.style.display = 'none'; return; }
+
+  // 방 창이 적어둔 것이 늘 더 새롭다. 없으면 마지막으로 받아온 목록을 쓴다.
+  const live = roomWindowInfo();
+  const here = myRoomData();
+  const name = live ? live.name : (here ? roomName(here) : null);
+  const n = live ? live.n : (here ? here.members.length : 0);
+
+  btn.style.display = name ? 'inline-flex' : 'none';
+  if (!name) return;
+  const t = document.getElementById('roomJumpText');
+  if (t) t.textContent = n ? `${name} ${n}명` : name;
+}
+
+function initRoomJump() {
+  const btn = document.getElementById('roomJump');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    const live = roomWindowInfo();
+    const here = myRoomData();
+    const room = live ? live.room : (here ? here.room : 0);
+    // 같은 이름으로 열면 브라우저가 새 창을 만들지 않고 그 창을 앞으로 낸다
+    if (room) openRoomWindow(room);
+  });
+  // 방 창이 표시를 새로 적을 때마다 따라 그린다 — 서버는 건드리지 않는다
+  window.addEventListener('storage', (e) => {
+    if (e.key === POPUP_KEY) renderRoomJump();
+  });
+  renderRoomJump();
 }
 
 /** 방이 다른 창에 있을 때, 바닥 창에 남겨두는 한 줄. */
@@ -2898,11 +3012,52 @@ async function enterRoom(room) {
  * 팝업이 막혀 있으면 열리지 않는다. 그때는 예전처럼 이 자리에서 방을 열어야
  * 하므로 false 를 돌려준다 — 막혔다고 방에 못 들어가면 안 된다.
  */
+/**
+ * 방 창의 크기와 자리.
+ *
+ * 방은 크게 띄워두고 ALT+TAB 으로 오가는 것이 실제로 쓰는 방식이라, 작은
+ * 창으로 뜨면 매번 늘려야 한다. 처음에는 화면에 맞춰 크게 열고, 그 뒤로는
+ * 그 사람이 맞춰둔 크기를 기억했다가 그대로 연다.
+ */
+const WIN_KEY = 'r6-room-win-size';
+
+function roomWinFeatures() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(WIN_KEY) || 'null');
+    if (saved && saved.w > 480 && saved.h > 360) {
+      return `popup=yes,width=${saved.w},height=${saved.h}` +
+             `,left=${saved.x},top=${saved.y},menubar=no,toolbar=no,location=no`;
+    }
+  } catch { /* 처음이거나 저장을 못 쓰는 브라우저 */ }
+
+  // 처음 여는 사람에게는 화면을 넉넉히 쓰게 해준다
+  const w = Math.max(900, Math.min(1440, Math.round(screen.availWidth * 0.72)));
+  const h = Math.max(700, Math.min(1000, Math.round(screen.availHeight * 0.86)));
+  const x = Math.max(0, Math.round((screen.availWidth - w) / 2));
+  const y = Math.max(0, Math.round((screen.availHeight - h) / 2));
+  return `popup=yes,width=${w},height=${h},left=${x},top=${y}` +
+         ',menubar=no,toolbar=no,location=no';
+}
+
+/** 방 창이 자기 크기를 적어둔다. 다음에 그대로 열리도록. */
+function rememberRoomWinSize() {
+  let t = 0;
+  const save = () => {
+    try {
+      localStorage.setItem(WIN_KEY, JSON.stringify({
+        w: window.outerWidth, h: window.outerHeight,
+        x: window.screenX, y: window.screenY,
+      }));
+    } catch { /* noop */ }
+  };
+  window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(save, 400); });
+  window.addEventListener('pagehide', save);
+}
+
 function openRoomWindow(room) {
   let w = null;
   try {
-    w = window.open(`/?room=${room}`, `r6room${room}`,
-      'popup=yes,width=1040,height=820,menubar=no,toolbar=no,location=no');
+    w = window.open(`/?room=${room}`, `r6room${room}`, roomWinFeatures());
   } catch { /* 브라우저가 막았다 */ }
   if (!w) {
     showToast('팝업이 막혀 있어 이 화면에서 방을 엽니다 · 주소창의 팝업 허용을 켜주세요.');
@@ -3377,7 +3532,9 @@ function showFatal(msg) {
  */
 async function bootRoomWindow() {
   document.documentElement.classList.add('room-only');
-  document.title = `${roomParam}번방 · RAINBOWSIX RANK`;
+  roomWindowTitle();
+  initUnreadWatch();
+  rememberRoomWinSize();
   markRoomWindow();
   // 탭만 켠다. activateTab 은 켜면서 목록을 또 받아오는데, 바로 아래에서
   // 들어가기 응답으로 같은 것을 받으므로 왕복이 한 번 헛돈다.
@@ -3394,8 +3551,7 @@ async function bootRoomWindow() {
   }
   hideRoomLoad();
   renderLauncher();
-  const here = myRoomData();
-  if (here) document.title = `${roomName(here)} · RAINBOWSIX RANK`;
+  roomWindowTitle();
 }
 
 /**
@@ -3417,6 +3573,7 @@ async function boot() {
   initBoardEvents();
   initScheduleEvents();
   initLauncherEvents();
+  initRoomJump();
   initCapEvents();
   initWhoEvents();
   initPlayingWatch();

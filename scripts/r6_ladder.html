@@ -1263,6 +1263,33 @@ button.room-n:hover{ color:var(--accent); text-decoration:underline; }
 
 .room-fail-t{ font-size:var(--fs-caption); color:var(--text-primary); }
 
+/* 어느 탭에 있든 방으로 돌아가는 표시.
+   방 창은 따로 떠 있어서 ALT+TAB 으로 오가는데, 그러다 창을 잃어버리면
+   런쳐 탭까지 가야 다시 찾을 수 있었다. 머리글에 한 줄로 붙여둔다. */
+.room-jump{
+  display:inline-flex; align-items:center; gap:var(--sp-2);
+  border:1px solid var(--success); border-radius:var(--radius-pill);
+  background:var(--success-bg); color:var(--text-primary);
+  font-family:inherit; font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+  padding:var(--sp-1) var(--sp-3); cursor:pointer;
+}
+.room-jump:hover{ border-color:var(--success-strong); }
+.room-jump:focus-visible{ outline:none; box-shadow:var(--shadow-focus); }
+.jump-dot{
+  flex:none; width:7px; height:7px; border-radius:50%; background:var(--success);
+}
+@media (prefers-reduced-motion:no-preference){
+  .jump-dot{ animation:jumpPulse 1.8s ease-in-out infinite; }
+}
+@keyframes jumpPulse{ 50%{ opacity:.25; } }
+.jump-n{
+  flex:none; min-width:16px; padding:0 4px; border-radius:var(--radius-pill);
+  background:var(--danger); color:var(--surface);
+  font-family:var(--font-mono); font-size:10px; line-height:16px; text-align:center;
+}
+/* 방 창 자신에게는 필요 없다 */
+.room-only .room-jump{ display:none !important; }
+
 /* 방이 다른 창에 떠 있을 때 바닥 창에 남는 한 줄 */
 .lc-away{
   display:flex; align-items:center; gap:var(--sp-3); flex-wrap:wrap;
@@ -1533,6 +1560,11 @@ if (/[?&]room=\d+/.test(location.search)) {
     </div>
     <div class="head-right">
       <div class="head-top">
+        <button type="button" class="room-jump" id="roomJump" style="display:none;">
+          <span class="jump-dot"></span>
+          <span class="jump-t" id="roomJumpText"></span>
+          <span class="jump-n" id="roomJumpN" hidden></span>
+        </button>
         <button type="button" class="admin-btn" data-tab="admin">관리자</button>
         <button type="button" class="theme-btn" id="themeToggle"
                 aria-label="밝은 화면과 어두운 화면 전환">
