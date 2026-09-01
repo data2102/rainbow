@@ -1,6 +1,6 @@
 import {
   tx, body, methodGuard, requireUser, requireAdmin, audit,
-  winGain, lossGain, cleanReason, ensureMatchVoid,
+  winGain, lossGain, lateGain, cleanReason, ensureMatchVoid,
 } from './_lib.js';
 import { ensureSeason } from './_season.js';
 
@@ -23,20 +23,32 @@ async function record(req, res, b) {
   const me = await requireUser(req, res);
   if (!me) return;
 
-  const { winners = [], losers = [] } = b;
+  const { winners = [], losers = [], late = [] } = b;
   if (!Array.isArray(winners) || !Array.isArray(losers) || !winners.length || !losers.length) {
     return res.status(400).json({ error: '승리 팀과 패배 팀을 각각 1명 이상 선택해주세요.' });
+  }
+  if (!Array.isArray(late)) {
+    return res.status(400).json({ error: '늦은 참석자 목록이 올바르지 않습니다.' });
   }
   const dup = winners.filter(w => losers.includes(w));
   if (dup.length) {
     return res.status(400).json({ error: '같은 선수를 양쪽에 동시에 넣을 수 없습니다: ' + dup.join(', ') });
   }
+  // 늦은 참석자는 승패 어느 쪽도 아니다. 양쪽에 겹치면 점수가 두 번 들어간다.
+  const both = late.filter(h => winners.includes(h) || losers.includes(h));
+  if (both.length) {
+    return res.status(400).json({
+      error: '늦은 참석자는 승리·패배 팀에 함께 넣을 수 없습니다: ' + both.join(', '),
+    });
+  }
 
   try {
+    // 늦은 참석자 칸이 아직 없는 데이터베이스일 수 있다
+    await ensureMatchVoid();
     const result = await tx(async (c) => {
       // 달이 바뀐 뒤 첫 기록이면 여기서 시즌을 넘긴다. 새 경기는 새 시즌에 들어간다.
       const season = await ensureSeason(c);
-      const all = [...winners, ...losers];
+      const all = [...winners, ...losers, ...late];
       const { rows } = await c.query(
         `SELECT * FROM players WHERE handle = ANY($1) FOR UPDATE`, [all]
       );
@@ -70,15 +82,25 @@ async function record(req, res, b) {
         );
       }
 
+      // 늦은 참석자는 전적에 넣지 않는다 — 경기 수도, 승도, 패도, 연승도
+      // 건드리지 않고 점수만 얹는다. 어느 편으로 세도 사실과 달라지기 때문이다.
+      for (const h of late) {
+        await c.query(
+          `UPDATE players SET point = point + $1 WHERE handle = $2`, [lateGain(), h]
+        );
+      }
+
       await c.query(
-        `INSERT INTO matches (winners, losers, ts, recorded_by, season) VALUES ($1, $2, $3, $4, $5)`,
-        [JSON.stringify(winnerResults), JSON.stringify(losers), ts, me, season.current ? season.current.id : null]
+        `INSERT INTO matches (winners, losers, late, ts, recorded_by, season)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [JSON.stringify(winnerResults), JSON.stringify(losers), JSON.stringify(late),
+         ts, me, season.current ? season.current.id : null]
       );
 
       return { winnerResults, ts };
     });
 
-    await audit(me, 'record_match', { winners, losers });
+    await audit(me, 'record_match', { winners, losers, late });
     res.status(200).json({ ok: true, ...result });
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -111,7 +133,7 @@ async function voidMatch(req, res, b) {
     });
     await audit(me, 'void_match', {
       id, reason, ts: m.ts, winners: winnerHandles(m), losers: m.losers || [],
-      recordedBy: m.recorded_by,
+      late: m.late || [], recordedBy: m.recorded_by,
     });
     res.status(200).json({ ok: true });
   } catch (e) {
@@ -138,6 +160,7 @@ async function restoreMatch(req, res, b) {
     });
     await audit(me, 'restore_match', {
       id, ts: m.ts, winners: winnerHandles(m), losers: m.losers || [],
+      late: m.late || [],
     });
     res.status(200).json({ ok: true });
   } catch (e) {
@@ -229,6 +252,13 @@ async function replay(c, seasonId) {
       s.losses += 1;
       s.lastResult = 'L';
       s.lastMatch = ts;
+    }
+
+    // 늦은 참석자는 점수만 받는다. 연승도, 마지막 경기일도 건드리지 않는다 —
+    // 전적에 없는 경기가 연승을 끊거나 이어붙이면 사실과 어긋난다.
+    for (const h of (Array.isArray(m.late) ? m.late : [])) {
+      if (!h) continue;
+      of(h).point += lateGain();
     }
 
     if (JSON.stringify(redone) !== JSON.stringify(winners)) {

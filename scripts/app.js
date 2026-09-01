@@ -224,7 +224,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 5;
+const APP_VERSION = 6;
 let toldToRefresh = false;
 
 /**
@@ -499,11 +499,15 @@ function getChecked(listId) {
 function renderChecklists() {
   const winChecked = new Set(getChecked('winList'));
   const loseChecked = new Set(getChecked('loseList'));
+  const lateChecked = new Set(getChecked('lateList'));
 
+  // 한 사람은 세 칸 중 한 곳에만 들어갈 수 있다. 다른 칸에 이미 체크돼 있으면
+  // 여기서는 누르지 못하게 막아, 눌러본 뒤에 거절당하는 일이 없게 한다.
   const rowHtml = (p, side) => {
-    const opposed = side === 'win' ? loseChecked : winChecked;
-    const disabled = opposed.has(p.handle);
-    const checked = side === 'win' ? winChecked.has(p.handle) : loseChecked.has(p.handle);
+    const picked = { win: winChecked, lose: loseChecked, late: lateChecked };
+    const checked = picked[side].has(p.handle);
+    const disabled = !checked && Object.keys(picked)
+      .some(k => k !== side && picked[k].has(p.handle));
     return `<label class="check-item ${disabled ? 'disabled' : ''}">
       <input type="checkbox" value="${esc(p.handle)}" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''} data-side="${side}">
       <span>${esc(p.handle)}</span> <span class="clan-mini">${esc(p.clan)}</span>
@@ -512,20 +516,23 @@ function renderChecklists() {
 
   const winList = document.getElementById('winList');
   const loseList = document.getElementById('loseList');
+  const lateList = document.getElementById('lateList');
   if (!winList || !loseList) return;
   // 점수 순이 아니라 아이디 순(ABC)으로 늘어놓는다. 체크할 사람을 눈으로 찾기 쉽도록.
   const byId = [...players].sort((a, b) =>
     a.handle.localeCompare(b.handle, 'en', { sensitivity: 'base' }));
   winList.innerHTML = byId.map(p => rowHtml(p, 'win')).join('');
   loseList.innerHTML = byId.map(p => rowHtml(p, 'lose')).join('');
+  if (lateList) lateList.innerHTML = byId.map(p => rowHtml(p, 'late')).join('');
 
-  document.querySelectorAll('#winList input, #loseList input').forEach(el => {
+  document.querySelectorAll('#winList input, #loseList input, #lateList input').forEach(el => {
     el.addEventListener('change', renderChecklists);
   });
 
   const nWin = getChecked('winList').length;
   const nLose = getChecked('loseList').length;
-  showPickCount(nWin, nLose);
+  const nLate = getChecked('lateList').length;
+  showPickCount(nWin, nLose, nLate);
 
   const submit = document.getElementById('submitMatch');
   if (submit) submit.disabled = !(nWin > 0 && nLose > 0);
@@ -538,7 +545,7 @@ function renderChecklists() {
  * 확정 버튼 위에 대진을 크게 띄운다. 인원이 안 맞아도 막지는 않는다 —
  * 7:8 같은 경기도 기록해야 하기 때문이다. 다르다는 사실만 알려준다.
  */
-function showPickCount(nWin, nLose) {
+function showPickCount(nWin, nLose, nLate = 0) {
   const set = (id, n) => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -547,10 +554,14 @@ function showPickCount(nWin, nLose) {
   };
   set('winCount', nWin);
   set('loseCount', nLose);
+  set('lateCount', nLate);
 
   const sum = document.getElementById('pickSum');
   if (sum) {
-    sum.innerHTML = `<span class="pw">${nWin}</span><span class="px">:</span><span class="pl">${nLose}</span>`;
+    // 늦은 참석자는 대진에 섞지 않는다. 7:7 에 한 명이 늦게 붙어도 경기는
+    // 7:7 이지, 8:7 이 아니기 때문이다.
+    sum.innerHTML = `<span class="pw">${nWin}</span><span class="px">:</span><span class="pl">${nLose}</span>`
+      + (nLate ? `<span class="plate">늦은 참석자 ${nLate}명 · 점수만 +1</span>` : '');
     sum.classList.toggle('zero', nWin === 0 && nLose === 0);
   }
 
@@ -593,6 +604,14 @@ function renderHistory() {
     ).join('') || '<span class="h-chip l">-</span>';
     const loseChips = losers.map(h => `<span class="h-chip l">${esc(h)}</span>`).join('')
       || '<span class="h-chip l">-</span>';
+    // 늦은 참석자는 패배 칸에 이어 붙인다. 승패 어느 쪽도 아니지만 그날 함께
+    // 뛴 사람이라, 기록에서 아예 빠지면 나중에 왜 점수가 올랐는지 알 수 없다.
+    const late = m.late || [];
+    const lateChips = late.length
+      ? `<div class="h-late">${late.map(h =>
+          `<span class="h-chip x">${esc(h)}<span class="h-gain">+1</span></span>`).join('')}
+         <span class="h-late-tag">늦은 참석</span></div>`
+      : '';
 
     // 번호는 취소된 기록까지 세어 붙인다. 취소했다고 뒤 번호가 밀리면
     // "#12 경기"라고 주고받은 말이 어긋난다.
@@ -609,7 +628,7 @@ function renderHistory() {
       <td class="h-inline" data-l="일시"><div class="h-date">${date}</div><div class="h-time">${time}</div></td>
       <td class="h-size-cell h-inline" data-l="규모">${winners.length} : ${losers.length}</td>
       <td data-l="승리 · WIN">${winChips}</td>
-      <td data-l="패배 · LOSE">${loseChips}</td>
+      <td data-l="패배 · LOSE">${loseChips}${lateChips}</td>
       <td class="h-by-cell" data-l="등록자">${esc(m.recordedBy || '-')}${cancelBtn}</td>
     </tr>`;
 
@@ -3333,15 +3352,17 @@ function initPlayingWatch() {
 
 /* ---------- 경기 기록 ---------- */
 
-async function recordTeamMatch(winners, losers) {
+async function recordTeamMatch(winners, losers, late = []) {
   const btn = document.getElementById('submitMatch');
   btn.disabled = true;
   try {
-    await apiPost('/api/match', { winners, losers });
+    await apiPost('/api/match', { winners, losers, late });
     await refreshAll();
-    document.querySelectorAll('#winList input, #loseList input').forEach(el => { el.checked = false; });
+    document.querySelectorAll('#winList input, #loseList input, #lateList input')
+      .forEach(el => { el.checked = false; });
     renderChecklists();
-    showToast(`승리 ${winners.length}명 / 패배 ${losers.length}명 기록 완료`);
+    showToast(`승리 ${winners.length}명 / 패배 ${losers.length}명`
+      + (late.length ? ` / 늦은 참석자 ${late.length}명` : '') + ' 기록 완료');
   } catch (e) {
     showToast(e.message);
     btn.disabled = false;
@@ -3474,8 +3495,9 @@ function initAdminEvents() {
   document.getElementById('submitMatch').addEventListener('click', async () => {
     const winners = getChecked('winList');
     const losers = getChecked('loseList');
+    const late = getChecked('lateList');
     if (!winners.length || !losers.length) return;
-    await recordTeamMatch(winners, losers);
+    await recordTeamMatch(winners, losers, late);
   });
 
   document.getElementById('resetBtn').addEventListener('click', async () => {

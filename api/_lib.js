@@ -287,6 +287,7 @@ export function rowToMatch(r) {
     id: r.id === undefined ? null : Number(r.id),
     winners: r.winners,
     losers: r.losers,
+    late: Array.isArray(r.late) ? r.late : [],
     ts: Number(r.ts),
     recordedBy: r.recorded_by,
     season: r.season || null,
@@ -311,17 +312,32 @@ export function cleanReason(v) {
 }
 
 /** 경기 취소 칸을 준비한다 (한 프로세스에 한 번) */
+/**
+ * 늦게 들어온 사람에게 주는 점수.
+ *
+ * 친목 경기라 인원이 딱 맞지 않는 날이 있다. 7:7 로 시작했는데 한 사람이
+ * 늦게 붙어 8:7 이 되는 식이다. 그 사람의 승패를 어느 쪽으로도 셀 수 없어
+ * 전적에는 넣지 않되, 와서 함께 뛴 몫으로 진 쪽과 같은 점수를 준다.
+ */
+export function lateGain() {
+  return lossGain();
+}
+
 let voidReady = false;
 export async function ensureMatchVoid() {
   if (voidReady) return;
   const has = await q(
     `SELECT 1 FROM information_schema.columns
-      WHERE table_name = 'matches' AND column_name = 'voided_at'`
+      WHERE table_name = 'matches' AND column_name = 'late'`
   );
   if (!has.length) {
-    await q(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS voided_at BIGINT`);
-    await q(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS voided_by TEXT`);
-    await q(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS void_reason TEXT`);
+    await q(`
+      ALTER TABLE matches ADD COLUMN IF NOT EXISTS voided_at BIGINT;
+      ALTER TABLE matches ADD COLUMN IF NOT EXISTS voided_by TEXT;
+      ALTER TABLE matches ADD COLUMN IF NOT EXISTS void_reason TEXT;
+      -- 늦게 붙은 사람. 승패 어느 쪽도 아니라 따로 담는다.
+      ALTER TABLE matches ADD COLUMN IF NOT EXISTS late JSONB;
+    `);
   }
   voidReady = true;
 }
