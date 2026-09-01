@@ -564,8 +564,10 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   opacity:.35;                      /* 0명일 때는 조용히 */
 }
 .pick-n.on{ opacity:1; }
+/* 한 줄이 46.4px, 위아래 안쪽 여백이 4px 씩이라 다섯 줄이면 240px 이다.
+   여섯 줄이 반쯤 걸쳐 보이면 아래에 더 있다는 것이 오히려 덜 읽혔다. */
 .checklist{
-  max-height:300px; overflow-y:auto;
+  max-height:240px; overflow-y:auto;
   border:1px solid var(--border); border-radius:var(--radius-md);
   background:var(--surface-sunken); padding:var(--sp-1);
 }
@@ -605,7 +607,30 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 }
 .late-label{ color:var(--warm); }
 .late-why{ margin:0 0 var(--sp-2); }
-.late-list{ max-height:150px; }
+.late-pick{ display:flex; gap:var(--sp-2); flex-wrap:wrap; }
+.late-pick select{
+  flex:1 1 220px; min-width:0;
+  background:var(--surface); color:var(--text-primary);
+  border:1px solid var(--border-strong); border-radius:var(--radius-sm);
+  padding:var(--sp-2) var(--sp-3); font-family:inherit; font-size:var(--fs-caption);
+}
+.late-pick select:focus{ outline:none; border-color:var(--accent); }
+.late-pick select:disabled{ color:var(--text-tertiary); background:var(--surface-sunken); }
+.late-chips{ display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-top:var(--sp-3); }
+.late-chips:empty{ display:none; }
+.late-chip{
+  display:inline-flex; align-items:center; gap:var(--sp-2);
+  background:var(--warm-bg); color:var(--warm);
+  border-radius:var(--radius-pill); padding:var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-3);
+  font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+}
+.late-chip button{
+  appearance:none; border:none; background:none; cursor:pointer;
+  color:inherit; font-family:inherit; font-size:13px; line-height:1;
+  padding:0 var(--sp-1); opacity:.7;
+}
+.late-chip button:hover{ opacity:1; }
+.late-chip button:focus-visible{ outline:none; box-shadow:var(--shadow-focus); border-radius:50%; }
 
 /* 기록 표에서 늦은 참석자 — 패배 칸 아래에 한 줄로 붙인다 */
 .h-late{
@@ -1782,7 +1807,13 @@ if (/[?&]room=\d+/.test(location.search)) {
         <div class="foot-note late-why">
           인원이 맞지 않아 뒤늦게 합류한 사람 · <b>경기 수·승·패에 넣지 않고</b> 점수만 +1 드립니다.
         </div>
-        <div class="checklist late-list" id="lateList"></div>
+        <div class="late-pick">
+          <select id="lateSelect" aria-label="늦은 참석자 고르기">
+            <option value="">선수를 고르세요</option>
+          </select>
+          <button type="button" class="btn-mini btn-approve" id="lateAdd">추가</button>
+        </div>
+        <div class="late-chips" id="lateChips"></div>
       </div>
 
       <div class="pick-sum zero" id="pickSum" aria-live="polite">
