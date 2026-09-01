@@ -10,6 +10,8 @@ let accounts = [];          // 계정 권한 목록 (관리자 이상)
 let acctLogs = [];          // 계정 로그
 let tMatches = [];          // 대회 경기 기록
 let posts = [];             // 게시판 글
+let files = [];             // 자료실 · 중요글 먼저, 그 다음 최신순 (서버가 맞춰 준다)
+let fileKinds = ['설치', '패치', '스킨', '타겟', '기타'];
 let season = null;          // 진행 중인 시즌
 let seasons = [];           // 시즌 목록(진행 중 + 마감)
 let viewSeasonId = null;    // 화면에서 보고 있는 달. null 이면 진행 중인 달
@@ -224,7 +226,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 21;
+const APP_VERSION = 22;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -311,6 +313,14 @@ async function loadPosts() {
     const d = await apiGet('/api/post');
     posts = d.posts || [];
   } catch { posts = []; }
+}
+
+async function loadFiles() {
+  try {
+    const d = await apiGet('/api/file');
+    files = d.files || [];
+    if (Array.isArray(d.kinds) && d.kinds.length) fileKinds = d.kinds;
+  } catch { files = []; }
 }
 
 /** 계정 권한 목록과 로그. 관리자 이상만 받아온다. */
@@ -985,10 +995,266 @@ function renderAll() {
   renderAcctLogs();
   renderTournament();
   renderBoard();
+  renderFiles();
   renderAttendance();
   renderLauncher();
   renderMonthPickers();
 }
+
+/* ---------- 자료실 ---------- */
+
+const FILES_PER_PAGE = 10;
+let filePage = 1;
+let fileKindFilter = '전체';
+let fileEditId = null;      // null 이면 새로 올리는 중
+
+/** 지금 화면에 걸린 조건으로 걸러낸 목록. 순서는 서버가 준 그대로 쓴다. */
+function viewFiles() {
+  if (fileKindFilter === '전체') return files;
+  return files.filter(f => f.kind === fileKindFilter);
+}
+
+/** 구분 고르는 단추 줄 */
+function renderFileKinds() {
+  const box = document.getElementById('fileKinds');
+  if (!box) return;
+  const all = ['전체', ...fileKinds];
+  box.innerHTML = all.map(k => {
+    const n = k === '전체' ? files.length : files.filter(f => f.kind === k).length;
+    return `<button type="button" class="fl-kind-btn${k === fileKindFilter ? ' on' : ''}"
+              data-kind="${esc(k)}">${esc(k)}${n ? ` ${n}` : ''}</button>`;
+  }).join('');
+}
+
+const CLIP_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
+  + ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+  + '<path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19'
+  + 'a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>';
+
+function renderFiles() {
+  const tbody = document.querySelector('#fileTable tbody');
+  const wrap = document.getElementById('fileTableWrap');
+  const empty = document.getElementById('fileEmpty');
+  if (!tbody || !wrap || !empty) return;
+
+  renderFileKinds();
+  renderFileForm();
+
+  const rows = viewFiles();
+  if (!rows.length) {
+    tbody.innerHTML = '';
+    wrap.style.display = 'none';
+    empty.style.display = 'block';
+    empty.textContent = files.length
+      ? '이 구분에는 올라온 자료가 없습니다.'
+      : '아직 올라온 자료가 없습니다.';
+    const pager = document.getElementById('filePager');
+    if (pager) { pager.innerHTML = ''; pager.style.display = 'none'; }
+    return;
+  }
+  wrap.style.display = '';
+  empty.style.display = 'none';
+
+  // 지워져서 쪽이 줄면 서 있던 쪽을 끝 쪽으로 당긴다
+  const pages = Math.max(1, Math.ceil(rows.length / FILES_PER_PAGE));
+  filePage = Math.min(Math.max(1, filePage), pages);
+  const from = (filePage - 1) * FILES_PER_PAGE;
+  const shown = rows.slice(from, from + FILES_PER_PAGE);
+
+  tbody.innerHTML = shown.map(f => {
+    const mine = isLoggedIn() && me.handle.toLowerCase() === String(f.author).toLowerCase();
+    const canManage = mine || isAdmin();
+    const d = new Date(f.createdAt);
+    const when = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
+    const kindCls = (f.kind === '설치') ? '' : ' k2';
+    const get = f.url
+      ? `<a class="fl-get" href="${esc(f.url)}" target="_blank" rel="noopener noreferrer"
+           data-hit="${f.id}">받기</a>`
+      : '';
+    const own = canManage
+      ? `<div class="fl-own">
+           <button class="btn-mini btn-edit" data-file-edit="${f.id}">고치기</button>
+           <button class="btn-mini btn-reject" data-file-del="${f.id}">삭제</button>
+         </div>`
+      : '';
+
+    return `<tr class="${f.pinned ? 'fl-pinned' : ''}">
+      <td class="fl-kind" data-l="구분"><span class="fl-chip${kindCls}">${esc(f.kind)}</span></td>
+      <td class="fl-title" data-l="제목">
+        ${f.pinned ? '<span class="fl-pin">중요</span>' : ''}<span class="fl-t">${esc(f.title)}</span>${get}
+        ${f.note ? `<span class="fl-note">${esc(f.note)}</span>` : ''}
+      </td>
+      <td class="fl-clip" data-l="첨부">${f.url
+        ? `<span title="첨부파일 있음" aria-label="첨부파일 있음">${CLIP_SVG}</span>`
+        : '<span class="fl-none" aria-label="첨부파일 없음">-</span>'}</td>
+      <td class="fl-size" data-l="용량">${f.sizeText ? esc(f.sizeText) : '<span class="fl-none">-</span>'}</td>
+      <td class="fl-hit" data-l="다운로드">${f.downloads}</td>
+      <td class="fl-by" data-l="올린이">${esc(f.author)}
+        <span class="fl-note fl-when">${when}</span>${own}</td>
+    </tr>`;
+  }).join('');
+
+  renderFilePager(rows.length, pages, from, shown.length);
+}
+
+/** 표 아래 쪽 넘김 줄. 기록 표와 같은 모양을 쓴다. */
+function renderFilePager(total, pages, from, shown) {
+  const box = document.getElementById('filePager');
+  if (!box) return;
+  if (pages <= 1) { box.innerHTML = ''; box.style.display = 'none'; return; }
+  box.style.display = '';
+
+  const nums = pageNumbers(filePage, pages).map(n =>
+    n === '…'
+      ? '<span class="pg-gap">…</span>'
+      : `<button type="button" class="pg${n === filePage ? ' on' : ''}" data-fpage="${n}"
+           ${n === filePage ? 'aria-current="page"' : ''}>${n}</button>`
+  ).join('');
+
+  box.innerHTML =
+    `<span class="pager-info">전체 ${total}개 중 ${from + 1}–${from + shown}번째</span>`
+    + '<div class="pager-nav">'
+    + `<button type="button" class="pg" data-fpage="${filePage - 1}"
+         ${filePage === 1 ? 'disabled' : ''} aria-label="이전 쪽">‹</button>`
+    + nums
+    + `<button type="button" class="pg" data-fpage="${filePage + 1}"
+         ${filePage === pages ? 'disabled' : ''} aria-label="다음 쪽">›</button>`
+    + '</div>';
+}
+
+/** 올리는 칸 — 로그인하지 않았으면 단추부터 감춘다 */
+function renderFileForm() {
+  const btn = document.getElementById('fileNewBtn');
+  const sel = document.getElementById('fileKind');
+  if (btn) btn.style.display = isLoggedIn() ? '' : 'none';
+  if (sel && !sel.options.length) {
+    sel.innerHTML = fileKinds.map(k => `<option value="${esc(k)}">${esc(k)}</option>`).join('');
+  }
+}
+
+function openFileForm(f) {
+  const form = document.getElementById('fileForm');
+  if (!form) return;
+  fileEditId = f ? f.id : null;
+  document.getElementById('fileKind').value = f ? f.kind : fileKinds[0];
+  document.getElementById('fileTitle').value = f ? f.title : '';
+  document.getElementById('fileUrl').value = f ? f.url : '';
+  document.getElementById('fileSize').value = f ? f.sizeText : '';
+  document.getElementById('fileNote').value = f ? f.note : '';
+  document.getElementById('filePinned').checked = f ? f.pinned : false;
+  document.getElementById('fileErr').textContent = '';
+  document.getElementById('fileSave').textContent = f ? '고치기' : '올리기';
+  form.style.display = 'grid';
+  document.getElementById('fileTitle').focus();
+}
+
+function closeFileForm() {
+  const form = document.getElementById('fileForm');
+  if (form) form.style.display = 'none';
+  fileEditId = null;
+}
+
+async function saveFile() {
+  const err = document.getElementById('fileErr');
+  const payload = {
+    action: fileEditId ? 'update' : 'create',
+    id: fileEditId,
+    kind: document.getElementById('fileKind').value,
+    title: document.getElementById('fileTitle').value.trim(),
+    url: document.getElementById('fileUrl').value.trim(),
+    sizeText: document.getElementById('fileSize').value.trim(),
+    note: document.getElementById('fileNote').value.trim(),
+    pinned: document.getElementById('filePinned').checked,
+  };
+  if (!payload.title) { err.textContent = '제목을 입력해주세요.'; return; }
+
+  const btn = document.getElementById('fileSave');
+  btn.disabled = true;
+  try {
+    await apiPost('/api/file', payload);
+    await loadFiles();
+    closeFileForm();
+    // 중요글은 맨 앞에 서므로, 올린 글이 보이도록 첫 쪽으로 돌아간다
+    filePage = 1;
+    renderFiles();
+    showToast(payload.action === 'create' ? '자료를 올렸습니다.' : '자료를 고쳤습니다.');
+  } catch (e) {
+    err.textContent = e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function removeFile(id) {
+  const f = files.find(x => x.id === id);
+  if (!f) return;
+  if (!confirm(`'${f.title}' 을(를) 지울까요?\n\n받는 곳 주소만 지워지고, 원본 파일은 그대로 남습니다.`)) return;
+  try {
+    await apiPost('/api/file', { action: 'remove', id });
+    await loadFiles();
+    renderFiles();
+    showToast('자료를 지웠습니다.');
+  } catch (e) { showToast(e.message); }
+}
+
+/** 받아간 횟수. 새 창은 이미 열렸으므로 세는 일이 실패해도 조용히 넘어간다. */
+async function hitFile(id) {
+  const f = files.find(x => x.id === id);
+  if (f) { f.downloads += 1; renderFiles(); }   // 눌렀으니 바로 올려 보여준다
+  try { await apiPost('/api/file', { action: 'hit', id }); }
+  catch { /* 숫자 하나 때문에 화면을 막지 않는다 */ }
+}
+
+function initFileEvents() {
+  const panel = document.getElementById('tab-files');
+  if (!panel) return;
+
+  const kinds = document.getElementById('fileKinds');
+  if (kinds) kinds.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-kind]');
+    if (!btn) return;
+    fileKindFilter = btn.dataset.kind;
+    filePage = 1;
+    renderFiles();
+  });
+
+  const newBtn = document.getElementById('fileNewBtn');
+  if (newBtn) newBtn.addEventListener('click', () => {
+    const form = document.getElementById('fileForm');
+    if (form.style.display !== 'none' && fileEditId === null) closeFileForm();
+    else openFileForm(null);
+  });
+
+  const cancel = document.getElementById('fileCancel');
+  if (cancel) cancel.addEventListener('click', closeFileForm);
+
+  const form = document.getElementById('fileForm');
+  if (form) form.addEventListener('submit', (e) => { e.preventDefault(); saveFile(); });
+
+  const tbody = document.querySelector('#fileTable tbody');
+  if (tbody) tbody.addEventListener('click', (e) => {
+    const get = e.target.closest('[data-hit]');
+    if (get) { hitFile(Number(get.dataset.hit)); return; }   // 링크는 그대로 열리게 둔다
+    const ed = e.target.closest('[data-file-edit]');
+    if (ed) { openFileForm(files.find(x => x.id === Number(ed.dataset.fileEdit))); return; }
+    const del = e.target.closest('[data-file-del]');
+    if (del) removeFile(Number(del.dataset.fileDel));
+  });
+
+  const pager = document.getElementById('filePager');
+  if (pager) pager.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-fpage]');
+    if (!btn || btn.disabled) return;
+    const n = Number(btn.dataset.fpage);
+    if (!n || n === filePage) return;
+    filePage = n;
+    renderFiles();
+    const wrap = document.getElementById('fileTableWrap');
+    if (wrap) wrap.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  });
+}
+
 
 /* ---------- 접속 예상 시간 ---------- */
 
@@ -3621,6 +3887,8 @@ function activateTab(name) {
   // 새로 받으면 왕복이 일곱 번 이어져 탭이 늦게 열린다.
   if (name === 'history') loadState().then(() => { renderHistory(); renderStanding(); renderTop5(); });
   if (name === 'attendance') { loadAttendance().then(renderAttendance); }
+  // 자료실은 다른 사람이 방금 올렸을 수 있으니 들어갈 때 새로 받아온다
+  if (name === 'files') { loadFiles().then(renderFiles); }
   if (name === 'launcher') { loadRooms().then(renderLauncher); }
 }
 
@@ -3724,7 +3992,7 @@ function initAdminEvents() {
 async function refreshAll() {
   await Promise.allSettled([
     loadState(), loadSeasons(), loadAttendance(),
-    loadTournament(), loadPosts(), loadRooms(), loadAccounts(),
+    loadTournament(), loadPosts(), loadFiles(), loadRooms(), loadAccounts(),
   ]);
   renderAll();
 }
@@ -3808,6 +4076,7 @@ async function boot() {
   initSeatMenu();
   initMonthPickers();
   initHistoryPager();
+  initFileEvents();
   renderAuthBar();
   try {
     // 방 창은 들어가기를 먼저 띄워두고 확인과 나란히 기다린다
