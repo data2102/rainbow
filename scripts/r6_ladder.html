@@ -547,6 +547,21 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .btn-edit{ background:var(--surface); color:var(--text-secondary); border-color:var(--border-strong); }
 .btn-edit:hover{ border-color:var(--accent); color:var(--accent); }
 
+/* 확정 버튼 옆에 붙는 되돌리기. 14명을 잘못 체크하고 하나씩 푸는 일이 없도록. */
+.pick-actions{ display:flex; gap:var(--sp-3); align-items:stretch; }
+.pick-actions .btn{ margin-top:var(--sp-4); }
+.btn-reset{
+  width:auto; flex:none; white-space:nowrap;
+  background:var(--surface); color:var(--text-secondary);
+  border:1px solid var(--border-strong);
+}
+.btn-reset:hover:not(:disabled){ background:var(--danger-bg); color:var(--danger); border-color:var(--danger); }
+.btn-reset:disabled{ background:var(--surface); border-color:var(--border); }
+@media (max-width:640px){
+  .pick-actions{ flex-direction:column; gap:0; }
+  .btn-reset{ width:100%; }
+}
+
 /* ---------- ADMIN 체크리스트 ---------- */
 .team-grid{ display:grid; grid-template-columns:1fr 1fr; gap:var(--sp-5); align-items:start; }
 @media (max-width:640px){ .team-grid{ grid-template-columns:1fr; } }
@@ -1818,8 +1833,11 @@ if (/[?&]room=\d+/.test(location.search)) {
         <span class="plate" id="pickLate" hidden></span>
       </div>
       <div class="pick-note" id="pickNote"></div>
-      <button class="btn" id="submitMatch" disabled>기록 확정 (Record Match)</button>
-      <div class="foot-note">동일 선수를 양쪽에 동시 체크할 수 없습니다 · 늦은 참석자는 승패 팀과 겹칠 수 없습니다 · 최소 각 팀 1명 이상 선택하세요.</div>
+      <div class="pick-actions">
+        <button class="btn" id="submitMatch" disabled>기록 확정 (Record Match)</button>
+        <button type="button" class="btn btn-reset" id="resetPick" disabled>체크 초기화</button>
+      </div>
+      <div class="foot-note">동일 선수를 양쪽에 동시 체크할 수 없습니다 · 늦은 참석자는 승패 팀과 겹칠 수 없습니다 · 최소 각 팀 1명 이상 선택하세요 · 잘못 체크했으면 <b>체크 초기화</b>로 처음부터 다시 고르세요.</div>
     </div>
     </div>
 

@@ -224,8 +224,11 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 8;
+const APP_VERSION = 9;
 let toldToRefresh = false;
+
+/** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
+const LOSS_GAIN = 1;
 
 /**
  * 회선이 얼마나 빨리 닿는지를 잰다.
@@ -544,6 +547,18 @@ function renderChecklists() {
 
   const submit = document.getElementById('submitMatch');
   if (submit) submit.disabled = !(nWin > 0 && nLose > 0);
+
+  // 지울 게 있을 때만 켠다 — 빈 화면에서 눌러봐야 아무 일도 안 일어난다
+  const reset = document.getElementById('resetPick');
+  if (reset) reset.disabled = !(nWin || nLose || latePicked.length);
+}
+
+/** 체크를 전부 푼다. 기록을 넣은 뒤에도, 잘못 골랐을 때도 같은 길을 쓴다. */
+function clearPicks() {
+  document.querySelectorAll('#winList input, #loseList input')
+    .forEach(el => { el.checked = false; });
+  latePicked = [];
+  renderChecklists();
 }
 
 /** 늦은 참석자 — 고르는 칸과 고른 사람 딱지. */
@@ -652,13 +667,16 @@ function renderHistory() {
     const winChips = winners.map(w =>
       `<span class="h-chip w">${esc(w.handle)}<span class="h-gain">+${w.gained !== undefined ? w.gained : '-'}</span></span>`
     ).join('') || '<span class="h-chip l">-</span>';
-    const loseChips = losers.map(h => `<span class="h-chip l">${esc(h)}</span>`).join('')
-      || '<span class="h-chip l">-</span>';
+    // 진 사람도 나온 값은 있다. 이긴 쪽만 +3 이 붙어 있으니 진 쪽은
+    // 아무것도 못 받은 것처럼 보였다 — 실제로는 다 같이 +1 을 받는다.
+    const loseChips = losers.map(h =>
+      `<span class="h-chip l">${esc(h)}<span class="h-gain">+${LOSS_GAIN}</span></span>`).join('')
+      || '<span class="h-none">-</span>';
     // 늦은 참석자는 칸을 따로 갖는다. 패배 칸에 이어 붙였더니 진 사람과
     // 섞여 보였다 — 이 사람들은 지지 않았고, 이긴 것도 아니다.
     const late = m.late || [];
     const lateChips = late.map(h =>
-      `<span class="h-chip x">${esc(h)}<span class="h-gain">+1</span></span>`).join('')
+      `<span class="h-chip x">${esc(h)}<span class="h-gain">+${LOSS_GAIN}</span></span>`).join('')
       || '<span class="h-none">-</span>';
 
     // 번호는 취소된 기록까지 세어 붙인다. 취소했다고 뒤 번호가 밀리면
@@ -3407,10 +3425,7 @@ async function recordTeamMatch(winners, losers, late = []) {
   try {
     await apiPost('/api/match', { winners, losers, late });
     await refreshAll();
-    document.querySelectorAll('#winList input, #loseList input')
-      .forEach(el => { el.checked = false; });
-    latePicked = [];
-    renderChecklists();
+    clearPicks();
     showToast(`승리 ${winners.length}명 / 패배 ${losers.length}명`
       + (late.length ? ` / 늦은 참석자 ${late.length}명` : '') + ' 기록 완료');
   } catch (e) {
@@ -3541,6 +3556,16 @@ function initAdminEvents() {
   document.getElementById('exportBtn').addEventListener('click', exportData);
   document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
   document.getElementById('importFile').addEventListener('change', handleImportFile);
+
+  document.getElementById('resetPick').addEventListener('click', () => {
+    const nWin = getChecked('winList').length;
+    const nLose = getChecked('loseList').length;
+    const total = nWin + nLose + latePicked.length;
+    if (!total) return;
+    if (!confirm(`체크한 ${total}명을 모두 지우고 처음부터 다시 고를까요?`)) return;
+    clearPicks();
+    showToast('체크를 모두 지웠습니다');
+  });
 
   document.getElementById('submitMatch').addEventListener('click', async () => {
     const winners = getChecked('winList');
