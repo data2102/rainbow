@@ -414,6 +414,29 @@ tbody tr:hover td{ background:var(--surface-sunken); }
 }
 .month-past:empty{ display:none; }
 
+/* ---------- 쪽 넘김 ---------- */
+.pager{
+  display:flex; align-items:center; gap:var(--sp-2);
+  flex-wrap:wrap; margin-top:var(--sp-4);
+}
+.pager-info{ font-size:var(--fs-footnote); color:var(--text-tertiary); margin-right:auto; }
+.pg{
+  min-width:34px; padding:var(--sp-2) var(--sp-3);
+  border:1px solid var(--border); border-radius:var(--radius-sm);
+  background:var(--surface); color:var(--text-secondary);
+  font-family:inherit; font-size:var(--fs-footnote); font-weight:var(--fw-medium);
+  cursor:pointer; transition:border-color var(--dur-fast) var(--ease-standard);
+}
+.pg:hover:not(:disabled){ border-color:var(--accent); color:var(--accent); }
+.pg.on{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
+.pg:disabled{ color:var(--text-disabled); cursor:not-allowed; }
+.pg:focus-visible{ outline:none; box-shadow:var(--shadow-focus); }
+.pg-gap{ color:var(--text-disabled); font-size:var(--fs-footnote); padding:0 var(--sp-1); }
+@media (max-width:640px){
+  /* 좁은 화면에서는 안내를 윗줄로 빼서 버튼이 한 줄에 들어가게 한다 */
+  .pager-info{ width:100%; margin-right:0; }
+}
+
 /* ---------- 내 시간대 한 줄 ---------- */
 .mine{
   display:flex; align-items:center; gap:var(--sp-3); flex-wrap:wrap;
@@ -1884,6 +1907,7 @@ if (/[?&]room=\d+/.test(location.search)) {
           <tbody></tbody>
         </table>
       </div>
+      <div class="pager" id="historyPager" style="display:none;"></div>
       <div id="historyEmpty" class="log-empty">기록 없음</div>
     </div>
 

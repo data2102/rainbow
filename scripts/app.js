@@ -224,7 +224,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 9;
+const APP_VERSION = 10;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -640,6 +640,70 @@ function showPickCount(nWin, nLose, nLate = 0) {
   note.textContent = msg;
 }
 
+/**
+ * 전체 기록은 최근 것부터 열 경기씩 끊어 보여준다. 마흔 경기가 한 화면에
+ * 다 깔리면 방금 넣은 기록을 찾기가 어렵다.
+ */
+const HISTORY_PER_PAGE = 10;
+let historyPage = 1;
+
+/**
+ * 쪽 번호 줄. 쪽이 많아지면 가운데만 남기고 양쪽 끝을 붙인다
+ * (1 … 4 5 6 … 12 꼴). 줄이 길어져 버튼을 못 찾는 일이 없도록.
+ */
+function pageNumbers(cur, pages) {
+  if (pages <= 7) return Array.from({ length: pages }, (_, i) => i + 1);
+  let a = Math.max(2, cur - 1);
+  let b = Math.min(pages - 1, cur + 1);
+  if (cur <= 3) { a = 2; b = 4; }
+  if (cur >= pages - 2) { a = pages - 3; b = pages - 1; }
+  const out = [1];
+  if (a > 2) out.push('…');
+  for (let i = a; i <= b; i++) out.push(i);
+  if (b < pages - 1) out.push('…');
+  out.push(pages);
+  return out;
+}
+
+/** 표 아래 쪽 넘김 줄. 한 쪽뿐이면 아예 감춘다. */
+function renderHistoryPager(total, pages, from, shown) {
+  const box = document.getElementById('historyPager');
+  if (!box) return;
+  if (pages <= 1) { box.innerHTML = ''; box.style.display = 'none'; return; }
+  box.style.display = '';
+
+  const nums = pageNumbers(historyPage, pages).map(n =>
+    n === '…'
+      ? '<span class="pg-gap">…</span>'
+      : `<button type="button" class="pg${n === historyPage ? ' on' : ''}" data-page="${n}"
+           ${n === historyPage ? 'aria-current="page"' : ''}>${n}</button>`
+  ).join('');
+
+  box.innerHTML =
+    `<span class="pager-info">전체 ${total}경기 중 ${from + 1}–${from + shown}번째</span>`
+    + `<button type="button" class="pg" data-page="${historyPage - 1}"
+         ${historyPage === 1 ? 'disabled' : ''} aria-label="이전 쪽">‹</button>`
+    + nums
+    + `<button type="button" class="pg" data-page="${historyPage + 1}"
+         ${historyPage === pages ? 'disabled' : ''} aria-label="다음 쪽">›</button>`;
+}
+
+function initHistoryPager() {
+  const box = document.getElementById('historyPager');
+  if (!box) return;
+  box.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-page]');
+    if (!btn || btn.disabled) return;
+    const n = Number(btn.dataset.page);
+    if (!n || n === historyPage) return;
+    historyPage = n;
+    renderHistory();
+    // 쪽을 넘기면 표 머리로 올려준다 — 아래에 서서 위가 바뀌면 알아채기 어렵다
+    const wrap = document.getElementById('historyTableWrap');
+    if (wrap) wrap.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  });
+}
+
 function renderHistory() {
   const tbody = document.querySelector('#historyTable tbody');
   const wrap = document.getElementById('historyTableWrap');
@@ -651,13 +715,25 @@ function renderHistory() {
     tbody.innerHTML = '';
     wrap.style.display = 'none';
     empty.style.display = 'block';
+    const pager = document.getElementById('historyPager');
+    if (pager) { pager.innerHTML = ''; pager.style.display = 'none'; }
     return;
   }
   wrap.style.display = '';
   empty.style.display = 'none';
 
   const all = [...rows].reverse();
-  tbody.innerHTML = all.map((m, i) => {
+
+  // 쪽을 잡아둔 채 새로고침이 돌 수 있다. 기록이 지워져 쪽이 줄면 끝 쪽으로 당긴다.
+  const pages = Math.max(1, Math.ceil(all.length / HISTORY_PER_PAGE));
+  historyPage = Math.min(Math.max(1, historyPage), pages);
+  const from = (historyPage - 1) * HISTORY_PER_PAGE;
+  const shown = all.slice(from, from + HISTORY_PER_PAGE);
+
+  tbody.innerHTML = shown.map((m, j) => {
+    // 번호는 이 쪽이 아니라 전체를 기준으로 매긴다 — "#39 경기"가 쪽마다
+    // 달라지면 주고받는 말이 어긋난다
+    const i = from + j;
     const winners = m.winners || [];
     const losers = m.losers || [];
     const d = new Date(m.ts);
@@ -716,6 +792,7 @@ function renderHistory() {
     </tr>`;
   }).join('');
 
+  renderHistoryPager(all.length, pages, from, shown.length);
   renderVoidLog(all);
 }
 
@@ -1095,6 +1172,8 @@ async function selectMonth(id) {
   renderStanding();
   renderTop5();
   renderClanTop();
+  // 다른 달을 골랐는데 7쪽에 서 있으면 빈 화면을 본다
+  historyPage = 1;
   renderHistory();
 }
 
@@ -3681,6 +3760,7 @@ async function boot() {
   initPlayingWatch();
   initSeatMenu();
   initMonthPickers();
+  initHistoryPager();
   renderAuthBar();
   try {
     // 방 창은 들어가기를 먼저 띄워두고 확인과 나란히 기다린다
