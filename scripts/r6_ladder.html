@@ -240,7 +240,13 @@ html,body{
   -webkit-font-smoothing:antialiased;
 }
 body{ padding:var(--sp-6) var(--sp-4) var(--sp-12); }
-#app{ max-width:1280px; margin:0 auto; }   /* 왼쪽 메뉴 180px + 내용 1080px */
+#app{
+  max-width:1280px; margin:0 auto;          /* 왼쪽 메뉴 180px + 내용 1080px */
+  /* 내용이 짧아도 왼쪽 메뉴가 화면 끝까지 내려오도록 바닥을 잡아둔다.
+     body 의 위아래 여백(24 + 48)을 뺀 만큼이 실제로 쓸 수 있는 높이다. */
+  display:flex; flex-direction:column;
+  min-height:calc(100vh - var(--sp-6) - var(--sp-12));
+}
 
 /* 숫자가 줄맞춤되어야 하는 곳 */
 table, .num{ font-variant-numeric:tabular-nums; }
@@ -306,15 +312,21 @@ h1{
    가로 메뉴로 되돌리려면 backup/garo-menu 가지를 보라. */
 .shell{
   display:grid; grid-template-columns:180px minmax(0,1fr);
-  gap:var(--sp-4); align-items:start;
+  gap:var(--sp-4);
+  flex:1;                              /* 남는 높이를 메뉴 판이 가져간다 */
+  /* align-items 기본값(stretch)을 그대로 둔다 — 메뉴 판이 내용 높이만큼 늘어난다 */
 }
 .panels{ min-width:0; }
 .tabs{
-  display:flex; flex-direction:column; gap:2px;
   background:var(--surface); border:1px solid var(--border);
   border-radius:var(--radius-lg); padding:var(--sp-2);
   box-shadow:var(--shadow-card);
-  position:sticky; top:var(--sp-4);   /* 내려도 메뉴는 따라온다 */
+}
+/* 판은 끝까지 내려가되 단추는 화면을 따라온다. 기록이 긴 달에는 표가
+   수천 픽셀이 되는데, 그때 메뉴만 저 위에 남아 있으면 다시 올라가야 한다. */
+.tabs-in{
+  display:flex; flex-direction:column; gap:2px;
+  position:sticky; top:var(--sp-2);
 }
 .tab-btn{
   display:flex; align-items:center; width:100%;
@@ -338,8 +350,9 @@ h1{
 
 @media (max-width:860px){
   /* 좁아지면 메뉴가 세로로 서 있을 자리가 없다. 위로 올려 칸으로 편다. */
-  .shell{ grid-template-columns:minmax(0,1fr); gap:var(--sp-4); }
-  .tabs{
+  .shell{ grid-template-columns:minmax(0,1fr); gap:var(--sp-4); align-content:start; }
+  .tabs{ align-self:start; }
+  .tabs-in{
     display:grid; grid-template-columns:repeat(3,minmax(0,1fr));
     gap:var(--sp-1); position:static;
   }
@@ -1816,7 +1829,7 @@ if (/[?&]room=\d+/.test(location.search)) {
   <div id="connBanner"></div>
 
   <div class="shell">
-  <nav class="tabs">
+  <nav class="tabs"><div class="tabs-in">
     <button class="tab-btn active" data-tab="standing">순위</button>
     <button class="tab-btn" data-tab="mostpoint">상세순위</button>
     <button class="tab-btn" data-tab="history">리폿(경기결과)</button>
@@ -1826,7 +1839,7 @@ if (/[?&]room=\d+/.test(location.search)) {
     <button class="tab-btn" data-tab="board">게시판</button>
     <button class="tab-btn" data-tab="files">자료실<span class="tab-wip">(준비중)</span></button>
     <button class="tab-btn" data-tab="launcher">런쳐<span class="tab-wip">(준비중)</span></button>
-  </nav>
+  </div></nav>
   <div class="panels">
 
   <!-- STANDING -->
