@@ -224,7 +224,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 19;
+const APP_VERSION = 20;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -1751,10 +1751,10 @@ function renderGates() {
     const el = document.getElementById(id);
     if (el) el.style.display = show ? 'block' : 'none';
   };
-  // ③ 리폿 — 로그인하면 승패를 기록할 수 있다
+  // 리폿 — 로그인하면 승패를 기록할 수 있다
   set('reportGate', !isLoggedIn());
   set('reportBox', isLoggedIn());
-  // ⑥ 게시판 — 로그인해야 글을 쓴다
+  // 게시판 — 로그인해야 글을 쓴다
   set('postGate', !isLoggedIn());
   set('postForm', isLoggedIn());
   // 관리자 화면 — 관리자 이상만

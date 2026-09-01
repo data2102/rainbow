@@ -137,6 +137,20 @@ Vercel 프로젝트 → **Settings → Domains** 에서 `r6rank.co.kr` 과 `www.
 python3 scripts/build_index.py
 ```
 
+### 가로 메뉴로 되돌리기
+
+메뉴는 원래 화면 위쪽 **가로 탭**이었고, 지금은 왼쪽 **세로 메뉴**입니다.
+가로 탭 마지막 상태는 `backup/garo-menu` 가지에 그대로 남아 있습니다.
+
+```bash
+git fetch origin backup/garo-menu
+git checkout origin/backup/garo-menu -- scripts/r6_ladder.html scripts/app.js
+python3 scripts/build_index.py
+```
+
+되돌리면 그 뒤에 넣은 화면 수정도 함께 사라지므로, 되돌린 다음 필요한 것만
+다시 얹으세요. 이 가지는 지우지 마세요.
+
 ---
 
 ## 대안: Vercel 대신 일반 서버(VPS·카페24)

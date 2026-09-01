@@ -240,7 +240,7 @@ html,body{
   -webkit-font-smoothing:antialiased;
 }
 body{ padding:var(--sp-6) var(--sp-4) var(--sp-12); }
-#app{ max-width:1080px; margin:0 auto; }
+#app{ max-width:1280px; margin:0 auto; }   /* 왼쪽 메뉴 180px + 내용 1080px */
 
 /* 숫자가 줄맞춤되어야 하는 곳 */
 table, .num{ font-variant-numeric:tabular-nums; }
@@ -300,36 +300,55 @@ h1{
   padding:var(--sp-2) var(--sp-3); border-radius:var(--radius-pill);
 }
 
-/* ---------- 탭 ---------- */
+/* ---------- 탭 (왼쪽 세로 메뉴) ----------
+   메뉴가 아홉 개가 되면서 가로 한 줄은 접히고 두 줄은 어긋났다. 왼쪽에
+   세우면 몇 개가 되든 아래로 붙기만 하면 된다.
+   가로 메뉴로 되돌리려면 backup/garo-menu 가지를 보라. */
+.shell{
+  display:grid; grid-template-columns:180px minmax(0,1fr);
+  gap:var(--sp-4); align-items:start;
+}
+.panels{ min-width:0; }
 .tabs{
-  display:flex; gap:var(--sp-1); flex-wrap:wrap;
+  display:flex; flex-direction:column; gap:2px;
   background:var(--surface); border:1px solid var(--border);
-  border-radius:var(--radius-lg); padding:var(--sp-1);
-  margin-bottom:var(--sp-4); box-shadow:var(--shadow-card);
+  border-radius:var(--radius-lg); padding:var(--sp-2);
+  box-shadow:var(--shadow-card);
+  position:sticky; top:var(--sp-4);   /* 내려도 메뉴는 따라온다 */
 }
 .tab-btn{
-  /* 글자가 잘리거나 두 줄로 접히지 않도록 라벨 너비를 먼저 확보하고 남는 공간을 나눈다 */
-  flex:1 1 auto; min-width:max-content; white-space:nowrap;
-  /* (준비중)이 아랫줄로 내려가도 메뉴 이름은 줄마다 가운데에 선다.
-     한 줄짜리 메뉴도 두 줄짜리와 높이가 같아지므로 세로로도 가운데를 잡는다. */
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
-  text-align:center; cursor:pointer;
+  display:flex; align-items:center; width:100%;
+  text-align:left; cursor:pointer;
   background:transparent; border:none; border-radius:var(--radius-md);
-  padding:var(--sp-3) var(--sp-3);
+  padding:var(--sp-3) var(--sp-4);
   font-family:inherit; font-size:var(--fs-caption); font-weight:var(--fw-medium);
-  color:var(--text-tertiary);
+  color:var(--text-secondary);
   transition:background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
 }
 .tab-btn:hover{ color:var(--text-primary); background:var(--surface-sunken); }
 .tab-btn.active{ background:var(--accent); color:var(--on-accent); font-weight:var(--fw-bold); }
 .tab-btn:focus-visible{ outline:none; box-shadow:var(--shadow-focus); }
-/* 아직 다듬는 중인 메뉴. 메뉴 이름 아래에 작게 한 줄 내려 붙인다. */
+/* 아직 다듬는 중인 메뉴. 세로라 자리가 넉넉해서 오른쪽 끝에 붙인다. */
 .tab-wip{
-  display:block; margin-top:1px;
-  font-size:10px; line-height:1.3; font-weight:var(--fw-regular);
-  color:var(--text-disabled);
+  margin-left:auto; padding-left:var(--sp-2);
+  font-size:10px; font-weight:var(--fw-regular);
+  color:var(--text-disabled); white-space:nowrap;
 }
 .tab-btn.active .tab-wip{ color:var(--on-accent); opacity:.75; }
+
+@media (max-width:860px){
+  /* 좁아지면 메뉴가 세로로 서 있을 자리가 없다. 위로 올려 칸으로 편다. */
+  .shell{ grid-template-columns:minmax(0,1fr); gap:var(--sp-4); }
+  .tabs{
+    display:grid; grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:var(--sp-1); position:static;
+  }
+  .tab-btn{
+    justify-content:center; text-align:center; padding:var(--sp-3) var(--sp-2);
+    flex-direction:column; gap:0;
+  }
+  .tab-wip{ margin-left:0; padding-left:0; }
+}
 .tab-panel{ display:none; }
 .tab-panel.active{ display:block; }
 
@@ -1528,6 +1547,8 @@ button.room-n:hover{ color:var(--accent); text-decoration:underline; }
 .room-only #lcRooms,
 .room-only #lcAway{ display:none !important; }
 .room-only .tab-panel:not(#tab-launcher){ display:none !important; }
+/* 방 창은 메뉴가 없으므로 왼쪽 칸을 아예 없앤다 */
+.room-only .shell{ display:block; }
 /* 자바스크립트가 탭을 켜주기를 기다리지 않는다. 그동안 빈 창만 보인다. */
 .room-only #tab-launcher{ display:block; }
 
@@ -1794,16 +1815,19 @@ if (/[?&]room=\d+/.test(location.search)) {
 
   <div id="connBanner"></div>
 
+  <div class="shell">
   <nav class="tabs">
-    <button class="tab-btn active" data-tab="standing">① 순위</button>
-    <button class="tab-btn" data-tab="mostpoint">② 상세순위</button>
-    <button class="tab-btn" data-tab="history">③ 리폿(경기결과)</button>
-    <button class="tab-btn" data-tab="attendance">④ 출석</button>
-    <button class="tab-btn" data-tab="tournament">⑤ 대회</button>
-    <button class="tab-btn" data-tab="rules">⑥ 규정<span class="tab-wip">(준비중)</span></button>
-    <button class="tab-btn" data-tab="board">⑦ 게시판</button>
-    <button class="tab-btn" data-tab="launcher">⑧ 런쳐<span class="tab-wip">(준비중)</span></button>
+    <button class="tab-btn active" data-tab="standing">순위</button>
+    <button class="tab-btn" data-tab="mostpoint">상세순위</button>
+    <button class="tab-btn" data-tab="history">리폿(경기결과)</button>
+    <button class="tab-btn" data-tab="attendance">출석</button>
+    <button class="tab-btn" data-tab="tournament">대회</button>
+    <button class="tab-btn" data-tab="rules">규정<span class="tab-wip">(준비중)</span></button>
+    <button class="tab-btn" data-tab="board">게시판</button>
+    <button class="tab-btn" data-tab="files">자료실<span class="tab-wip">(준비중)</span></button>
+    <button class="tab-btn" data-tab="launcher">런쳐<span class="tab-wip">(준비중)</span></button>
   </nav>
+  <div class="panels">
 
   <!-- STANDING -->
   <div class="tab-panel active" id="tab-standing">
@@ -2312,7 +2336,7 @@ if (/[?&]room=\d+/.test(location.search)) {
               <tr>
                 <td class="rt-no"><span class="rt-badge">4</span></td>
                 <td class="rt-item">기록하는 법</td>
-                <td><b>③ 리폿</b> 페이지에서 승리 팀 · 패배 팀에 넣지 말고
+                <td><b>리폿</b> 페이지에서 승리 팀 · 패배 팀에 넣지 말고
                     <b>LATE TEAM · 지각 팀</b>에 넣어주세요. 점수는 자동으로 +1점만 붙습니다.</td>
               </tr>
             </tbody>
@@ -2441,6 +2465,17 @@ if (/[?&]room=\d+/.test(location.search)) {
 
       <div class="foot-note" id="postCount" style="margin-bottom:6px;"></div>
       <div id="postList"></div>
+    </div>
+  </div>
+
+  <!-- FILES — 자료실 (준비중) -->
+  <div class="tab-panel" id="tab-files">
+    <div class="panel hud-corner">
+      <h2>자료실 · Files</h2>
+      <div class="soon">
+        <div class="soon-t">준비중</div>
+        <div class="soon-s">설치 파일 · 패치 · 스킨 · 타겟을 한자리에 모을 예정입니다.</div>
+      </div>
     </div>
   </div>
 
@@ -2618,6 +2653,8 @@ if (/[?&]room=\d+/.test(location.search)) {
       </div>
     </div>
   </div>
+  </div><!-- /.panels -->
+  </div><!-- /.shell -->
 </div>
 <div class="toast" id="toast"></div>
 <div class="cd" id="countdown" aria-hidden="true"><div class="cd-n" id="countdownN"></div></div>
@@ -2859,7 +2896,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 19;
+const APP_VERSION = 20;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -4386,10 +4423,10 @@ function renderGates() {
     const el = document.getElementById(id);
     if (el) el.style.display = show ? 'block' : 'none';
   };
-  // ③ 리폿 — 로그인하면 승패를 기록할 수 있다
+  // 리폿 — 로그인하면 승패를 기록할 수 있다
   set('reportGate', !isLoggedIn());
   set('reportBox', isLoggedIn());
-  // ⑥ 게시판 — 로그인해야 글을 쓴다
+  // 게시판 — 로그인해야 글을 쓴다
   set('postGate', !isLoggedIn());
   set('postForm', isLoggedIn());
   // 관리자 화면 — 관리자 이상만
