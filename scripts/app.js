@@ -679,13 +679,16 @@ function renderHistoryPager(total, pages, from, shown) {
            ${n === historyPage ? 'aria-current="page"' : ''}>${n}</button>`
   ).join('');
 
+  // 안내는 왼쪽에 두고 버튼만 판 한가운데에 놓는다 (아래 grid 참고)
   box.innerHTML =
     `<span class="pager-info">전체 ${total}경기 중 ${from + 1}–${from + shown}번째</span>`
+    + '<div class="pager-nav">'
     + `<button type="button" class="pg" data-page="${historyPage - 1}"
          ${historyPage === 1 ? 'disabled' : ''} aria-label="이전 쪽">‹</button>`
     + nums
     + `<button type="button" class="pg" data-page="${historyPage + 1}"
-         ${historyPage === pages ? 'disabled' : ''} aria-label="다음 쪽">›</button>`;
+         ${historyPage === pages ? 'disabled' : ''} aria-label="다음 쪽">›</button>`
+    + '</div>';
 }
 
 function initHistoryPager() {

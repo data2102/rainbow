@@ -415,11 +415,17 @@ tbody tr:hover td{ background:var(--surface-sunken); }
 .month-past:empty{ display:none; }
 
 /* ---------- 쪽 넘김 ---------- */
+/* 버튼은 판 한가운데. 안내를 왼쪽에 두고 밀면 버튼이 오른쪽으로 쏠리므로,
+   양옆에 같은 몫(1fr)을 주고 가운데 칸에 버튼을 넣는다. */
 .pager{
-  display:flex; align-items:center; gap:var(--sp-2);
-  flex-wrap:wrap; margin-top:var(--sp-4);
+  display:grid; grid-template-columns:1fr auto 1fr;
+  align-items:center; gap:var(--sp-2); margin-top:var(--sp-4);
 }
-.pager-info{ font-size:var(--fs-footnote); color:var(--text-tertiary); margin-right:auto; }
+.pager-nav{ display:flex; align-items:center; gap:var(--sp-2); justify-content:center; }
+.pager-info{
+  font-size:var(--fs-footnote); color:var(--text-tertiary);
+  justify-self:start; white-space:nowrap;
+}
 .pg{
   min-width:34px; padding:var(--sp-2) var(--sp-3);
   border:1px solid var(--border); border-radius:var(--radius-sm);
@@ -432,9 +438,11 @@ tbody tr:hover td{ background:var(--surface-sunken); }
 .pg:disabled{ color:var(--text-disabled); cursor:not-allowed; }
 .pg:focus-visible{ outline:none; box-shadow:var(--shadow-focus); }
 .pg-gap{ color:var(--text-disabled); font-size:var(--fs-footnote); padding:0 var(--sp-1); }
-@media (max-width:640px){
-  /* 좁은 화면에서는 안내를 윗줄로 빼서 버튼이 한 줄에 들어가게 한다 */
-  .pager-info{ width:100%; margin-right:0; }
+@media (max-width:900px){
+  /* 좁아지면 양옆 몫이 버튼을 짓눌러 삐뚤어진다. 안내를 윗줄로 빼고 둘 다 가운데. */
+  .pager{ grid-template-columns:1fr; justify-items:center; gap:var(--sp-3); }
+  .pager-info{ justify-self:center; white-space:normal; text-align:center; }
+  .pager-nav{ flex-wrap:wrap; }
 }
 
 /* ---------- 내 시간대 한 줄 ---------- */
@@ -3130,13 +3138,16 @@ function renderHistoryPager(total, pages, from, shown) {
            ${n === historyPage ? 'aria-current="page"' : ''}>${n}</button>`
   ).join('');
 
+  // 안내는 왼쪽에 두고 버튼만 판 한가운데에 놓는다 (아래 grid 참고)
   box.innerHTML =
     `<span class="pager-info">전체 ${total}경기 중 ${from + 1}–${from + shown}번째</span>`
+    + '<div class="pager-nav">'
     + `<button type="button" class="pg" data-page="${historyPage - 1}"
          ${historyPage === 1 ? 'disabled' : ''} aria-label="이전 쪽">‹</button>`
     + nums
     + `<button type="button" class="pg" data-page="${historyPage + 1}"
-         ${historyPage === pages ? 'disabled' : ''} aria-label="다음 쪽">›</button>`;
+         ${historyPage === pages ? 'disabled' : ''} aria-label="다음 쪽">›</button>`
+    + '</div>';
 }
 
 function initHistoryPager() {
