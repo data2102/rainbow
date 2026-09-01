@@ -784,6 +784,25 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 }
 .tsec-sub{ font-size:var(--fs-footnote); color:var(--text-tertiary); margin:0 0 var(--sp-4); }
 
+/* 규정 표. 순위표와 달리 칸에 문장이 들어가므로 nowrap 과 정렬 손잡이를 푼다. */
+.rule-table th{ cursor:default; }
+.rule-table th:hover{ color:var(--text-tertiary); }
+.rule-table td{
+  white-space:normal; vertical-align:top;
+  line-height:var(--lh-body); color:var(--text-secondary);
+}
+.rule-table td b{ color:var(--text-primary); font-weight:var(--fw-bold); }
+.rule-table .rt-no{ width:36px; text-align:center; color:var(--text-tertiary); }
+.rule-table .rt-item{
+  width:150px; white-space:nowrap;
+  color:var(--text-primary); font-weight:var(--fw-medium);
+}
+@media (max-width:640px){
+  /* 좁은 화면에서는 항목 이름이 줄바꿈되더라도 내용 칸을 살린다 */
+  .rule-table .rt-item{ width:96px; white-space:normal; }
+  .rule-table .rt-no{ width:26px; padding-left:0; padding-right:0; }
+}
+
 .team-cards{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:var(--sp-3); }
 .team-card{
   border:1px solid var(--border); border-radius:var(--radius-md);
@@ -2089,9 +2108,95 @@ if (/[?&]room=\d+/.test(location.search)) {
   <div class="tab-panel" id="tab-rules">
     <div class="panel hud-corner">
       <h2>규정 · Rule</h2>
-      <div class="soon">
-        <div class="soon-t">준비중</div>
-        <div class="soon-s">클랜 규정을 정리해서 올릴 예정입니다.</div>
+      <div class="foot-note" style="margin-top:0;margin-bottom:var(--sp-6);">
+        모두 함께 즐겁게 하기 위해 회의에서 합의한 내용입니다 · 규정이 바뀌면 이 페이지에 올립니다.
+      </div>
+
+      <div class="tsec">
+        <div class="tsec-h">■ 팀 편성</div>
+        <div class="tsec-sub">랜덤 팀을 다시 돌리는 기준</div>
+        <div class="table-wrap">
+          <table class="rule-table">
+            <thead><tr><th class="rt-no">#</th><th class="rt-item">항목</th><th>내용</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="rt-no">1</td>
+                <td class="rt-item">다시 돌리는 경우</td>
+                <td>팀이 한쪽으로 쏠린 것이 <b>모두가 납득할 정도</b>일 때에 한해,
+                    <b>전원 동의</b>하에 <b>1회만</b> 랜덤 팀을 다시 돌립니다.</td>
+              </tr>
+              <tr>
+                <td class="rt-no">2</td>
+                <td class="rt-item">동의가 없을 때</td>
+                <td>불편하더라도 <b>그대로 진행</b>합니다.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="tsec">
+        <div class="tsec-h">■ C. 프랙 및 권총</div>
+        <div class="tsec-sub">서로 스트레스받지 않기 위한 약속</div>
+        <div class="table-wrap">
+          <table class="rule-table">
+            <thead><tr><th class="rt-no">#</th><th class="rt-item">항목</th><th>내용</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="rt-no">1</td>
+                <td class="rt-item">프랙</td>
+                <td><b>팀당 1명만 6프랙</b>이 가능합니다.
+                    룸이든 난간이든 각 팀에서 합의해 <b>1명만</b> 6프랙을 허용합니다.</td>
+              </tr>
+              <tr>
+                <td class="rt-no">2</td>
+                <td class="rt-item">권총</td>
+                <td>시작할 때 쏘는 권총이 위협적이라 스트레스를 받는다는 의견이 있었습니다.
+                    무조건 안 된다는 뜻은 아니지만, 꼭 <b>하늘에 쏴서</b> 팀원이 다치지 않게 해주세요.</td>
+              </tr>
+              <tr>
+                <td class="rt-no">3</td>
+                <td class="rt-item">팀원이 다쳤을 때</td>
+                <td>권총에 팀원이 다치면 <b>그 사람은 이후 권총 금지</b>입니다.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="tsec">
+        <div class="tsec-h">■ D. 공지 전달</div>
+        <div class="tsec-sub">공지가 전달되지 않거나 못 읽는 분들을 위해</div>
+        <div class="table-wrap">
+          <table class="rule-table">
+            <thead><tr><th class="rt-no">#</th><th class="rt-item">항목</th><th>내용</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="rt-no">1</td>
+                <td class="rt-item">OK(FVC)</td>
+                <td>공지가 전달되지 않을 경우 <b>현정님</b>이 빠르게 소통해주시기로 했습니다.</td>
+              </tr>
+              <tr>
+                <td class="rt-no">2</td>
+                <td class="rt-item">회의 참석</td>
+                <td>다른 팀도 빠르게 전달할 수 있도록
+                    <b>로터스-티얼님 / 성남-구짜비님 / 레나님</b>은
+                    다음 기본 회의에 꼭 참석해 함께 의논해주세요.</td>
+              </tr>
+              <tr>
+                <td class="rt-no">3</td>
+                <td class="rt-item">제안</td>
+                <td>공지를 빠르게 전달하자는 취지로 <b>현정님</b>이 제안해주셨습니다.</td>
+              </tr>
+              <tr>
+                <td class="rt-no">4</td>
+                <td class="rt-item">회의는 열려 있습니다</td>
+                <td>회의는 <b>모든 분이 참석 가능</b>합니다.
+                    다만 여러 의견을 모아 <b>결정하는 일은 소수</b>로 진행합니다.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
