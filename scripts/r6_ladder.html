@@ -1867,16 +1867,16 @@ if (/[?&]room=\d+/.test(location.search)) {
       <div class="foot-note" style="margin-top:0;margin-bottom:14px;">7:7, 8:8, 7:8 등 팀전 지원 — 승리한 인원과 패배한 인원을 각각 여러 명 체크한 뒤 기록하세요.</div>
       <div class="team-grid">
         <div>
-          <div class="side-label" style="color:var(--success-strong);">WIN TEAM · 승리 팀<span class="pick-n" id="winCount">0명</span><button type="button" class="pick-clear" id="winClear" hidden>지우기</button></div>
+          <div class="side-label" style="color:var(--success-strong);">WIN TEAM · 승리 팀<span class="pick-n" id="winCount">0명</span><button type="button" class="pick-clear" id="winClear" hidden>초기화</button></div>
           <div class="checklist" id="winList"></div>
         </div>
         <div>
-          <div class="side-label" style="color:var(--danger-strong);">LOSE TEAM · 패배 팀<span class="pick-n" id="loseCount">0명</span><button type="button" class="pick-clear" id="loseClear" hidden>지우기</button></div>
+          <div class="side-label" style="color:var(--danger-strong);">LOSE TEAM · 패배 팀<span class="pick-n" id="loseCount">0명</span><button type="button" class="pick-clear" id="loseClear" hidden>초기화</button></div>
           <div class="checklist" id="loseList"></div>
         </div>
       </div>
       <div class="late-box">
-        <div class="side-label late-label">늦은 참석자<span class="pick-n" id="lateCount">0명</span><button type="button" class="pick-clear" id="lateClear" hidden>지우기</button></div>
+        <div class="side-label late-label">늦은 참석자<span class="pick-n" id="lateCount">0명</span><button type="button" class="pick-clear" id="lateClear" hidden>초기화</button></div>
         <div class="foot-note late-why">
           인원이 맞지 않아 뒤늦게 합류한 사람 · <b>경기 수·승·패에 넣지 않고</b> 점수만 +1 드립니다.
         </div>
@@ -1898,7 +1898,7 @@ if (/[?&]room=\d+/.test(location.search)) {
         <button class="btn" id="submitMatch" disabled>기록 확정 (Record Match)</button>
         <button type="button" class="btn btn-reset" id="resetPick" disabled>체크 초기화</button>
       </div>
-      <div class="foot-note">동일 선수를 양쪽에 동시 체크할 수 없습니다 · 늦은 참석자는 승패 팀과 겹칠 수 없습니다 · 최소 각 팀 1명 이상 선택하세요 · 한 칸만 잘못 골랐으면 그 칸의 <b>지우기</b>를, 전부 다시 고르려면 <b>체크 초기화</b>를 누르세요.</div>
+      <div class="foot-note">동일 선수를 양쪽에 동시 체크할 수 없습니다 · 늦은 참석자는 승패 팀과 겹칠 수 없습니다 · 최소 각 팀 1명 이상 선택하세요 · 한 칸만 잘못 골랐으면 그 칸의 <b>초기화</b>를, 전부 다시 고르려면 아래 <b>체크 초기화</b>를 누르세요.</div>
     </div>
     </div>
 
