@@ -224,7 +224,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 10;
+const APP_VERSION = 11;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -551,6 +551,15 @@ function renderChecklists() {
   // 지울 게 있을 때만 켠다 — 빈 화면에서 눌러봐야 아무 일도 안 일어난다
   const reset = document.getElementById('resetPick');
   if (reset) reset.disabled = !(nWin || nLose || latePicked.length);
+
+  // 칸마다 붙은 지우기는 고른 사람이 있을 때만 나타난다
+  const showClear = (id, n) => {
+    const el = document.getElementById(id);
+    if (el) el.hidden = !n;
+  };
+  showClear('winClear', nWin);
+  showClear('loseClear', nLose);
+  showClear('lateClear', latePicked.length);
 }
 
 /** 체크를 전부 푼다. 기록을 넣은 뒤에도, 잘못 골랐을 때도 같은 길을 쓴다. */
@@ -559,6 +568,25 @@ function clearPicks() {
     .forEach(el => { el.checked = false; });
   latePicked = [];
   renderChecklists();
+}
+
+/**
+ * 한 칸만 지운다. 승리 팀을 잘못 골랐다고 패배 팀까지 다시 체크할 이유는 없다.
+ * 한 명뿐이면 묻지 않는다 — 다시 누르는 데 한 번이면 되는 것을 붙잡지 않는다.
+ */
+function clearSide(which) {
+  const label = { win: '승리 팀', lose: '패배 팀', late: '늦은 참석자' }[which];
+  const n = which === 'late' ? latePicked.length : getChecked(which + 'List').length;
+  if (!n) return;
+  const ask = which === 'late'
+    ? `늦은 참석자로 고른 ${n}명을 지울까요?`
+    : `${label}에 체크한 ${n}명을 지울까요?`;
+  if (n >= 2 && !confirm(ask)) return;
+
+  if (which === 'late') latePicked = [];
+  else document.querySelectorAll(`#${which}List input`).forEach(el => { el.checked = false; });
+  renderChecklists();
+  showToast(`${label} 체크를 지웠습니다`);
 }
 
 /** 늦은 참석자 — 고르는 칸과 고른 사람 딱지. */
@@ -3639,12 +3667,17 @@ function initAdminEvents() {
   document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
   document.getElementById('importFile').addEventListener('change', handleImportFile);
 
+  for (const which of ['win', 'lose', 'late']) {
+    const btn = document.getElementById(which + 'Clear');
+    if (btn) btn.addEventListener('click', () => clearSide(which));
+  }
+
   document.getElementById('resetPick').addEventListener('click', () => {
     const nWin = getChecked('winList').length;
     const nLose = getChecked('loseList').length;
     const total = nWin + nLose + latePicked.length;
     if (!total) return;
-    if (!confirm(`체크한 ${total}명을 모두 지우고 처음부터 다시 고를까요?`)) return;
+    if (total >= 2 && !confirm(`체크한 ${total}명을 모두 지우고 처음부터 다시 고를까요?`)) return;
     clearPicks();
     showToast('체크를 모두 지웠습니다');
   });
