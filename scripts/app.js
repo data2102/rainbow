@@ -224,7 +224,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 7;
+const APP_VERSION = 8;
 let toldToRefresh = false;
 
 /**
@@ -654,14 +654,12 @@ function renderHistory() {
     ).join('') || '<span class="h-chip l">-</span>';
     const loseChips = losers.map(h => `<span class="h-chip l">${esc(h)}</span>`).join('')
       || '<span class="h-chip l">-</span>';
-    // 늦은 참석자는 패배 칸에 이어 붙인다. 승패 어느 쪽도 아니지만 그날 함께
-    // 뛴 사람이라, 기록에서 아예 빠지면 나중에 왜 점수가 올랐는지 알 수 없다.
+    // 늦은 참석자는 칸을 따로 갖는다. 패배 칸에 이어 붙였더니 진 사람과
+    // 섞여 보였다 — 이 사람들은 지지 않았고, 이긴 것도 아니다.
     const late = m.late || [];
-    const lateChips = late.length
-      ? `<div class="h-late">${late.map(h =>
-          `<span class="h-chip x">${esc(h)}<span class="h-gain">+1</span></span>`).join('')}
-         <span class="h-late-tag">늦은 참석</span></div>`
-      : '';
+    const lateChips = late.map(h =>
+      `<span class="h-chip x">${esc(h)}<span class="h-gain">+1</span></span>`).join('')
+      || '<span class="h-none">-</span>';
 
     // 번호는 취소된 기록까지 세어 붙인다. 취소했다고 뒤 번호가 밀리면
     // "#12 경기"라고 주고받은 말이 어긋난다.
@@ -678,7 +676,8 @@ function renderHistory() {
       <td class="h-inline" data-l="일시"><div class="h-date">${date}</div><div class="h-time">${time}</div></td>
       <td class="h-size-cell h-inline" data-l="규모">${winners.length} : ${losers.length}</td>
       <td data-l="승리 · WIN">${winChips}</td>
-      <td data-l="패배 · LOSE">${loseChips}${lateChips}</td>
+      <td data-l="패배 · LOSE">${loseChips}</td>
+      <td data-l="늦은 참석자">${lateChips}</td>
       <td class="h-by-cell" data-l="등록자">${esc(m.recordedBy || '-')}${cancelBtn}</td>
     </tr>`;
 
@@ -688,7 +687,7 @@ function renderHistory() {
       ? `<button class="btn-mini" data-void="${m.id}" data-do="restore">되돌리기</button>`
       : '';
     return main + `<tr class="h-why">
-      <td colspan="6">
+      <td colspan="7">
         <div class="void-line">
           <span class="void-tag">취소됨</span>
           <span class="void-why">${esc(m.voidReason || '사유 없음')}</span>

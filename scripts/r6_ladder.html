@@ -632,13 +632,9 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .late-chip button:hover{ opacity:1; }
 .late-chip button:focus-visible{ outline:none; box-shadow:var(--shadow-focus); border-radius:50%; }
 
-/* 기록 표에서 늦은 참석자 — 패배 칸 아래에 한 줄로 붙인다 */
-.h-late{
-  display:flex; align-items:center; gap:var(--sp-2); flex-wrap:wrap;
-  margin-top:var(--sp-2); padding-top:var(--sp-2); border-top:1px dashed var(--border);
-}
+/* 기록 표의 늦은 참석자 칸 — 승패와 나란히 세운다 */
 .h-chip.x{ background:var(--warm-bg); color:var(--warm); }
-.h-late-tag{ font-size:10px; color:var(--text-tertiary); }
+.h-none{ color:var(--text-disabled); }
 .pick-note{
   text-align:center; font-size:var(--fs-footnote); color:var(--text-tertiary);
   margin:calc(var(--sp-3) * -1) 0 var(--sp-4);
@@ -699,6 +695,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .history-table th.h-no{ width:56px; }
 .history-table th.h-when{ width:116px; }
 .history-table th.h-size{ width:62px; }
+.history-table th.h-late{ width:170px; }
 .history-table th.h-by{ width:130px; }
 .h-no-cell{ color:var(--text-tertiary); font-weight:var(--fw-medium); }
 .h-date,.h-time{ font-size:var(--fs-footnote); color:var(--text-secondary); white-space:nowrap; }
@@ -1843,6 +1840,7 @@ if (/[?&]room=\d+/.test(location.search)) {
               <th class="h-size">규모</th>
               <th>승리 · WIN</th>
               <th>패배 · LOSE</th>
+              <th class="h-late">늦은 참석자</th>
               <th class="h-by">등록자</th>
             </tr>
           </thead>
