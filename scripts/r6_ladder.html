@@ -1223,6 +1223,13 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   color:var(--accent); font-weight:var(--fw-bold);
 }
 .rlist b{ color:var(--text-primary); font-weight:var(--fw-bold); }
+/* 아이디를 맞춰야 할 곳 — 어디어디인지 세어 보이는 편이 문장보다 빠르다 */
+.rch{ display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-top:var(--sp-3); }
+.ch{
+  font-size:var(--fs-caption); font-weight:var(--fw-medium);
+  padding:var(--sp-2) var(--sp-4); border-radius:var(--radius-pill);
+  background:var(--accent-bg); color:var(--accent);
+}
 .rcard-note .rnum{ background:var(--warm); color:var(--bg); }
 
 /* 예시 — 숫자가 눈에 먼저 들어와야 한다 */
@@ -2818,13 +2825,19 @@ if (/[?&]room=\d+/.test(location.search)) {
           <div class="rcard-h"><span class="rnum">1</span>ID 설정</div>
           <div class="rcard-b">
             <ul class="rlist">
-              <li>카카오톡 오픈 채팅방과 랭킹사이트 아이디를 <b>동일하게</b> 설정 부탁드립니다.</li>
+              <li>아래 <b>세 곳의 아이디를 모두 동일하게</b> 설정 부탁드립니다.
+                <div class="rch">
+                  <span class="ch">카카오톡 오픈채팅방</span>
+                  <span class="ch">RAINBOW SIX 랭킹사이트</span>
+                  <span class="ch">디스코드</span>
+                </div>
+              </li>
               <li><b>ZONE 시절의 ID</b>로 반드시 설정 부탁드립니다.</li>
             </ul>
             <div class="rex">
               <div class="rex-h">예시</div>
               <div class="rex-row"><b class="ok">O</b><span class="val">SNC_Gjplayer</span></div>
-              <div class="rex-row"><b class="no">X</b><span class="val bad">굿잡이</span></div>
+              <div class="rex-row"><b class="no">X</b><span class="val bad">굿잡이, HandsomeBoy 등</span></div>
             </div>
           </div>
         </article>
