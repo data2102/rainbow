@@ -10,16 +10,27 @@
 
 ---
 
-## 만드는 순서 (4단계)
+## 누가 무엇을 받는가
 
-### 1단계 · Inno Setup 을 깝니다 (한 번만)
+헷갈리기 쉬운 부분이라 먼저 짚습니다. **클랜원들은 이 폴더를 받지 않습니다.**
 
-https://jrsoftware.org/isdl.php 에서 **innosetup-6.x.x.exe** 를 받아 설치하세요. 무료입니다.
-물어보는 건 전부 기본값으로 넘기면 됩니다.
+```
+나 (한 번만)                        클랜원들 (각자)
+─────────────                       ─────────────
+이 폴더
+   │  BUILD.bat 더블클릭
+   ▼
+R6ClanSetup.exe  ───────────────▶   더블클릭 → 설치 끝
+```
 
-> 설치 파일을 **만드는 사람**만 필요합니다. 받아 쓰는 사람은 깔 필요 없습니다.
+클랜원이 받는 것은 `R6ClanSetup.exe` **하나**입니다.
+Inno Setup 도, 이 폴더도, `build.bat` 도 그 사람들과는 상관없습니다.
 
-### 2단계 · `payload\` 세 폴더를 채웁니다
+---
+
+## 만드는 순서 (3단계)
+
+### 1단계 · `payload\` 세 폴더를 채웁니다
 
 각 폴더에 `_README.txt` 안내문이 들어 있습니다. **비워두면 그 단계가 통째로 빠집니다.**
 
@@ -35,9 +46,13 @@ https://jrsoftware.org/isdl.php 에서 **innosetup-6.x.x.exe** 를 받아 설치
 - **폴더를 한 겹 더 만들지 마세요.** `payload\skin\character\` 가 바로 보여야 맞습니다.
   `payload\skin\레나스킨_V2\character\` 는 틀립니다.
 
-### 3단계 · `build.bat` 을 더블클릭합니다
+### 2단계 · `BUILD.bat` 을 더블클릭합니다
 
 무엇이 들어있는지 확인한 뒤 압축합니다. 몇 분 걸립니다.
+
+**Inno Setup 이 없으면 받아서 깔지 물어봅니다.** `Y` 를 누르면 알아서 처리합니다
+(공식 사이트에서 5MB 짜리를 받아 조용히 설치). 설치 파일을 만드는 데만 쓰이고,
+받아 쓰는 사람에게는 필요 없습니다.
 
 ```
   [O] compiler : C:\Program Files (x86)\Inno Setup 6\ISCC.exe
@@ -47,7 +62,7 @@ https://jrsoftware.org/isdl.php 에서 **innosetup-6.x.x.exe** 를 받아 설치
   [-] extra    : payload\extra\ is empty - nothing extra
 ```
 
-### 4단계 · 결과물
+### 3단계 · 결과물
 
 ```
 installer\output\R6ClanSetup.exe      (약 75MB)
@@ -109,9 +124,10 @@ HonestEngine 단계를 아예 빼고 완전 자동으로 만들 수 있습니다
 
 ## 자주 막히는 곳
 
-**`[X] Inno Setup was not found.`**
-1단계를 안 하셨거나 기본 위치가 아닌 곳에 까셨습니다.
-`build.bat` 을 메모장으로 열어 위쪽 경로 목록에 실제 경로를 추가하세요.
+**Inno Setup 자동 설치가 실패합니다**
+회사망이나 백신이 다운로드를 막는 경우가 있습니다.
+https://jrsoftware.org/isdl.php 에서 직접 받아 설치한 뒤 다시 실행하세요.
+기본 위치가 아닌 곳에 까셨다면 `build.bat` 의 `:findiscc` 목록에 경로를 추가하면 됩니다.
 
 **`[X] game : part02.rar is missing`**
 세 볼륨이 다 있어야 합니다. 이름도 그대로여야 합니다.
@@ -154,5 +170,7 @@ HonestEngine 은 핵 방지 프로그램이라 더 잘 걸립니다.
 | `payload/skin/` | 레나스킨 V2 내용을 넣는 자리 |
 | `payload/extra/` | 게임 폴더에 얹을 것을 넣는 자리 (선택) |
 | `output/` | 만들어진 설치 파일이 나오는 자리 |
+| `READ-ME-FIRST.txt` | 배포용 zip 의 맨 위에 놓는 안내문 |
+| `make-zip.sh` | 건네줄 zip 을 만드는 스크립트 (`sh installer/make-zip.sh`) |
 
 `payload/` 와 `output/` 의 내용은 저장소에 올라가지 않습니다 (`.gitignore`).
