@@ -228,7 +228,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 24;
+const APP_VERSION = 25;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -1088,10 +1088,10 @@ function renderFiles() {
     const kindCls = (f.kind === '설치') ? '' : ' k2';
     // 사이트에 담아둔 파일이면 사이트에서 바로 내려준다 (횟수는 서버가 센다)
     const get = f.hasBlob
-      ? `<a class="fl-get" href="/api/post?download=${f.id}">받기</a>`
+      ? `<a class="fl-get" href="/api/post?download=${f.id}">다운로드</a>`
       : (f.url
         ? `<a class="fl-get" href="${esc(f.url)}" target="_blank" rel="noopener noreferrer"
-             data-hit="${f.id}">받기</a>`
+             data-hit="${f.id}">다운로드</a>`
         : '');
     const own = canManage
       ? `<div class="fl-own">
@@ -1301,7 +1301,10 @@ async function saveFile() {
 async function removeFile(id) {
   const f = files.find(x => x.id === id);
   if (!f) return;
-  if (!confirm(`'${f.title}' 을(를) 지울까요?\n\n받는 곳 주소만 지워지고, 원본 파일은 그대로 남습니다.`)) return;
+  const what = f.hasBlob
+    ? '사이트에 담긴 파일이 함께 지워집니다. 되돌릴 수 없습니다.'
+    : '받는 곳 주소만 지워지고, 원본 파일은 그대로 남습니다.';
+  if (!confirm(`'${f.title}' 을(를) 지울까요?\n\n${what}`)) return;
   try {
     await apiPost('/api/post', { action: 'fileRemove', id });
     await loadFiles();
