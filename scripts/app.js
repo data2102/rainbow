@@ -228,7 +228,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 29;
+const APP_VERSION = 30;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -2686,7 +2686,9 @@ const TEAM_FIELDS = [
 const GRADE_POWER = { A: 5, B: 4, C: 3, D: 2, E: 1 };
 
 let tmOut = new Set();      // 참가에서 뺀 사람 (기본은 모두 참가)
-let tmTeams = null;         // 마지막으로 짠 결과
+let tmTeams = null;         // 마지막으로 짠 결과 (팀들의 배열)
+let tmCount = 2;            // 몇 팀으로 나눌지 (2~10)
+const TM_MAX_TEAMS = 10;
 let tmSort = { key: 'handle', dir: 1 };
 
 /**
@@ -2772,13 +2774,23 @@ function renderTeamPanel() {
   const cnt = document.getElementById('tmCount');
   if (cnt) cnt.textContent = `참가 ${n}명`;
 
+  // 참가한 사람보다 많은 팀은 만들 수 없다
+  const maxTeams = Math.min(TM_MAX_TEAMS, Math.max(2, n));
+  if (tmCount > maxTeams) tmCount = maxTeams;
+  const cntSel = document.getElementById('tmCountSel');
+  if (cntSel) {
+    cntSel.innerHTML = Array.from({ length: maxTeams - 1 }, (_, i) => i + 2)
+      .map(v => `<option value="${v}"${v === tmCount ? ' selected' : ''}>${v}팀</option>`).join('');
+    cntSel.disabled = n < 2;
+  }
+
   const make = document.getElementById('tmMake');
   if (make) make.disabled = n < 2;
   const note = document.getElementById('tmNote');
   if (note) {
     note.textContent = n < 2
       ? '팀을 짜려면 두 명 이상 참가해야 합니다.'
-      : `참가 ${n}명을 ${Math.ceil(n / 2)} : ${Math.floor(n / 2)} 로 나눕니다 ·
+      : `참가 ${n}명을 ${tmCount}팀으로 · ${tmSizes(n, tmCount).join(' : ')} 로 나눕니다 ·
          등급 · 참석률 · 접속시간 · 포지션이 고르게 나뉘도록 여러 번 돌려 가장 고른 것을 고릅니다.`;
   }
   if (tmTeams) renderTeamResult();
@@ -2791,22 +2803,26 @@ function renderTeamPanel() {
  * E 하나를 맞바꾸면 수는 같아도 팀 세기는 크게 달라진다.
  * 호스트는 양 팀에 하나씩 있어야 게임이 서므로 무겁게 본다.
  */
-function tmScore(a, b) {
+function tmScore(teams) {
+  const spread = (nums) => Math.max(...nums) - Math.min(...nums);
   let bad = 0;
 
-  const powA = a.reduce((s, p) => s + (GRADE_POWER[p.grade] || 0), 0);
-  const powB = b.reduce((s, p) => s + (GRADE_POWER[p.grade] || 0), 0);
-  bad += Math.abs(powA - powB) * 6;
+  bad += spread(teams.map(t => t.reduce((s, p) => s + (GRADE_POWER[p.grade] || 0), 0))) * 6;
 
   for (const [field] of TEAM_FIELDS) {
     for (const opt of (teamOptions[field] || [])) {
-      const na = a.filter(p => p[field] === opt).length;
-      const nb = b.filter(p => p[field] === opt).length;
       const w = field === 'grade' ? 3 : (opt === '호스트' ? 5 : 1);
-      bad += Math.abs(na - nb) * w;
+      bad += spread(teams.map(t => t.filter(p => p[field] === opt).length)) * w;
     }
   }
   return bad;
+}
+
+/** 사람 수를 팀 수로 최대한 고르게 쪼갠다. 25명 · 4팀 → 7,6,6,6 */
+function tmSizes(total, n) {
+  const base = Math.floor(total / n);
+  const extra = total % n;
+  return Array.from({ length: n }, (_, i) => base + (i < extra ? 1 : 0));
 }
 
 /**
@@ -2816,8 +2832,9 @@ function tmScore(a, b) {
  * 규칙끼리 서로 부딪친다. 여러 번 던져 가장 나은 것을 집는 편이 결과도
  * 낫고 읽기도 쉽다. 스물몇 명이면 눈 깜짝할 새에 끝난다.
  */
-function tmSplit(players) {
+function tmSplit(players, n) {
   const TRIES = 600;
+  const sizes = tmSizes(players.length, n);
   let best = null, bestScore = Infinity;
 
   for (let t = 0; t < TRIES; t++) {
@@ -2826,32 +2843,42 @@ function tmSplit(players) {
       const j = Math.floor(Math.random() * (i + 1));
       [pool[i], pool[j]] = [pool[j], pool[i]];
     }
-    const half = Math.ceil(pool.length / 2);
-    const a = pool.slice(0, half);
-    const b = pool.slice(half);
-    const sc = tmScore(a, b);
-    if (sc < bestScore) { bestScore = sc; best = [a, b]; }
+    const teams = [];
+    let at = 0;
+    for (const size of sizes) { teams.push(pool.slice(at, at + size)); at += size; }
+
+    const sc = tmScore(teams);
+    if (sc < bestScore) { bestScore = sc; best = teams; }
     if (sc === 0) break;                                  // 더 고를 것이 없다
   }
-  return { a: best[0], b: best[1], score: bestScore };
+  return { teams: best, score: bestScore };
 }
 
 function makeTeams() {
   const joined = accounts.filter(a => !tmOut.has(a.handle));
-  if (joined.length < 2) return;
-  tmTeams = tmSplit(joined);
+  const n = Math.min(tmCount, joined.length);
+  if (joined.length < 2 || n < 2) return;
+  tmTeams = tmSplit(joined, n);
   renderTeamResult();
-  showToast(`${joined.length}명을 ${tmTeams.a.length} : ${tmTeams.b.length} 로 나눴습니다.`);
+  showToast(`${joined.length}명을 ${n}팀으로 · `
+    + tmTeams.teams.map(t => t.length).join(' : ') + ' 로 나눴습니다.');
 }
+
+/** A팀 · B팀 … J팀. 열 팀까지 글자로 가른다 — 색으로는 못 가른다. */
+function tmTeamName(i) { return String.fromCharCode(65 + i) + '팀'; }
 
 function renderTeamResult() {
   const box = document.getElementById('tmResult');
   if (!box || !tmTeams) return;
+  const teams = tmTeams.teams;
 
-  const one = (team, cls, name) => {
+  const one = (team, i) => {
     const pow = team.reduce((s, p) => s + (GRADE_POWER[p.grade] || 0), 0);
-    return `<div class="tm-team ${cls}">
-      <div class="tm-team-h">${name}<span class="tm-team-n">${team.length}명 · 세기 ${pow}</span></div>
+    return `<div class="tm-team">
+      <div class="tm-team-h">
+        <span class="tm-team-badge">${tmTeamName(i)}</span>
+        <span class="tm-team-n">${team.length}명 · 세기 ${pow}</span>
+      </div>
       <div class="tm-list">${team.map(p => `<div class="tm-p">
         <span class="id">${esc(p.handle)}</span>
         ${p.grade ? `<span class="g">${esc(p.grade)}</span>` : ''}
@@ -2864,16 +2891,16 @@ function renderTeamResult() {
   // 어느 항목이 몇 대 몇으로 나뉘었는지 그대로 보여준다 — 믿고 쓰려면 보여야 한다
   const rows = TEAM_FIELDS.map(([field, label]) => {
     const parts = (teamOptions[field] || []).map(opt => {
-      const na = tmTeams.a.filter(p => p[field] === opt).length;
-      const nb = tmTeams.b.filter(p => p[field] === opt).length;
-      return (na || nb) ? `${esc(opt)} ${na}:${nb}` : '';
+      const per = teams.map(t => t.filter(p => p[field] === opt).length);
+      return per.some(Boolean) ? `<span>${esc(opt)} ${per.join(':')}</span>` : '';
     }).filter(Boolean).join(' · ');
     return parts ? `<div class="tm-bal-row"><b>${label}</b>${parts}</div>` : '';
   }).join('');
 
-  box.innerHTML = `<div class="tm-teams">${one(tmTeams.a, 'a', 'A팀')}${one(tmTeams.b, 'b', 'B팀')}</div>`
+  const order = teams.map((_, i) => tmTeamName(i)).join(' : ');
+  box.innerHTML = `<div class="tm-teams">${teams.map(one).join('')}</div>`
     + `<div class="tm-balance">
-         <div class="tm-bal-h">양 팀에 어떻게 나뉘었나 (A팀 : B팀)</div>${rows}
+         <div class="tm-bal-h">팀마다 어떻게 나뉘었나 (${esc(order)})</div>${rows}
        </div>`;
 }
 
@@ -2927,6 +2954,12 @@ function initAdminPagers() {
     tmOut = new Set(accounts.map(a => a.handle));
     renderTeamPanel();
   });
+  const cntSel = document.getElementById('tmCountSel');
+  if (cntSel) cntSel.addEventListener('change', () => {
+    tmCount = Number(cntSel.value) || 2;
+    renderTeamPanel();
+  });
+
   const make = document.getElementById('tmMake');
   if (make) make.addEventListener('click', makeTeams);
 }

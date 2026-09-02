@@ -634,9 +634,24 @@ tr.fl-pinned td:first-child{ box-shadow:inset 3px 0 0 var(--danger); }
 .tm-table select:hover{ border-color:var(--accent); }
 .tm-table tr.off td{ opacity:.45; }
 
+/* 팀 수 고르기 + 짜기 */
+.tm-make{ display:flex; align-items:center; gap:var(--sp-3); flex-wrap:wrap; margin-top:var(--sp-4); }
+.tm-cnt{ display:flex; align-items:center; gap:var(--sp-2); flex:none; }
+.tm-cnt > span{ font-size:var(--fs-caption); font-weight:var(--fw-medium); color:var(--text-secondary); }
+.tm-cnt select{
+  background:var(--surface); color:var(--text-primary);
+  border:1px solid var(--border-strong); border-radius:var(--radius-md);
+  padding:var(--sp-3) var(--sp-4); font-family:inherit;
+  font-size:var(--fs-caption); font-weight:var(--fw-bold); cursor:pointer;
+}
+.tm-make .btn{ flex:1 1 220px; margin-top:0; }
+
 /* 짠 결과 */
-.tm-teams{ display:grid; grid-template-columns:1fr 1fr; gap:var(--sp-4); margin-top:var(--sp-5); }
-@media (max-width:760px){ .tm-teams{ grid-template-columns:1fr; } }
+/* 두 팀이든 열 팀이든 같은 칸으로 흘려 담는다 */
+.tm-teams{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+  gap:var(--sp-4); margin-top:var(--sp-5);
+}
 .tm-team{
   border:1px solid var(--border); border-radius:var(--radius-lg);
   background:var(--surface-sunken); overflow:hidden;
@@ -646,8 +661,13 @@ tr.fl-pinned td:first-child{ box-shadow:inset 3px 0 0 var(--danger); }
   padding:var(--sp-3) var(--sp-4); border-bottom:1px solid var(--border-strong);
   font-size:var(--fs-subhead); font-weight:var(--fw-bold);
 }
-.tm-team.a .tm-team-h{ background:var(--accent-bg); color:var(--accent); }
-.tm-team.b .tm-team-h{ background:var(--warm-bg); color:var(--warm); }
+.tm-team-h{ background:var(--accent-bg); color:var(--accent); }
+.tm-team-badge{
+  display:inline-flex; align-items:center; justify-content:center;
+  min-width:26px; height:26px; padding:0 var(--sp-2); border-radius:var(--radius-sm);
+  background:var(--accent); color:var(--on-accent);
+  font-size:var(--fs-caption); font-weight:var(--fw-bold);
+}
 .tm-team-n{ margin-left:auto; font-size:var(--fs-caption); color:var(--text-secondary); font-weight:var(--fw-medium); }
 .tm-list{ padding:var(--sp-2) var(--sp-3); }
 .tm-p{
@@ -674,7 +694,8 @@ tr.fl-pinned td:first-child{ box-shadow:inset 3px 0 0 var(--danger); }
   display:flex; gap:var(--sp-4); flex-wrap:wrap;
   font-size:var(--fs-caption); color:var(--text-secondary); padding:2px 0;
 }
-.tm-bal-row b{ color:var(--text-primary); min-width:64px; display:inline-block; }
+.tm-bal-row b{ color:var(--text-primary); min-width:64px; display:inline-block; flex:none; }
+.tm-bal-row span{ font-variant-numeric:tabular-nums; }
 
 /* ---------- 쪽 넘김 ---------- */
 /* 버튼은 판 한가운데. 안내를 왼쪽에 두고 밀면 버튼이 오른쪽으로 쏠리므로,
@@ -2232,7 +2253,13 @@ if (/[?&]room=\d+/.test(location.search)) {
         </div>
         <div class="pager" id="tmPager" style="display:none;"></div>
 
-        <button class="btn" id="tmMake">팀 짜기 (랜덤)</button>
+        <div class="tm-make">
+          <label class="tm-cnt">
+            <span>팀 수</span>
+            <select id="tmCountSel"></select>
+          </label>
+          <button class="btn" id="tmMake">팀 짜기 (랜덤)</button>
+        </div>
         <div class="foot-note" id="tmNote"></div>
         <div id="tmResult"></div>
       </div>
