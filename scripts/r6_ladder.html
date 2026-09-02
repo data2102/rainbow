@@ -616,8 +616,11 @@ tr.fl-pinned td:first-child{ box-shadow:inset 3px 0 0 var(--danger); }
   padding:var(--sp-3) var(--sp-4); font-family:inherit; font-size:var(--fs-caption);
 }
 .tm-n{ font-size:var(--fs-caption); font-weight:var(--fw-bold); color:var(--accent); white-space:nowrap; }
-.tm-table th{ cursor:default; }
-.tm-table th:hover{ color:var(--text-tertiary); }
+/* 머리를 누르면 그 값으로 줄을 세운다 */
+.tm-table th[data-tm-sort]{ cursor:pointer; user-select:none; white-space:nowrap; }
+.tm-table th[data-tm-sort]:hover{ color:var(--text-primary); }
+.tm-table th.sorted{ color:var(--accent); }
+.tm-table th .sort-ar{ margin-left:2px; font-size:9px; }
 .tm-table td{ vertical-align:middle; }
 .tm-table th.tm-ck, .tm-table td.tm-ck{ width:52px; text-align:center; }
 .tm-table th.tm-sel{ width:120px; }
@@ -2216,9 +2219,12 @@ if (/[?&]room=\d+/.test(location.search)) {
           <table id="tmTable" class="tm-table">
             <thead>
               <tr>
-                <th class="tm-ck">참가</th><th>ID</th>
-                <th class="tm-sel">등급</th><th class="tm-sel">참석률</th>
-                <th class="tm-sel">접속시간</th><th class="tm-sel">포지션</th>
+                <th class="tm-ck" data-tm-sort="in">참가</th>
+                <th data-tm-sort="handle">ID</th>
+                <th class="tm-sel" data-tm-sort="grade">등급</th>
+                <th class="tm-sel" data-tm-sort="attend">참석률</th>
+                <th class="tm-sel" data-tm-sort="playtime">접속시간</th>
+                <th class="tm-sel" data-tm-sort="position">포지션</th>
               </tr>
             </thead>
             <tbody></tbody>

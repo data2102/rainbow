@@ -228,7 +228,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 28;
+const APP_VERSION = 29;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -2687,12 +2687,48 @@ const GRADE_POWER = { A: 5, B: 4, C: 3, D: 2, E: 1 };
 
 let tmOut = new Set();      // 참가에서 뺀 사람 (기본은 모두 참가)
 let tmTeams = null;         // 마지막으로 짠 결과
+let tmSort = { key: 'handle', dir: 1 };
+
+/**
+ * 줄 세울 때 쓰는 값.
+ * 등급 같은 항목은 글자 순이 아니라 고르는 칸에 적힌 순서를 따른다 —
+ * FIRST TIME 이 FULL TIME 보다 앞에 오면 읽는 사람이 헷갈린다.
+ * 아직 안 고른 사람은 어느 쪽으로 세우든 늘 뒤로 보낸다.
+ */
+function tmSortValue(a, key) {
+  if (key === 'in') return tmOut.has(a.handle) ? 1 : 0;
+  if (key === 'handle') return a.handle.toLowerCase();
+  const opts = teamOptions[key] || [];
+  const i = opts.indexOf(a[key]);
+  return i < 0 ? Infinity : i;
+}
 
 function tmList() {
   const q = (document.getElementById('tmSearch') || {}).value || '';
   const query = q.trim().toLowerCase();
-  return accounts.filter(a =>
+  const rows = accounts.filter(a =>
     !query || a.handle.toLowerCase().includes(query) || (a.clan || '').toLowerCase().includes(query));
+
+  const { key, dir } = tmSort;
+  return rows.slice().sort((x, y) => {
+    const vx = tmSortValue(x, key), vy = tmSortValue(y, key);
+    // 안 고른 사람은 오름이든 내림이든 뒤에 둔다
+    if (vx === Infinity && vy !== Infinity) return 1;
+    if (vy === Infinity && vx !== Infinity) return -1;
+    if (vx < vy) return -dir;
+    if (vx > vy) return dir;
+    return x.handle.localeCompare(y.handle);   // 같으면 아이디 순
+  });
+}
+
+/** 머리줄에 지금 무엇으로 세웠는지 표시한다. */
+function renderTmHead() {
+  document.querySelectorAll('#tmTable th[data-tm-sort]').forEach(th => {
+    const on = th.dataset.tmSort === tmSort.key;
+    th.classList.toggle('sorted', on);
+    const label = th.textContent.replace(/[▲▼]\s*$/, '').trim();
+    th.innerHTML = esc(label) + (on ? `<span class="sort-ar">${tmSort.dir > 0 ? '▲' : '▼'}</span>` : '');
+  });
 }
 
 function renderTeamPanel() {
@@ -2722,13 +2758,14 @@ function renderTeamPanel() {
   tbody.innerHTML = shown.map(a => `<tr class="${tmOut.has(a.handle) ? 'off' : ''}">
     <td class="tm-ck"><input type="checkbox" data-tm-in="${esc(a.handle)}"
         ${tmOut.has(a.handle) ? '' : 'checked'} aria-label="${esc(a.handle)} 참가"></td>
-    <td>${esc(a.handle)}${a.clan && a.clan !== '-' ? ` <span class="clan-tag">${esc(a.clan)}</span>` : ''}</td>
+    <td>${esc(a.handle)}</td>
     <td>${sel(a, 'grade')}</td>
     <td>${sel(a, 'attend')}</td>
     <td>${sel(a, 'playtime')}</td>
     <td>${sel(a, 'position')}</td>
   </tr>`).join('') || '<tr><td colspan="6" class="log-empty">회원이 없습니다.</td></tr>';
 
+  renderTmHead();
   renderPager('tmPager', 'tpage', list.length, pages, tmPage, from, shown.length, '명');
 
   const n = accounts.filter(a => !tmOut.has(a.handle)).length;
@@ -2872,6 +2909,17 @@ function initAdminPagers() {
       }
     });
   }
+  const head = document.querySelector('#tmTable thead');
+  if (head) head.addEventListener('click', (e) => {
+    const th = e.target.closest('[data-tm-sort]');
+    if (!th) return;
+    const key = th.dataset.tmSort;
+    // 같은 칸을 다시 누르면 방향만 뒤집는다
+    tmSort = (tmSort.key === key) ? { key, dir: -tmSort.dir } : { key, dir: 1 };
+    tmPage = 1;
+    renderTeamPanel();
+  });
+
   const all = document.getElementById('tmAll');
   if (all) all.addEventListener('click', () => { tmOut.clear(); renderTeamPanel(); });
   const none = document.getElementById('tmNone');
