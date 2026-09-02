@@ -3076,7 +3076,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 22;
+const APP_VERSION = 23;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -3158,20 +3158,20 @@ async function loadRooms() {
   measurePing();   // 다음 요청에 실어 보낼 값을 미리 재둔다
 }
 
+/**
+ * 게시판 글과 자료실을 한 번에 받아온다.
+ * 둘은 서버에서도 한 함수에 들어 있다 — Vercel 무료 요금제가 배포 한 번에
+ * 허용하는 서버리스 함수가 12개뿐이라 자료실을 따로 둘 수 없었다.
+ */
 async function loadPosts() {
   try {
     const d = await apiGet('/api/post');
     posts = d.posts || [];
-  } catch { posts = []; }
-}
-
-async function loadFiles() {
-  try {
-    const d = await apiGet('/api/file');
     files = d.files || [];
     if (Array.isArray(d.kinds) && d.kinds.length) fileKinds = d.kinds;
-  } catch { files = []; }
+  } catch { posts = []; files = []; }
 }
+const loadFiles = loadPosts;
 
 /** 계정 권한 목록과 로그. 관리자 이상만 받아온다. */
 async function loadAccounts() {
@@ -4008,7 +4008,7 @@ function closeFileForm() {
 async function saveFile() {
   const err = document.getElementById('fileErr');
   const payload = {
-    action: fileEditId ? 'update' : 'create',
+    action: fileEditId ? 'fileUpdate' : 'fileCreate',
     id: fileEditId,
     kind: document.getElementById('fileKind').value,
     title: document.getElementById('fileTitle').value.trim(),
@@ -4022,13 +4022,13 @@ async function saveFile() {
   const btn = document.getElementById('fileSave');
   btn.disabled = true;
   try {
-    await apiPost('/api/file', payload);
+    await apiPost('/api/post', payload);
     await loadFiles();
     closeFileForm();
     // 중요글은 맨 앞에 서므로, 올린 글이 보이도록 첫 쪽으로 돌아간다
     filePage = 1;
     renderFiles();
-    showToast(payload.action === 'create' ? '자료를 올렸습니다.' : '자료를 고쳤습니다.');
+    showToast(payload.action === 'fileCreate' ? '자료를 올렸습니다.' : '자료를 고쳤습니다.');
   } catch (e) {
     err.textContent = e.message;
   } finally {
@@ -4041,7 +4041,7 @@ async function removeFile(id) {
   if (!f) return;
   if (!confirm(`'${f.title}' 을(를) 지울까요?\n\n받는 곳 주소만 지워지고, 원본 파일은 그대로 남습니다.`)) return;
   try {
-    await apiPost('/api/file', { action: 'remove', id });
+    await apiPost('/api/post', { action: 'fileRemove', id });
     await loadFiles();
     renderFiles();
     showToast('자료를 지웠습니다.');
@@ -4052,7 +4052,7 @@ async function removeFile(id) {
 async function hitFile(id) {
   const f = files.find(x => x.id === id);
   if (f) { f.downloads += 1; renderFiles(); }   // 눌렀으니 바로 올려 보여준다
-  try { await apiPost('/api/file', { action: 'hit', id }); }
+  try { await apiPost('/api/post', { action: 'fileHit', id }); }
   catch { /* 숫자 하나 때문에 화면을 막지 않는다 */ }
 }
 
@@ -6842,7 +6842,7 @@ function initAdminEvents() {
 async function refreshAll() {
   await Promise.allSettled([
     loadState(), loadSeasons(), loadAttendance(),
-    loadTournament(), loadPosts(), loadFiles(), loadRooms(), loadAccounts(),
+    loadTournament(), loadPosts(), loadRooms(), loadAccounts(),
   ]);
   renderAll();
 }
