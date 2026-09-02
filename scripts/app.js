@@ -228,7 +228,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 26;
+const APP_VERSION = 27;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -1156,6 +1156,15 @@ function renderFileForm() {
   }
 }
 
+/** 목록 화면과 올리기 화면 중 하나만 보인다. */
+function showFileView(which) {
+  const list = document.getElementById('fileListView');
+  const form = document.getElementById('fileFormView');
+  if (!list || !form) return;
+  list.hidden = which === 'form';
+  form.hidden = which !== 'form';
+}
+
 function openFileForm(f) {
   const form = document.getElementById('fileForm');
   if (!form) return;
@@ -1168,6 +1177,7 @@ function openFileForm(f) {
   document.getElementById('fileErr').textContent = '';
   document.getElementById('fileSave').textContent = f ? '수정' : '올리기';
   document.getElementById('fileMaxNote').textContent = fmtBytes(fileMaxUpload);
+  document.getElementById('fileFormTitle').textContent = f ? '자료 수정' : '자료 올리기';
 
   // 고칠 때는 이미 담아둔 파일을 그대로 보여준다 — 다시 붙이지 않아도 된다
   filePicked = (f && (f.hasBlob || f.bytes))
@@ -1175,13 +1185,14 @@ function openFileForm(f) {
     : null;
   renderPicked();
 
-  form.style.display = 'grid';
+  showFileView('form');
   document.getElementById('fileTitle').focus();
+  // 목록 중간에서 눌렀으면 화면이 엉뚱한 데서 시작한다
+  document.getElementById('tab-files').scrollIntoView({ block: 'start', behavior: 'smooth' });
 }
 
 function closeFileForm() {
-  const form = document.getElementById('fileForm');
-  if (form) form.style.display = 'none';
+  showFileView('list');
   fileEditId = null;
   filePicked = null;
   const pick = document.getElementById('filePick');
@@ -1335,11 +1346,10 @@ function initFileEvents() {
   });
 
   const newBtn = document.getElementById('fileNewBtn');
-  if (newBtn) newBtn.addEventListener('click', () => {
-    const form = document.getElementById('fileForm');
-    if (form.style.display !== 'none' && fileEditId === null) closeFileForm();
-    else openFileForm(null);
-  });
+  if (newBtn) newBtn.addEventListener('click', () => openFileForm(null));
+
+  const back = document.getElementById('fileBack');
+  if (back) back.addEventListener('click', closeFileForm);
 
   const cancel = document.getElementById('fileCancel');
   if (cancel) cancel.addEventListener('click', closeFileForm);
@@ -4034,7 +4044,7 @@ function activateTab(name) {
   if (name === 'history') loadState().then(() => { renderHistory(); renderStanding(); renderTop5(); });
   if (name === 'attendance') { loadAttendance().then(renderAttendance); }
   // 자료실은 다른 사람이 방금 올렸을 수 있으니 들어갈 때 새로 받아온다
-  if (name === 'files') { loadFiles().then(renderFiles); }
+  if (name === 'files') { showFileView('list'); loadFiles().then(renderFiles); }
   if (name === 'launcher') { loadRooms().then(renderLauncher); }
 }
 

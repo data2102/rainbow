@@ -472,7 +472,7 @@ tbody tr:hover td{ background:var(--surface-sunken); }
 .fl-form{
   border:1px solid var(--border-strong); border-radius:var(--radius-lg);
   background:var(--surface-sunken); padding:var(--sp-5);
-  margin-bottom:var(--sp-5); display:grid; gap:var(--sp-3);
+  display:grid; gap:var(--sp-3);
 }
 .fl-row{ display:grid; grid-template-columns:76px minmax(0,1fr); gap:var(--sp-3); align-items:center; }
 .fl-lab{ font-size:var(--fs-footnote); font-weight:var(--fw-medium); color:var(--text-tertiary); }
@@ -483,6 +483,15 @@ tbody tr:hover td{ background:var(--surface-sunken); }
 }
 .fl-row textarea{ resize:vertical; }
 .fl-narrow{ max-width:160px; }
+
+/* 올리기 화면 머리 — 목록으로 돌아가는 길을 왼쪽 위에 둔다 */
+.fl-head{
+  display:flex; align-items:center; gap:var(--sp-3);
+  margin-bottom:var(--sp-4); padding-bottom:var(--sp-3);
+  border-bottom:1px solid var(--border);
+}
+.fl-head-t{ font-size:var(--fs-subhead); font-weight:var(--fw-bold); color:var(--text-primary); }
+#fileFormView[hidden], #fileListView[hidden]{ display:none; }
 
 /* 파일 붙이는 칸 — 끌어다 놓거나 눌러서 고른다 */
 .fl-drop{
@@ -2632,79 +2641,87 @@ if (/[?&]room=\d+/.test(location.search)) {
         올리는 것은 로그인한 회원 누구나, 지우는 것은 올린 사람과 관리자만 할 수 있습니다.
       </div>
 
-      <div class="fl-top">
-        <div class="fl-kinds" id="fileKinds"></div>
-        <button class="btn-mini btn-approve" id="fileNewBtn">+ 자료 올리기</button>
+      <!-- 목록 화면 -->
+      <div id="fileListView">
+        <div class="fl-top">
+          <div class="fl-kinds" id="fileKinds"></div>
+          <button class="btn-mini btn-approve" id="fileNewBtn">+ 자료 올리기</button>
+        </div>
+        <div class="table-wrap" id="fileTableWrap">
+          <table id="fileTable" class="file-table">
+            <thead>
+              <tr>
+                <th class="fl-kind">구분</th>
+                <th>제목</th>
+                <th class="fl-clip" title="첨부파일 있음">첨부</th>
+                <th class="fl-size">용량</th>
+                <th class="fl-hit">다운로드</th>
+                <th class="fl-by">올린이</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="fileEmpty" class="log-empty">아직 올라온 자료가 없습니다.</div>
+        <div class="pager" id="filePager" style="display:none;"></div>
       </div>
 
-      <!-- 올리기 · 고치기 -->
-      <form class="fl-form" id="fileForm" style="display:none;">
-        <div class="fl-row">
-          <label class="fl-lab" for="fileKind">구분</label>
-          <select id="fileKind" class="fl-sel"></select>
+      <!-- 올리기 · 수정 화면 — 목록 대신 이쪽이 뜬다 -->
+      <div id="fileFormView" hidden>
+        <div class="fl-head">
+          <button type="button" class="btn-mini btn-edit" id="fileBack">← 목록으로</button>
+          <span class="fl-head-t" id="fileFormTitle">자료 올리기</span>
         </div>
-        <div class="fl-row">
-          <label class="fl-lab" for="fileTitle">제목</label>
-          <input type="text" id="fileTitle" maxlength="80" placeholder="예) 레인보우식스 1998 설치파일 (한글)">
-        </div>
-        <div class="fl-row">
-          <span class="fl-lab">파일</span>
-          <div>
-            <div class="fl-drop" id="fileDrop" tabindex="0" role="button"
-                 aria-label="파일을 끌어다 놓거나 눌러서 고르기">
-              <div class="fl-drop-in" id="fileDropIn">
-                <b>파일을 여기로 끌어다 놓으세요</b>
-                <span>또는 <span class="fl-pick">첨부하기</span>를 눌러 고르세요 ·
-                      <b id="fileMaxNote">3MB</b> 까지 사이트에 바로 담깁니다</span>
+        <form class="fl-form" id="fileForm">
+          <div class="fl-row">
+            <label class="fl-lab" for="fileKind">구분</label>
+            <select id="fileKind" class="fl-sel"></select>
+          </div>
+          <div class="fl-row">
+            <label class="fl-lab" for="fileTitle">제목</label>
+            <input type="text" id="fileTitle" maxlength="80" placeholder="예) 레인보우식스 1998 설치파일 (한글)">
+          </div>
+          <div class="fl-row">
+            <span class="fl-lab">파일</span>
+            <div>
+              <div class="fl-drop" id="fileDrop" tabindex="0" role="button"
+                   aria-label="파일을 끌어다 놓거나 눌러서 고르기">
+                <div class="fl-drop-in" id="fileDropIn">
+                  <b>파일을 여기로 끌어다 놓으세요</b>
+                  <span>또는 <span class="fl-pick">첨부하기</span>를 눌러 고르세요 ·
+                        <b id="fileMaxNote">3MB</b> 까지 사이트에 바로 담깁니다</span>
+                </div>
               </div>
+              <input type="file" id="filePick" hidden>
+              <div class="fl-picked" id="filePicked" hidden></div>
             </div>
-            <input type="file" id="filePick" hidden>
-            <div class="fl-picked" id="filePicked" hidden></div>
           </div>
-        </div>
-        <div class="fl-row">
-          <label class="fl-lab" for="fileUrl">받는 곳</label>
-          <div>
-            <input type="url" id="fileUrl" maxlength="2000"
-                   placeholder="https://drive.google.com/... (파일을 담았으면 비워두세요)">
-            <div class="fl-hint" id="fileUrlHint"></div>
+          <div class="fl-row">
+            <label class="fl-lab" for="fileUrl">받는 곳</label>
+            <div>
+              <input type="url" id="fileUrl" maxlength="2000"
+                     placeholder="https://drive.google.com/... (파일을 담았으면 비워두세요)">
+              <div class="fl-hint" id="fileUrlHint"></div>
+            </div>
           </div>
-        </div>
-        <div class="fl-row">
-          <label class="fl-lab" for="fileNote">설명</label>
-          <textarea id="fileNote" rows="2" maxlength="500" placeholder="받는 방법이나 주의할 점을 적어주세요 (선택)"></textarea>
-        </div>
-        <div class="fl-row">
-          <span class="fl-lab">중요글</span>
-          <label class="fl-check">
-            <input type="checkbox" id="filePinned">
-            <span>중요글로 올리기 — <b>1페이지 맨 위</b>에 고정됩니다.</span>
-          </label>
-        </div>
-        <div class="fl-actions">
-          <button type="submit" class="btn-mini btn-approve" id="fileSave">올리기</button>
-          <button type="button" class="btn-mini btn-edit" id="fileCancel">취소</button>
-          <span class="fl-err" id="fileErr"></span>
-        </div>
-      </form>
-
-      <div class="table-wrap" id="fileTableWrap">
-        <table id="fileTable" class="file-table">
-          <thead>
-            <tr>
-              <th class="fl-kind">구분</th>
-              <th>제목</th>
-              <th class="fl-clip" title="첨부파일 있음">첨부</th>
-              <th class="fl-size">용량</th>
-              <th class="fl-hit">다운로드</th>
-              <th class="fl-by">올린이</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+          <div class="fl-row">
+            <label class="fl-lab" for="fileNote">설명</label>
+            <textarea id="fileNote" rows="2" maxlength="500" placeholder="받는 방법이나 주의할 점을 적어주세요 (선택)"></textarea>
+          </div>
+          <div class="fl-row">
+            <span class="fl-lab">중요글</span>
+            <label class="fl-check">
+              <input type="checkbox" id="filePinned">
+              <span>중요글로 올리기 — <b>1페이지 맨 위</b>에 고정됩니다.</span>
+            </label>
+          </div>
+          <div class="fl-actions">
+            <button type="submit" class="btn-mini btn-approve" id="fileSave">올리기</button>
+            <button type="button" class="btn-mini btn-edit" id="fileCancel">취소</button>
+            <span class="fl-err" id="fileErr"></span>
+          </div>
+        </form>
       </div>
-      <div id="fileEmpty" class="log-empty">아직 올라온 자료가 없습니다.</div>
-      <div class="pager" id="filePager" style="display:none;"></div>
     </div>
   </div>
 
