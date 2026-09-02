@@ -3289,7 +3289,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 31;
+const APP_VERSION = 32;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -5735,7 +5735,7 @@ function bindPager(boxId, key, set, redraw) {
 /** api/account.js 의 TEAM_OPTIONS 와 같아야 한다. 서버가 준 값으로 덮인다. */
 let teamOptions = {
   grade:    ['A', 'B', 'C', 'D', 'E'],
-  attend:   ['A', 'B', 'C', 'E'],
+  attend:   ['0%~20%', '20%~40%', '40%~60%', '60%~80%', '80%~100%'],
   playtime: ['8~9시', '9~10시', '10~11시', '11~12시', '가끔 접속'],
   position: ['호스트', '베스트', '백업', '센서'],
 };

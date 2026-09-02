@@ -211,7 +211,7 @@ async function list(req, res) {
  */
 export const TEAM_OPTIONS = {
   grade:    ['A', 'B', 'C', 'D', 'E'],
-  attend:   ['A', 'B', 'C', 'E'],
+  attend:   ['0%~20%', '20%~40%', '40%~60%', '60%~80%', '80%~100%'],
   playtime: ['8~9시', '9~10시', '10~11시', '11~12시', '가끔 접속'],
   position: ['호스트', '베스트', '백업', '센서'],
 };
@@ -229,14 +229,15 @@ async function ensureTeamCols() {
                                  ADD COLUMN playtime TEXT,
                                  ADD COLUMN position TEXT`);
   }
-  // 접속시간의 값이 FULL TIME 같은 옛 이름에서 시간대로 바뀌었다.
-  // 이제 고를 수 없는 값이 남아 있으면 비워, 다시 고르도록 한다.
-  // 지금 쓰는 값은 건드리지 않으므로 몇 번을 돌려도 같다.
-  await q(
-    `UPDATE players SET playtime = NULL
-      WHERE playtime IS NOT NULL AND playtime <> ALL($1)`,
-    [TEAM_OPTIONS.playtime]
-  );
+  // 고를 수 있는 값이 바뀌면 옛 값이 화면에 남는다. 지금 목록에 없는 값은
+  // 비워 다시 고르도록 한다. 쓰는 값은 건드리지 않으므로 몇 번을 돌려도 같다.
+  for (const [field, opts] of Object.entries(TEAM_OPTIONS)) {
+    await q(
+      `UPDATE players SET ${field} = NULL
+        WHERE ${field} IS NOT NULL AND ${field} <> ALL($1)`,
+      [opts]
+    );
+  }
   teamColsReady = true;
 }
 
