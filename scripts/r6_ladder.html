@@ -1200,6 +1200,22 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   color:var(--text-secondary);
 }
 .rtext b{ color:var(--text-primary); font-weight:var(--fw-bold); }
+/* 한 항목에 지킬 것이 여럿이면 줄을 나눈다. 한 문단에 붙여 쓰면 뭉개진다.
+   줄(li)을 flex 로 두면 안 된다 — 문장 속 <b> 까지 각각 칸이 되어
+   한 문장이 여러 세로줄로 쪼개진다. 점은 자리를 잡아 띄워 둔다. */
+.rlist{
+  margin:0; padding:0 0 0 1.1em; list-style:none;
+  display:flex; flex-direction:column; gap:var(--sp-2);
+}
+.rlist li{
+  position:relative; font-size:var(--fs-body);
+  color:var(--text-secondary); line-height:var(--lh-body);
+}
+.rlist li::before{
+  content:'·'; position:absolute; left:-1.1em; top:0;
+  color:var(--accent); font-weight:var(--fw-bold);
+}
+.rlist b{ color:var(--text-primary); font-weight:var(--fw-bold); }
 .rcard-note .rnum{ background:var(--warm); color:var(--bg); }
 
 /* 예시 — 숫자가 눈에 먼저 들어와야 한다 */
@@ -1263,6 +1279,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   margin-top:var(--sp-3); font-size:var(--fs-caption);
   color:var(--warm); line-height:var(--lh-body);
 }
+.rwarn b{ font-weight:var(--fw-bold); }
 
 @media (max-width:640px){
   .rcard-h{ padding:var(--sp-3) var(--sp-4); font-size:var(--fs-body); }
@@ -2747,26 +2764,23 @@ if (/[?&]room=\d+/.test(location.search)) {
         <article class="rcard">
           <div class="rcard-h"><span class="rnum">1</span>기본</div>
           <div class="rcard-b">
-            <p class="rtext">랜덤 팀을 돌리는 방식은 <b>지금까지와 같습니다</b>.</p>
+            <ul class="rlist">
+              <li><b>팀서바이벌</b> → <b>랜덤팀</b> 형태로 구성합니다.</li>
+              <li>돌리는 방식은 <b>기존과 동일</b>합니다.</li>
+              <li>인원이 안 맞을 경우, <b>가장 늦게 들어온 1명이 인원이 많은 팀</b>으로
+                  구성될 때까지 랜덤팀을 다시 돌립니다.</li>
+            </ul>
           </div>
         </article>
 
         <article class="rcard">
-          <div class="rcard-h"><span class="rnum">2</span>다시 돌리는 경우</div>
+          <div class="rcard-h"><span class="rnum">2</span>랜덤팀 재구성 (다시 돌리는 경우)</div>
           <div class="rcard-b">
-            <p class="rtext">팀이 한쪽으로 쏠린 것이 <b>모두가 납득할 정도</b>일 때에 한해,
-              <b>전원 동의</b>하에 <b>1회만</b> 다시 돌립니다.</p>
-            <div class="rex">
-              <div class="rex-h">예시</div>
-              <div class="rex-row"><span class="memo">상위권이 한 팀에 몰려 모두가 "이건 아니다" 할 때 → 동의 후 1회 재추첨</span></div>
-            </div>
-          </div>
-        </article>
-
-        <article class="rcard">
-          <div class="rcard-h"><span class="rnum">3</span>동의가 없을 때</div>
-          <div class="rcard-b">
-            <p class="rtext">불편하더라도 <b>그대로 진행</b>합니다. 2회 이상 다시 돌리지 않습니다.</p>
+            <ul class="rlist">
+              <li>팀 밸런스가 <b>너무 붕괴</b>되고 <b>모두가 동의</b>할 경우
+                  <b>1회</b> 다시 돌릴 수 있습니다.</li>
+              <li>동의가 없을 경우 <b>최초 랜덤팀 구성한 대로</b> 경기를 진행합니다.</li>
+            </ul>
           </div>
         </article>
       </section>
@@ -2776,10 +2790,9 @@ if (/[?&]room=\d+/.test(location.search)) {
         <div class="rsec-h">세부 규정</div>
 
         <article class="rcard">
-          <div class="rcard-h"><span class="rnum">1</span>프랙</div>
+          <div class="rcard-h"><span class="rnum">1</span>6프랙</div>
           <div class="rcard-b">
-            <p class="rtext"><b>팀당 1명만 6프랙</b>이 가능합니다.
-              룸이든 난간이든 각 팀에서 합의해 <b>1명만</b> 6프랙을 허용합니다.</p>
+            <p class="rtext"><b>팀당 1명만</b> 6프랙 소유가 가능합니다.</p>
             <div class="rex">
               <div class="rex-h">예시</div>
               <div class="rex-row"><b class="ok">O</b><span class="memo">A팀 6프랙 1명 · B팀 6프랙 1명</span></div>
@@ -2791,48 +2804,16 @@ if (/[?&]room=\d+/.test(location.search)) {
         <article class="rcard">
           <div class="rcard-h"><span class="rnum">2</span>권총</div>
           <div class="rcard-b">
-            <p class="rtext">시작할 때 쏘는 권총이 위협적이라 스트레스를 받는다는 의견이 있었습니다.
-              무조건 안 된다는 뜻은 아니지만, 꼭 <b>하늘에 쏴서</b> 팀원이 다치지 않게 해주세요.</p>
-            <div class="rwarn">※ 권총으로 인해 팀원이 데미지를 입을 경우 그 사람은 이후 권총 금지입니다</div>
+            <ul class="rlist">
+              <li>경기 시작 시 <b>가급적 권총은 지양</b>해 주시기 바랍니다.</li>
+              <li>가급적 <b>하늘을 보고</b> 쏴주시기 바랍니다.</li>
+            </ul>
+            <div class="rwarn">※ 만약 권총으로 <b>같은 팀에 데미지를 입힐 경우</b>
+              해당 인원은 <b>권총 사용을 금지</b>합니다.</div>
           </div>
         </article>
       </section>
 
-      <!-- ── 공지 전달 ── -->
-      <section class="rsec">
-        <div class="rsec-h">공지 전달</div>
-
-        <article class="rcard">
-          <div class="rcard-h"><span class="rnum">1</span>OK(FVC)</div>
-          <div class="rcard-b">
-            <p class="rtext">공지가 전달되지 않을 경우 <b>현정님</b>이 빠르게 소통해주시기로 했습니다.</p>
-          </div>
-        </article>
-
-        <article class="rcard">
-          <div class="rcard-h"><span class="rnum">2</span>회의 참석</div>
-          <div class="rcard-b">
-            <p class="rtext">다른 팀도 빠르게 전달할 수 있도록
-              <b>로터스-티얼님 / 성남-구짜비님 / 레나님</b>은
-              다음 기본 회의에 꼭 참석해 함께 의논해주세요.</p>
-          </div>
-        </article>
-
-        <article class="rcard">
-          <div class="rcard-h"><span class="rnum">3</span>제안</div>
-          <div class="rcard-b">
-            <p class="rtext">공지를 빠르게 전달하자는 취지로 <b>현정님</b>이 제안해주셨습니다.</p>
-          </div>
-        </article>
-
-        <article class="rcard">
-          <div class="rcard-h"><span class="rnum">4</span>회의는 열려 있습니다</div>
-          <div class="rcard-b">
-            <p class="rtext">회의는 <b>모든 분이 참석 가능</b>합니다.
-              다만 여러 의견을 모아 <b>결정하는 일은 소수</b>로 진행합니다.</p>
-          </div>
-        </article>
-      </section>
     </div>
   </div>
 
