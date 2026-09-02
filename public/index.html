@@ -1249,14 +1249,22 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   font-size:var(--fs-subhead); font-weight:var(--fw-bold);
   color:var(--accent); font-variant-numeric:tabular-nums; letter-spacing:.02em;
 }
-.rex-row .memo{ font-size:var(--fs-caption); color:var(--text-tertiary); }
+.rex-row .memo, .rflow-row .memo{ font-size:var(--fs-caption); color:var(--text-tertiary); }
 .rex-row .ok, .rex-row .no{
   display:inline-flex; align-items:center; justify-content:center; flex:none;
   width:22px; height:22px; border-radius:var(--radius-sm);
   font-size:var(--fs-footnote); font-weight:var(--fw-bold);
 }
-.rex-row .ok{ background:var(--success-bg); color:var(--success-strong); }
-.rex-row .no{ background:var(--danger-bg); color:var(--danger-strong); }
+.rex-row .ok, .rflow-row .ok{ background:var(--success-bg); color:var(--success-strong); }
+.rex-row .no, .rflow-row .no{ background:var(--danger-bg); color:var(--danger-strong); }
+.rflow-row .ok, .rflow-row .no{
+  display:inline-flex; align-items:center; justify-content:center; flex:none;
+  width:22px; height:22px; border-radius:var(--radius-sm);
+  font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+}
+/* 아이디나 프로그램 이름은 값 그대로 보여야 한다 */
+.val{ color:var(--text-primary); font-weight:var(--fw-medium); }
+.val.bad{ color:var(--text-tertiary); text-decoration:line-through; }
 
 /* 리폿 쓰는 법 — 규칙과 색을 달리해 "적는 방법"임을 드러낸다 */
 .rrep{
@@ -1282,6 +1290,13 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 }
 .rflow-row .t{ min-width:76px; color:var(--text-tertiary); font-size:var(--fs-caption); }
 .rflow-row .team{ font-size:var(--fs-subhead); font-weight:var(--fw-bold); color:var(--warm); }
+/* O·X 와 그 값은 한 덩어리다. 따로 놀면 무엇이 되고 무엇이 안 되는지 흐려진다. */
+.ov{ display:inline-flex; align-items:center; gap:var(--sp-2); }
+.rflow-note{
+  margin-top:var(--sp-2); font-size:var(--fs-caption); color:var(--text-tertiary);
+  line-height:var(--lh-body);
+}
+.rflow-note b{ color:var(--text-secondary); font-weight:var(--fw-bold); }
 .rwarn{
   margin-top:var(--sp-3); font-size:var(--fs-caption);
   color:var(--warm); line-height:var(--lh-body);
@@ -1293,6 +1308,9 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   .rcard-b{ padding:var(--sp-4); }
   .rsec-h{ font-size:var(--fs-subhead); }
   .rex, .rrep, .rflow{ padding:var(--sp-3); }
+  /* 앞칸을 줄여야 값이 다음 줄로 접히지 않는다 */
+  .rflow-row .t{ min-width:56px; }
+  .rex-row .n{ min-width:44px; }
 }
 
 .team-cards{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:var(--sp-3); }
@@ -2797,7 +2815,44 @@ if (/[?&]room=\d+/.test(location.search)) {
         <div class="rsec-h">세부 규정</div>
 
         <article class="rcard">
-          <div class="rcard-h"><span class="rnum">1</span>6프랙</div>
+          <div class="rcard-h"><span class="rnum">1</span>ID 설정</div>
+          <div class="rcard-b">
+            <ul class="rlist">
+              <li>카카오톡 오픈 채팅방과 랭킹사이트 아이디를 <b>동일하게</b> 설정 부탁드립니다.</li>
+              <li><b>ZONE 시절의 ID</b>로 반드시 설정 부탁드립니다.</li>
+            </ul>
+            <div class="rex">
+              <div class="rex-h">예시</div>
+              <div class="rex-row"><b class="ok">O</b><span class="val">SNC_Gjplayer</span></div>
+              <div class="rex-row"><b class="no">X</b><span class="val bad">굿잡이</span></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="rcard">
+          <div class="rcard-h"><span class="rnum">2</span>디스코드</div>
+          <div class="rcard-b">
+            <ul class="rlist">
+              <li>래더게임에 참여하기 위해서는 <b>디스코드에 반드시 접속</b>해 주시기 바랍니다.</li>
+              <li><b>필수사항</b>이며, 미참여 시 <b>래더게임에 참여할 수 없습니다</b>.</li>
+              <li>개인 사정으로 마이크 사용이 불가할 경우
+                  <b>최소 듣기 기능이라도 활성화</b> 부탁드립니다.</li>
+            </ul>
+            <div class="rflow">
+              <div class="rflow-h">디스코드는 이렇게 실행해주세요</div>
+              <div class="rflow-row"><span class="t">PC</span>
+                <span class="ov"><b class="ok">O</b><span class="val">모바일웹</span></span></div>
+              <div class="rflow-row"><span class="t"></span>
+                <span class="ov"><b class="no">X</b><span class="val bad">디스코드 프로그램</span></span></div>
+              <div class="rflow-row"><span class="t">모바일</span>
+                <span class="ov"><b class="ok">O</b><span class="val">디스코드 앱</span></span></div>
+              <div class="rflow-note">모바일은 <b>스피커로 소통</b>해주세요.</div>
+            </div>
+          </div>
+        </article>
+
+        <article class="rcard">
+          <div class="rcard-h"><span class="rnum">3</span>6프랙</div>
           <div class="rcard-b">
             <p class="rtext"><b>팀당 1명만</b> 6프랙 소유가 가능합니다.</p>
             <div class="rex">
@@ -2809,7 +2864,7 @@ if (/[?&]room=\d+/.test(location.search)) {
         </article>
 
         <article class="rcard">
-          <div class="rcard-h"><span class="rnum">2</span>권총</div>
+          <div class="rcard-h"><span class="rnum">4</span>권총</div>
           <div class="rcard-b">
             <ul class="rlist">
               <li>경기 시작 시 <b>가급적 권총은 지양</b>해 주시기 바랍니다.</li>
@@ -3377,7 +3432,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 37;
+const APP_VERSION = 38;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
