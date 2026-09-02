@@ -444,7 +444,7 @@ tbody tr:hover td{ background:var(--surface-sunken); }
   margin-bottom:var(--sp-4);
 }
 .month-bar-k{ font-size:var(--fs-caption); color:var(--text-secondary); font-weight:var(--fw-medium); }
-.month-select{
+.month-select, .vote-month{
   flex:none; width:auto; min-width:170px; max-width:100%; padding:var(--sp-2) var(--sp-4);
   font-size:var(--fs-caption); font-weight:var(--fw-medium);
   border-radius:var(--radius-md); cursor:pointer;
@@ -601,6 +601,39 @@ tr.fl-pinned td:first-child{ box-shadow:inset 3px 0 0 var(--danger); }
   .file-table td.fl-size, .file-table td.fl-hit{
     display:inline-block; margin-right:var(--sp-5); text-align:left;
   }
+}
+
+/* ---------- 투표 현황 ---------- */
+.vote-table th{ cursor:default; }
+.vote-table th:hover{ color:var(--text-tertiary); }
+.vote-table td{ vertical-align:middle; }
+.vote-table th.v-rank, .vote-table td.v-rank{
+  width:44px; color:var(--text-tertiary); font-weight:var(--fw-bold);
+}
+.vote-table th.v-n, .vote-table td.v-n{ width:80px; font-variant-numeric:tabular-nums; }
+.vote-table th.v-rate, .vote-table td.v-rate{ width:220px; }
+.vote-table tbody tr:nth-child(even) td{ background:var(--surface-sunken); }
+.vote-table tbody tr:hover td{ background:var(--accent-bg); }
+.v-id{ color:var(--text-primary); font-weight:var(--fw-medium); }
+.v-miss{ color:var(--text-tertiary); }
+.v-miss.bad{ color:var(--danger-strong); font-weight:var(--fw-bold); }
+/* 숫자만으로는 누가 잘하고 못하는지 한눈에 안 들어온다. 막대를 함께 둔다. */
+.v-bar{ display:flex; align-items:center; gap:var(--sp-3); }
+.v-bar-track{
+  flex:1; min-width:60px; height:8px; border-radius:999px;
+  background:var(--surface-sunken); border:1px solid var(--border); overflow:hidden;
+}
+.v-bar-fill{ height:100%; background:var(--accent); border-radius:999px; }
+.v-bar-fill.mid{ background:var(--warning-strong); }
+.v-bar-fill.low{ background:var(--danger); }
+.v-pct{
+  font-size:var(--fs-caption); font-weight:var(--fw-bold);
+  font-variant-numeric:tabular-nums; width:46px; text-align:right; flex:none;
+}
+.vote-table tr.v-zero .v-id{ color:var(--text-tertiary); }
+@media (max-width:640px){
+  .vote-table th.v-rate, .vote-table td.v-rate{ width:auto; }
+  .vote-table th.v-n, .vote-table td.v-n{ width:62px; }
 }
 
 /* ---------- 팀 편성하기 (마스터 전용) ---------- */
@@ -2403,6 +2436,28 @@ if (/[?&]room=\d+/.test(location.search)) {
 
       <div id="slotSummary" class="slot-summary"></div>
     </div>
+
+    <!-- 달마다 누가 투표했는지 -->
+    <div class="panel hud-corner">
+      <div class="panel-head">
+        <h2>투표 현황 · 월별</h2>
+        <select class="vote-month" id="voteMonth" aria-label="조회할 월 선택"></select>
+      </div>
+      <div class="foot-note" style="margin-top:0;margin-bottom:12px;" id="voteNote"></div>
+      <div class="table-wrap">
+        <table id="voteTable" class="vote-table">
+          <thead>
+            <tr>
+              <th class="v-rank">#</th><th>ID</th>
+              <th class="v-n">투표</th><th class="v-n">미투표</th>
+              <th class="v-rate">투표율</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="voteEmpty" class="log-empty">이 달에는 아직 투표가 없습니다.</div>
+    </div>
   </div>
 
   <!-- TOURNAMENT -->
@@ -3289,7 +3344,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 32;
+const APP_VERSION = 33;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -4514,6 +4569,80 @@ function slotChipLabel(s) {
   if (s === SLOT_UNSURE) return '미정';
   if (s === SLOT_ABSENT) return '불참';
   return String(s);
+}
+
+/* ---------- 투표 현황 (월별) ---------- */
+
+let voteStats = null;      // { month, months, days, stats }
+let voteMonth = '';        // 고른 달. 비어 있으면 이번 달
+
+/** 이 달에 누가 며칠 투표했는지 받아온다. */
+async function loadVoteStats(month) {
+  try {
+    voteStats = await apiPost('/api/attendance', { action: 'voteStats', month: month || voteMonth });
+    // 시즌 달 고르기와 같은 목록이 아니다 — renderMonthPickers 가 건드리지 않도록
+    // 클래스를 나눠 두었다 (.vote-month).
+    voteMonth = voteStats.month;
+  } catch { voteStats = null; }
+}
+
+function renderVoteStats() {
+  const tbody = document.querySelector('#voteTable tbody');
+  const empty = document.getElementById('voteEmpty');
+  const note = document.getElementById('voteNote');
+  const sel = document.getElementById('voteMonth');
+  if (!tbody || !empty || !note) return;
+
+  if (!voteStats) { tbody.innerHTML = ''; empty.style.display = 'block'; note.textContent = ''; return; }
+
+  const { days, stats, months, month } = voteStats;
+  if (sel) {
+    sel.innerHTML = (months || []).map(m => {
+      const [y, mm] = m.split('-');
+      return `<option value="${esc(m)}"${m === month ? ' selected' : ''}>${y}년 ${Number(mm)}월</option>`;
+    }).join('');
+  }
+
+  note.innerHTML = days
+    ? `이 달에 누구라도 투표한 날은 <b>${days}일</b>입니다 · 그 ${days}일 가운데 며칠을 투표했는지 셉니다 ·
+       <b>미정 · 불참도 투표한 것</b>으로 봅니다.`
+    : '이 달에는 아직 아무도 투표하지 않았습니다.';
+
+  if (!days || !stats.length) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  // 많이 한 사람부터. 같으면 아이디 순.
+  const rows = stats.slice().sort((a, b) => b.voted - a.voted || a.handle.localeCompare(b.handle));
+
+  tbody.innerHTML = rows.map((r, i) => {
+    const miss = days - r.voted;
+    const pct = Math.round((r.voted / days) * 100);
+    const cls = pct >= 70 ? '' : (pct >= 40 ? ' mid' : ' low');
+    return `<tr class="${r.voted ? '' : 'v-zero'}">
+      <td class="v-rank">${i + 1}</td>
+      <td><span class="v-id">${esc(r.handle)}</span></td>
+      <td class="v-n">${r.voted}일</td>
+      <td class="v-n"><span class="v-miss${miss === days ? ' bad' : ''}">${miss}일</span></td>
+      <td class="v-rate"><div class="v-bar">
+        <div class="v-bar-track"><div class="v-bar-fill${cls}" style="width:${pct}%"></div></div>
+        <span class="v-pct">${pct}%</span>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+function initVoteStats() {
+  const sel = document.getElementById('voteMonth');
+  if (!sel) return;
+  sel.addEventListener('change', async () => {
+    voteMonth = sel.value;
+    await loadVoteStats(voteMonth);
+    renderVoteStats();
+  });
 }
 
 /** 시간대별로 누가 오는지 */
@@ -7465,7 +7594,10 @@ function activateTab(name) {
   // 그 탭이 쓰는 것만 받아온다. 리폿 하나 보자고 출석·대회·게시판까지
   // 새로 받으면 왕복이 일곱 번 이어져 탭이 늦게 열린다.
   if (name === 'history') loadState().then(() => { renderHistory(); renderStanding(); renderTop5(); });
-  if (name === 'attendance') { loadAttendance().then(renderAttendance); }
+  if (name === 'attendance') {
+    loadAttendance().then(renderAttendance);
+    loadVoteStats().then(renderVoteStats);
+  }
   // 자료실은 다른 사람이 방금 올렸을 수 있으니 들어갈 때 새로 받아온다
   if (name === 'files') { showFileView('list'); loadFiles().then(renderFiles); }
   if (name === 'launcher') { loadRooms().then(renderLauncher); }
@@ -7657,6 +7789,7 @@ async function boot() {
   initHistoryPager();
   initFileEvents();
   initAdminPagers();
+  initVoteStats();
   renderAuthBar();
   try {
     // 방 창은 들어가기를 먼저 띄워두고 확인과 나란히 기다린다

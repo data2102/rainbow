@@ -444,7 +444,7 @@ tbody tr:hover td{ background:var(--surface-sunken); }
   margin-bottom:var(--sp-4);
 }
 .month-bar-k{ font-size:var(--fs-caption); color:var(--text-secondary); font-weight:var(--fw-medium); }
-.month-select{
+.month-select, .vote-month{
   flex:none; width:auto; min-width:170px; max-width:100%; padding:var(--sp-2) var(--sp-4);
   font-size:var(--fs-caption); font-weight:var(--fw-medium);
   border-radius:var(--radius-md); cursor:pointer;
@@ -601,6 +601,39 @@ tr.fl-pinned td:first-child{ box-shadow:inset 3px 0 0 var(--danger); }
   .file-table td.fl-size, .file-table td.fl-hit{
     display:inline-block; margin-right:var(--sp-5); text-align:left;
   }
+}
+
+/* ---------- 투표 현황 ---------- */
+.vote-table th{ cursor:default; }
+.vote-table th:hover{ color:var(--text-tertiary); }
+.vote-table td{ vertical-align:middle; }
+.vote-table th.v-rank, .vote-table td.v-rank{
+  width:44px; color:var(--text-tertiary); font-weight:var(--fw-bold);
+}
+.vote-table th.v-n, .vote-table td.v-n{ width:80px; font-variant-numeric:tabular-nums; }
+.vote-table th.v-rate, .vote-table td.v-rate{ width:220px; }
+.vote-table tbody tr:nth-child(even) td{ background:var(--surface-sunken); }
+.vote-table tbody tr:hover td{ background:var(--accent-bg); }
+.v-id{ color:var(--text-primary); font-weight:var(--fw-medium); }
+.v-miss{ color:var(--text-tertiary); }
+.v-miss.bad{ color:var(--danger-strong); font-weight:var(--fw-bold); }
+/* 숫자만으로는 누가 잘하고 못하는지 한눈에 안 들어온다. 막대를 함께 둔다. */
+.v-bar{ display:flex; align-items:center; gap:var(--sp-3); }
+.v-bar-track{
+  flex:1; min-width:60px; height:8px; border-radius:999px;
+  background:var(--surface-sunken); border:1px solid var(--border); overflow:hidden;
+}
+.v-bar-fill{ height:100%; background:var(--accent); border-radius:999px; }
+.v-bar-fill.mid{ background:var(--warning-strong); }
+.v-bar-fill.low{ background:var(--danger); }
+.v-pct{
+  font-size:var(--fs-caption); font-weight:var(--fw-bold);
+  font-variant-numeric:tabular-nums; width:46px; text-align:right; flex:none;
+}
+.vote-table tr.v-zero .v-id{ color:var(--text-tertiary); }
+@media (max-width:640px){
+  .vote-table th.v-rate, .vote-table td.v-rate{ width:auto; }
+  .vote-table th.v-n, .vote-table td.v-n{ width:62px; }
 }
 
 /* ---------- 팀 편성하기 (마스터 전용) ---------- */
@@ -2402,6 +2435,28 @@ if (/[?&]room=\d+/.test(location.search)) {
       <div class="slot-divider"></div>
 
       <div id="slotSummary" class="slot-summary"></div>
+    </div>
+
+    <!-- 달마다 누가 투표했는지 -->
+    <div class="panel hud-corner">
+      <div class="panel-head">
+        <h2>투표 현황 · 월별</h2>
+        <select class="vote-month" id="voteMonth" aria-label="조회할 월 선택"></select>
+      </div>
+      <div class="foot-note" style="margin-top:0;margin-bottom:12px;" id="voteNote"></div>
+      <div class="table-wrap">
+        <table id="voteTable" class="vote-table">
+          <thead>
+            <tr>
+              <th class="v-rank">#</th><th>ID</th>
+              <th class="v-n">투표</th><th class="v-n">미투표</th>
+              <th class="v-rate">투표율</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="voteEmpty" class="log-empty">이 달에는 아직 투표가 없습니다.</div>
     </div>
   </div>
 

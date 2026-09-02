@@ -135,10 +135,48 @@ export default async function handler(req, res) {
       return await setSchedule(res, me, body(req).slots);
     }
     if (action === 'remove') return await remove(req, res, id);
+    if (action === 'voteStats') return await voteStats(req, res);
     return res.status(400).json({ error: '알 수 없는 요청입니다.' });
   } catch (e) {
     res.status(400).json({ error: e.message });
   }
+}
+
+/**
+ * 달마다 누가 투표를 했고 누가 안 했는지.
+ *
+ * "며칠 중 며칠"의 분모는 달력 날수가 아니라 **그 달에 누구라도 투표한 날**로
+ * 센다. 아무도 안 들어온 날까지 세면 모두의 투표율이 억울하게 떨어진다.
+ * 미정·불참도 투표한 것으로 본다 — 대답을 한 것이기 때문이다.
+ */
+async function voteStats(req, res) {
+  const raw = String(body(req).month || '');
+  const month = /^\d{4}-\d{2}$/.test(raw) ? raw : playDay().slice(0, 7);
+  const like = month + '%';
+
+  const [days, counts, months, roster] = await Promise.all([
+    q(`SELECT COUNT(DISTINCT day)::int AS n FROM play_schedule WHERE day LIKE $1`, [like]),
+    q(`SELECT handle, COUNT(DISTINCT day)::int AS n FROM play_schedule
+        WHERE day LIKE $1 GROUP BY handle`, [like]),
+    q(`SELECT DISTINCT substring(day, 1, 7) AS m FROM play_schedule ORDER BY m DESC`),
+    q(`SELECT handle, clan FROM players ORDER BY handle`),
+  ]);
+
+  const by = new Map(counts.map(r => [r.handle, Number(r.n)]));
+  const total = Number((days[0] || {}).n || 0);
+
+  // 이 달에 투표가 하나도 없어도 이 달은 고를 수 있어야 한다
+  const list = months.map(r => r.m);
+  if (!list.includes(month)) list.unshift(month);
+
+  res.setHeader('Cache-Control', 'no-store');
+  res.status(200).json({
+    month, months: list, days: total,
+    stats: roster.map(r => ({
+      handle: r.handle, clan: r.clan,
+      voted: by.get(r.handle) || 0,
+    })),
+  });
 }
 
 async function punch(res, action, handle, season) {

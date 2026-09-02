@@ -228,7 +228,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 32;
+const APP_VERSION = 33;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -1453,6 +1453,80 @@ function slotChipLabel(s) {
   if (s === SLOT_UNSURE) return '미정';
   if (s === SLOT_ABSENT) return '불참';
   return String(s);
+}
+
+/* ---------- 투표 현황 (월별) ---------- */
+
+let voteStats = null;      // { month, months, days, stats }
+let voteMonth = '';        // 고른 달. 비어 있으면 이번 달
+
+/** 이 달에 누가 며칠 투표했는지 받아온다. */
+async function loadVoteStats(month) {
+  try {
+    voteStats = await apiPost('/api/attendance', { action: 'voteStats', month: month || voteMonth });
+    // 시즌 달 고르기와 같은 목록이 아니다 — renderMonthPickers 가 건드리지 않도록
+    // 클래스를 나눠 두었다 (.vote-month).
+    voteMonth = voteStats.month;
+  } catch { voteStats = null; }
+}
+
+function renderVoteStats() {
+  const tbody = document.querySelector('#voteTable tbody');
+  const empty = document.getElementById('voteEmpty');
+  const note = document.getElementById('voteNote');
+  const sel = document.getElementById('voteMonth');
+  if (!tbody || !empty || !note) return;
+
+  if (!voteStats) { tbody.innerHTML = ''; empty.style.display = 'block'; note.textContent = ''; return; }
+
+  const { days, stats, months, month } = voteStats;
+  if (sel) {
+    sel.innerHTML = (months || []).map(m => {
+      const [y, mm] = m.split('-');
+      return `<option value="${esc(m)}"${m === month ? ' selected' : ''}>${y}년 ${Number(mm)}월</option>`;
+    }).join('');
+  }
+
+  note.innerHTML = days
+    ? `이 달에 누구라도 투표한 날은 <b>${days}일</b>입니다 · 그 ${days}일 가운데 며칠을 투표했는지 셉니다 ·
+       <b>미정 · 불참도 투표한 것</b>으로 봅니다.`
+    : '이 달에는 아직 아무도 투표하지 않았습니다.';
+
+  if (!days || !stats.length) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  // 많이 한 사람부터. 같으면 아이디 순.
+  const rows = stats.slice().sort((a, b) => b.voted - a.voted || a.handle.localeCompare(b.handle));
+
+  tbody.innerHTML = rows.map((r, i) => {
+    const miss = days - r.voted;
+    const pct = Math.round((r.voted / days) * 100);
+    const cls = pct >= 70 ? '' : (pct >= 40 ? ' mid' : ' low');
+    return `<tr class="${r.voted ? '' : 'v-zero'}">
+      <td class="v-rank">${i + 1}</td>
+      <td><span class="v-id">${esc(r.handle)}</span></td>
+      <td class="v-n">${r.voted}일</td>
+      <td class="v-n"><span class="v-miss${miss === days ? ' bad' : ''}">${miss}일</span></td>
+      <td class="v-rate"><div class="v-bar">
+        <div class="v-bar-track"><div class="v-bar-fill${cls}" style="width:${pct}%"></div></div>
+        <span class="v-pct">${pct}%</span>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+function initVoteStats() {
+  const sel = document.getElementById('voteMonth');
+  if (!sel) return;
+  sel.addEventListener('change', async () => {
+    voteMonth = sel.value;
+    await loadVoteStats(voteMonth);
+    renderVoteStats();
+  });
 }
 
 /** 시간대별로 누가 오는지 */
@@ -4404,7 +4478,10 @@ function activateTab(name) {
   // 그 탭이 쓰는 것만 받아온다. 리폿 하나 보자고 출석·대회·게시판까지
   // 새로 받으면 왕복이 일곱 번 이어져 탭이 늦게 열린다.
   if (name === 'history') loadState().then(() => { renderHistory(); renderStanding(); renderTop5(); });
-  if (name === 'attendance') { loadAttendance().then(renderAttendance); }
+  if (name === 'attendance') {
+    loadAttendance().then(renderAttendance);
+    loadVoteStats().then(renderVoteStats);
+  }
   // 자료실은 다른 사람이 방금 올렸을 수 있으니 들어갈 때 새로 받아온다
   if (name === 'files') { showFileView('list'); loadFiles().then(renderFiles); }
   if (name === 'launcher') { loadRooms().then(renderLauncher); }
@@ -4596,6 +4673,7 @@ async function boot() {
   initHistoryPager();
   initFileEvents();
   initAdminPagers();
+  initVoteStats();
   renderAuthBar();
   try {
     // 방 창은 들어가기를 먼저 띄워두고 확인과 나란히 기다린다
