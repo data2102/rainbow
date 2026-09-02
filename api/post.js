@@ -304,7 +304,7 @@ async function clear(req, res) {
    주소도 /api/post 하나를 같이 쓰고, action 앞에 file 을 붙여 가른다.
    ====================================================================== */
 
-export const FILE_KINDS = ['설치', '패치', '스킨', '타겟', '기타'];
+export const FILE_KINDS = ['설치', '패치', '스킨', '타겟', '이미지', '기타'];
 
 const MAX_TITLE = 80;
 const MAX_NOTE = 500;

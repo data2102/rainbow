@@ -11,7 +11,7 @@ let acctLogs = [];          // 계정 로그
 let tMatches = [];          // 대회 경기 기록
 let posts = [];             // 게시판 글
 let files = [];             // 자료실 · 중요글 먼저, 그 다음 최신순 (서버가 맞춰 준다)
-let fileKinds = ['설치', '패치', '스킨', '타겟', '기타'];
+let fileKinds = ['설치', '패치', '스킨', '타겟', '이미지', '기타'];
 let fileMaxUpload = 3 * 1024 * 1024;   // 서버가 알려주는 값으로 덮인다
 let filePicked = null;                 // 지금 붙여둔 파일 {name, size, mime, data|null}
 let season = null;          // 진행 중인 시즌
@@ -228,7 +228,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 25;
+const APP_VERSION = 26;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
