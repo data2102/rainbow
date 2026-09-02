@@ -34,6 +34,7 @@ export default async function handler(req, res) {
       case 'setEmail': return await setEmail(req, res);
       case 'list':     return await list(req, res);
       case 'setRole':  return await setRole(req, res);
+      case 'setTeamInfo': return await setTeamInfo(req, res);
       case 'logs':     return await logs(req, res);
       default:         return res.status(400).json({ error: '알 수 없는 요청입니다.' });
     }
@@ -188,15 +189,72 @@ async function setEmail(req, res) {
 async function list(req, res) {
   const me = await requireAdmin(req, res);
   if (!me) return;
+  await ensureTeamCols();
   const rows = await q(
-    `SELECT handle, clan, email, role FROM players ORDER BY handle`
+    `SELECT handle, clan, email, role, grade, attend, playtime, position
+       FROM players ORDER BY handle`
   );
   res.status(200).json({
     accounts: rows.map(r => ({
       handle: r.handle, clan: r.clan, email: r.email, role: r.role || 'member',
+      grade: r.grade || '', attend: r.attend || '',
+      playtime: r.playtime || '', position: r.position || '',
     })),
     roles: ROLES.map(r => ({ value: r, label: ROLE_LABEL[r] })),
+    teamOptions: TEAM_OPTIONS,
   });
+}
+
+/**
+ * 팀을 나눌 때 쓰는 네 가지. 마스터가 회원마다 골라 둔다.
+ * 참석률에 D 가 없는 것은 오타가 아니라 정해준 그대로다.
+ */
+export const TEAM_OPTIONS = {
+  grade:    ['A', 'B', 'C', 'D', 'E'],
+  attend:   ['A', 'B', 'C', 'E'],
+  playtime: ['FULL TIME', 'FIRST TIME', 'MIDDLE TIME', 'LAST TIME'],
+  position: ['호스트', '베스트', '백업', '센서'],
+};
+
+let teamColsReady = false;
+async function ensureTeamCols() {
+  if (teamColsReady) return;
+  const has = await q(
+    `SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'players' AND column_name = 'grade'`
+  );
+  if (!has.length) {
+    await q(`ALTER TABLE players ADD COLUMN grade    TEXT,
+                                 ADD COLUMN attend   TEXT,
+                                 ADD COLUMN playtime TEXT,
+                                 ADD COLUMN position TEXT`);
+  }
+  teamColsReady = true;
+}
+
+/**
+ * 팀 나누기에 쓰는 값을 정한다. 마스터만 손댈 수 있다 —
+ * 등급은 사람을 줄 세우는 값이라 관리자 여럿이 고치면 서로 어긋난다.
+ */
+async function setTeamInfo(req, res) {
+  const actor = await currentUser(req);
+  if (!actor || actor.role !== 'master') {
+    return res.status(403).json({ error: '마스터만 팀 등급을 정할 수 있습니다.' });
+  }
+  await ensureTeamCols();
+
+  const { handle, field, value } = body(req);
+  if (!TEAM_OPTIONS[field]) return res.status(400).json({ error: '알 수 없는 항목입니다.' });
+  const v = String(value || '');
+  if (v && !TEAM_OPTIONS[field].includes(v)) {
+    return res.status(400).json({ error: '고를 수 없는 값입니다.' });
+  }
+  const rows = await q(
+    `UPDATE players SET ${field} = $1 WHERE handle = $2 RETURNING handle`,
+    [v || null, String(handle || '')]
+  );
+  if (!rows.length) return res.status(404).json({ error: '명단에 없는 선수입니다.' });
+  res.status(200).json({ ok: true });
 }
 
 /**

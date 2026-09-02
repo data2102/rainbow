@@ -228,7 +228,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 27;
+const APP_VERSION = 28;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -332,6 +332,7 @@ async function loadAccounts() {
   try {
     const d = await apiPost('/api/account', { action: 'list' });
     accounts = d.accounts || [];
+    if (d.teamOptions) teamOptions = d.teamOptions;
   } catch { accounts = []; }
   try {
     const d = await apiPost('/api/account', { action: 'logs' });
@@ -996,6 +997,7 @@ function renderAll() {
   renderPending();
   renderAccounts();
   renderAcctLogs();
+  renderTeamPanel();
   renderTournament();
   renderBoard();
   renderFiles();
@@ -2493,7 +2495,12 @@ function renderAccounts() {
   const list = accounts.filter(a =>
     !query || a.handle.toLowerCase().includes(query) || (a.clan || '').toLowerCase().includes(query));
 
-  tbody.innerHTML = list.map(a => {
+  const pages = Math.max(1, Math.ceil(list.length / ADMIN_PER_PAGE));
+  rolePage = Math.min(Math.max(1, rolePage), pages);
+  const from = (rolePage - 1) * ADMIN_PER_PAGE;
+  const shown = list.slice(from, from + ADMIN_PER_PAGE);
+
+  tbody.innerHTML = shown.map(a => {
     // 전적은 진행 중인 달의 명단(players)에서 가져온다
     const p = findPlayer(a.handle);
     return `<tr>
@@ -2509,9 +2516,11 @@ function renderAccounts() {
   </tr>`;
   }).join('') || `<tr><td colspan="6" class="log-empty">${query ? '검색 결과 없음' : '등록된 회원이 없습니다.'}</td></tr>`;
 
+  renderPager('rolePager', 'rpage', list.length, pages, rolePage, from, shown.length, '명');
+
   if (count) {
     count.textContent = query
-      ? `${accounts.length}명 중 ${list.length}명 표시`
+      ? `${accounts.length}명 중 ${list.length}명 찾음`
       : `등록된 회원 ${accounts.length}명`;
   }
 }
@@ -2611,13 +2620,282 @@ const ACCT_ACTION_LABEL = {
   restore_match: '취소 되돌림',
 };
 
+/* ---------- 관리자 표 쪽 넘김 ---------- */
+
+const ADMIN_PER_PAGE = 10;
+let rolePage = 1;
+let logPage = 1;
+let tmPage = 1;
+
+/**
+ * 쪽 넘김 줄 하나를 그린다. 기록·자료실이 쓰는 것과 같은 모양이고,
+ * 어느 표의 것인지는 data-<key> 로 가른다.
+ */
+function renderPager(boxId, key, total, pages, cur, from, shown, unit) {
+  const box = document.getElementById(boxId);
+  if (!box) return;
+  if (pages <= 1) { box.innerHTML = ''; box.style.display = 'none'; return; }
+  box.style.display = '';
+
+  const nums = pageNumbers(cur, pages).map(n =>
+    n === '…'
+      ? '<span class="pg-gap">…</span>'
+      : `<button type="button" class="pg${n === cur ? ' on' : ''}" data-${key}="${n}"
+           ${n === cur ? 'aria-current="page"' : ''}>${n}</button>`
+  ).join('');
+
+  box.innerHTML =
+    `<span class="pager-info">전체 ${total}${unit} 중 ${from + 1}–${from + shown}번째</span>`
+    + '<div class="pager-nav">'
+    + `<button type="button" class="pg" data-${key}="${cur - 1}"
+         ${cur === 1 ? 'disabled' : ''} aria-label="이전 쪽">‹</button>`
+    + nums
+    + `<button type="button" class="pg" data-${key}="${cur + 1}"
+         ${cur === pages ? 'disabled' : ''} aria-label="다음 쪽">›</button>`
+    + '</div>';
+}
+
+/** 쪽 단추를 눌렀을 때 해당 쪽으로 옮기고 다시 그린다. */
+function bindPager(boxId, key, set, redraw) {
+  const box = document.getElementById(boxId);
+  if (!box) return;
+  box.addEventListener('click', (e) => {
+    const btn = e.target.closest(`[data-${key}]`);
+    if (!btn || btn.disabled) return;
+    const n = Number(btn.dataset[key]);
+    if (!n) return;
+    set(n);
+    redraw();
+  });
+}
+
+/* ---------- 팀 편성하기 (마스터 전용) ---------- */
+
+/** api/account.js 의 TEAM_OPTIONS 와 같아야 한다. 서버가 준 값으로 덮인다. */
+let teamOptions = {
+  grade:    ['A', 'B', 'C', 'D', 'E'],
+  attend:   ['A', 'B', 'C', 'E'],
+  playtime: ['FULL TIME', 'FIRST TIME', 'MIDDLE TIME', 'LAST TIME'],
+  position: ['호스트', '베스트', '백업', '센서'],
+};
+const TEAM_FIELDS = [
+  ['grade', '등급'], ['attend', '참석률'],
+  ['playtime', '접속시간'], ['position', '포지션'],
+];
+/** 등급을 숫자로. A 가 가장 세다. 양 팀의 힘 합계를 맞추는 데 쓴다. */
+const GRADE_POWER = { A: 5, B: 4, C: 3, D: 2, E: 1 };
+
+let tmOut = new Set();      // 참가에서 뺀 사람 (기본은 모두 참가)
+let tmTeams = null;         // 마지막으로 짠 결과
+
+function tmList() {
+  const q = (document.getElementById('tmSearch') || {}).value || '';
+  const query = q.trim().toLowerCase();
+  return accounts.filter(a =>
+    !query || a.handle.toLowerCase().includes(query) || (a.clan || '').toLowerCase().includes(query));
+}
+
+function renderTeamPanel() {
+  const panel = document.getElementById('teamPanel');
+  if (!panel) return;
+  // 마스터가 아니면 판 자체를 보여주지 않는다
+  panel.style.display = isMaster() ? '' : 'none';
+  if (!isMaster()) return;
+
+  const tbody = document.querySelector('#tmTable tbody');
+  if (!tbody) return;
+
+  const list = tmList();
+  const pages = Math.max(1, Math.ceil(list.length / ADMIN_PER_PAGE));
+  tmPage = Math.min(Math.max(1, tmPage), pages);
+  const from = (tmPage - 1) * ADMIN_PER_PAGE;
+  const shown = list.slice(from, from + ADMIN_PER_PAGE);
+
+  const sel = (a, field) => {
+    const opts = teamOptions[field] || [];
+    return `<select data-tm-field="${field}" data-tm-who="${esc(a.handle)}">`
+      + `<option value="">-</option>`
+      + opts.map(o => `<option value="${esc(o)}"${a[field] === o ? ' selected' : ''}>${esc(o)}</option>`).join('')
+      + '</select>';
+  };
+
+  tbody.innerHTML = shown.map(a => `<tr class="${tmOut.has(a.handle) ? 'off' : ''}">
+    <td class="tm-ck"><input type="checkbox" data-tm-in="${esc(a.handle)}"
+        ${tmOut.has(a.handle) ? '' : 'checked'} aria-label="${esc(a.handle)} 참가"></td>
+    <td>${esc(a.handle)}${a.clan && a.clan !== '-' ? ` <span class="clan-tag">${esc(a.clan)}</span>` : ''}</td>
+    <td>${sel(a, 'grade')}</td>
+    <td>${sel(a, 'attend')}</td>
+    <td>${sel(a, 'playtime')}</td>
+    <td>${sel(a, 'position')}</td>
+  </tr>`).join('') || '<tr><td colspan="6" class="log-empty">회원이 없습니다.</td></tr>';
+
+  renderPager('tmPager', 'tpage', list.length, pages, tmPage, from, shown.length, '명');
+
+  const n = accounts.filter(a => !tmOut.has(a.handle)).length;
+  const cnt = document.getElementById('tmCount');
+  if (cnt) cnt.textContent = `참가 ${n}명`;
+
+  const make = document.getElementById('tmMake');
+  if (make) make.disabled = n < 2;
+  const note = document.getElementById('tmNote');
+  if (note) {
+    note.textContent = n < 2
+      ? '팀을 짜려면 두 명 이상 참가해야 합니다.'
+      : `참가 ${n}명을 ${Math.ceil(n / 2)} : ${Math.floor(n / 2)} 로 나눕니다 ·
+         등급 · 참석률 · 접속시간 · 포지션이 고르게 나뉘도록 여러 번 돌려 가장 고른 것을 고릅니다.`;
+  }
+  if (tmTeams) renderTeamResult();
+}
+
+/**
+ * 얼마나 치우쳤는지 매긴 점수. 낮을수록 고르다.
+ *
+ * 등급은 세기를 뜻하므로 사람 수뿐 아니라 힘의 합계도 본다 — A 하나와
+ * E 하나를 맞바꾸면 수는 같아도 팀 세기는 크게 달라진다.
+ * 호스트는 양 팀에 하나씩 있어야 게임이 서므로 무겁게 본다.
+ */
+function tmScore(a, b) {
+  let bad = 0;
+
+  const powA = a.reduce((s, p) => s + (GRADE_POWER[p.grade] || 0), 0);
+  const powB = b.reduce((s, p) => s + (GRADE_POWER[p.grade] || 0), 0);
+  bad += Math.abs(powA - powB) * 6;
+
+  for (const [field] of TEAM_FIELDS) {
+    for (const opt of (teamOptions[field] || [])) {
+      const na = a.filter(p => p[field] === opt).length;
+      const nb = b.filter(p => p[field] === opt).length;
+      const w = field === 'grade' ? 3 : (opt === '호스트' ? 5 : 1);
+      bad += Math.abs(na - nb) * w;
+    }
+  }
+  return bad;
+}
+
+/**
+ * 무작위로 나눈 뒤 가장 고른 것을 고른다.
+ *
+ * 규칙을 하나씩 맞춰 나가는 방법도 있지만, 네 가지를 한꺼번에 맞추려면
+ * 규칙끼리 서로 부딪친다. 여러 번 던져 가장 나은 것을 집는 편이 결과도
+ * 낫고 읽기도 쉽다. 스물몇 명이면 눈 깜짝할 새에 끝난다.
+ */
+function tmSplit(players) {
+  const TRIES = 600;
+  let best = null, bestScore = Infinity;
+
+  for (let t = 0; t < TRIES; t++) {
+    const pool = players.slice();
+    for (let i = pool.length - 1; i > 0; i--) {          // 피셔–예이츠
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    const half = Math.ceil(pool.length / 2);
+    const a = pool.slice(0, half);
+    const b = pool.slice(half);
+    const sc = tmScore(a, b);
+    if (sc < bestScore) { bestScore = sc; best = [a, b]; }
+    if (sc === 0) break;                                  // 더 고를 것이 없다
+  }
+  return { a: best[0], b: best[1], score: bestScore };
+}
+
+function makeTeams() {
+  const joined = accounts.filter(a => !tmOut.has(a.handle));
+  if (joined.length < 2) return;
+  tmTeams = tmSplit(joined);
+  renderTeamResult();
+  showToast(`${joined.length}명을 ${tmTeams.a.length} : ${tmTeams.b.length} 로 나눴습니다.`);
+}
+
+function renderTeamResult() {
+  const box = document.getElementById('tmResult');
+  if (!box || !tmTeams) return;
+
+  const one = (team, cls, name) => {
+    const pow = team.reduce((s, p) => s + (GRADE_POWER[p.grade] || 0), 0);
+    return `<div class="tm-team ${cls}">
+      <div class="tm-team-h">${name}<span class="tm-team-n">${team.length}명 · 세기 ${pow}</span></div>
+      <div class="tm-list">${team.map(p => `<div class="tm-p">
+        <span class="id">${esc(p.handle)}</span>
+        ${p.grade ? `<span class="g">${esc(p.grade)}</span>` : ''}
+        ${p.position ? `<span class="g${p.position === '호스트' ? ' host' : ''}">${esc(p.position)}</span>` : ''}
+        <span class="meta">${esc([p.playtime, p.attend && '참석 ' + p.attend].filter(Boolean).join(' · '))}</span>
+      </div>`).join('')}</div>
+    </div>`;
+  };
+
+  // 어느 항목이 몇 대 몇으로 나뉘었는지 그대로 보여준다 — 믿고 쓰려면 보여야 한다
+  const rows = TEAM_FIELDS.map(([field, label]) => {
+    const parts = (teamOptions[field] || []).map(opt => {
+      const na = tmTeams.a.filter(p => p[field] === opt).length;
+      const nb = tmTeams.b.filter(p => p[field] === opt).length;
+      return (na || nb) ? `${esc(opt)} ${na}:${nb}` : '';
+    }).filter(Boolean).join(' · ');
+    return parts ? `<div class="tm-bal-row"><b>${label}</b>${parts}</div>` : '';
+  }).join('');
+
+  box.innerHTML = `<div class="tm-teams">${one(tmTeams.a, 'a', 'A팀')}${one(tmTeams.b, 'b', 'B팀')}</div>`
+    + `<div class="tm-balance">
+         <div class="tm-bal-h">양 팀에 어떻게 나뉘었나 (A팀 : B팀)</div>${rows}
+       </div>`;
+}
+
+async function setTeamField(handle, field, value) {
+  const a = accounts.find(x => x.handle === handle);
+  if (a) a[field] = value;          // 먼저 화면에 반영한다
+  try {
+    await apiPost('/api/account', { action: 'setTeamInfo', handle, field, value });
+  } catch (e) {
+    showToast(e.message);
+    await loadAccounts();
+    renderTeamPanel();
+  }
+}
+
+function initAdminPagers() {
+  bindPager('rolePager', 'rpage', n => { rolePage = n; }, renderAccounts);
+  bindPager('acctLogPager', 'lpage', n => { logPage = n; }, renderAcctLogs);
+  bindPager('tmPager', 'tpage', n => { tmPage = n; }, renderTeamPanel);
+
+  const search = document.getElementById('tmSearch');
+  if (search) search.addEventListener('input', () => { tmPage = 1; renderTeamPanel(); });
+
+  const tbody = document.querySelector('#tmTable tbody');
+  if (tbody) {
+    tbody.addEventListener('change', (e) => {
+      const sel = e.target.closest('[data-tm-field]');
+      if (sel) { setTeamField(sel.dataset.tmWho, sel.dataset.tmField, sel.value); return; }
+      const ck = e.target.closest('[data-tm-in]');
+      if (ck) {
+        if (ck.checked) tmOut.delete(ck.dataset.tmIn); else tmOut.add(ck.dataset.tmIn);
+        renderTeamPanel();
+      }
+    });
+  }
+  const all = document.getElementById('tmAll');
+  if (all) all.addEventListener('click', () => { tmOut.clear(); renderTeamPanel(); });
+  const none = document.getElementById('tmNone');
+  if (none) none.addEventListener('click', () => {
+    tmOut = new Set(accounts.map(a => a.handle));
+    renderTeamPanel();
+  });
+  const make = document.getElementById('tmMake');
+  if (make) make.addEventListener('click', makeTeams);
+}
+
 function renderAcctLogs() {
   const tbody = document.querySelector('#acctLogTable tbody');
   const empty = document.getElementById('acctLogEmpty');
   if (!tbody || !empty) return;
 
   empty.style.display = acctLogs.length ? 'none' : 'block';
-  tbody.innerHTML = acctLogs.map(l => {
+
+  const pages = Math.max(1, Math.ceil(acctLogs.length / ADMIN_PER_PAGE));
+  logPage = Math.min(Math.max(1, logPage), pages);
+  const from = (logPage - 1) * ADMIN_PER_PAGE;
+  const shown = acctLogs.slice(from, from + ADMIN_PER_PAGE);
+
+  tbody.innerHTML = shown.map(l => {
     const d = l.detail || {};
     let target = d.handle || d.to || d.target || '-';
     let extra = '';
@@ -2646,6 +2924,8 @@ function renderAcctLogs() {
       <td class="h-by-cell" data-l="처리자">${esc(l.by || '-')}</td>
     </tr>`;
   }).join('');
+
+  renderPager('acctLogPager', 'lpage', acctLogs.length, pages, logPage, from, shown.length, '건');
 }
 
 async function setRole(handle, role) {
@@ -2665,7 +2945,8 @@ async function setRole(handle, role) {
 
 function initAccountEvents() {
   const search = document.getElementById('roleSearch');
-  if (search) search.addEventListener('input', renderAccounts);
+  // 검색어를 바꾸면 첫 쪽부터 — 3쪽에 서 있다가 검색하면 빈 화면이 뜬다
+  if (search) search.addEventListener('input', () => { rolePage = 1; renderAccounts(); });
 
   const table = document.getElementById('roleTable');
   if (table) {
@@ -4233,6 +4514,7 @@ async function boot() {
   initMonthPickers();
   initHistoryPager();
   initFileEvents();
+  initAdminPagers();
   renderAuthBar();
   try {
     // 방 창은 들어가기를 먼저 띄워두고 확인과 나란히 기다린다
