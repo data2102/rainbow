@@ -212,7 +212,7 @@ async function list(req, res) {
 export const TEAM_OPTIONS = {
   grade:    ['A', 'B', 'C', 'D', 'E'],
   attend:   ['A', 'B', 'C', 'E'],
-  playtime: ['FULL TIME', 'FIRST TIME', 'MIDDLE TIME', 'LAST TIME'],
+  playtime: ['8~9시', '9~10시', '10~11시', '11~12시', '가끔 접속'],
   position: ['호스트', '베스트', '백업', '센서'],
 };
 
@@ -229,6 +229,14 @@ async function ensureTeamCols() {
                                  ADD COLUMN playtime TEXT,
                                  ADD COLUMN position TEXT`);
   }
+  // 접속시간의 값이 FULL TIME 같은 옛 이름에서 시간대로 바뀌었다.
+  // 이제 고를 수 없는 값이 남아 있으면 비워, 다시 고르도록 한다.
+  // 지금 쓰는 값은 건드리지 않으므로 몇 번을 돌려도 같다.
+  await q(
+    `UPDATE players SET playtime = NULL
+      WHERE playtime IS NOT NULL AND playtime <> ALL($1)`,
+    [TEAM_OPTIONS.playtime]
+  );
   teamColsReady = true;
 }
 

@@ -3289,7 +3289,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 30;
+const APP_VERSION = 31;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -5736,7 +5736,7 @@ function bindPager(boxId, key, set, redraw) {
 let teamOptions = {
   grade:    ['A', 'B', 'C', 'D', 'E'],
   attend:   ['A', 'B', 'C', 'E'],
-  playtime: ['FULL TIME', 'FIRST TIME', 'MIDDLE TIME', 'LAST TIME'],
+  playtime: ['8~9시', '9~10시', '10~11시', '11~12시', '가끔 접속'],
   position: ['호스트', '베스트', '백업', '센서'],
 };
 const TEAM_FIELDS = [
@@ -5755,7 +5755,7 @@ let tmSort = { key: 'handle', dir: 1 };
 /**
  * 줄 세울 때 쓰는 값.
  * 등급 같은 항목은 글자 순이 아니라 고르는 칸에 적힌 순서를 따른다 —
- * FIRST TIME 이 FULL TIME 보다 앞에 오면 읽는 사람이 헷갈린다.
+ * 접속시간을 글자 순으로 세우면 10~11시가 8~9시보다 앞에 온다.
  * 아직 안 고른 사람은 어느 쪽으로 세우든 늘 뒤로 보낸다.
  */
 function tmSortValue(a, key) {
