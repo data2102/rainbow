@@ -239,7 +239,14 @@ html,body{
   line-height:var(--lh-body);
   -webkit-font-smoothing:antialiased;
 }
-body{ padding:var(--sp-6) var(--sp-4) var(--sp-12); }
+body{
+  padding:var(--sp-6) var(--sp-4) var(--sp-12);
+  /* 한글은 기본값이면 아무 글자 사이에서나 줄이 바뀐다 — "1명" 이 "1" 과 "명"
+     으로 갈라져 다음 줄로 넘어간다. 띄어쓰기에서만 넘기도록 바꾼다.
+     대신 한 낱말이 칸보다 길면 그때는 잘라서라도 넣는다 (break-word). */
+  word-break:keep-all;
+  overflow-wrap:break-word;
+}
 #app{
   max-width:1280px; margin:0 auto;          /* 왼쪽 메뉴 180px + 내용 1080px */
   /* 내용이 짧아도 왼쪽 메뉴가 화면 끝까지 내려오도록 바닥을 잡아둔다.
