@@ -483,6 +483,41 @@ tbody tr:hover td{ background:var(--surface-sunken); }
 }
 .fl-row textarea{ resize:vertical; }
 .fl-narrow{ max-width:160px; }
+
+/* 파일 붙이는 칸 — 끌어다 놓거나 눌러서 고른다 */
+.fl-drop{
+  border:1.5px dashed var(--border-strong); border-radius:var(--radius-md);
+  background:var(--surface); padding:var(--sp-5) var(--sp-4);
+  text-align:center; cursor:pointer;
+  transition:border-color var(--dur-fast) var(--ease-standard),
+             background var(--dur-fast) var(--ease-standard);
+}
+.fl-drop:hover, .fl-drop:focus-visible{ border-color:var(--accent); outline:none; }
+.fl-drop.over{ border-color:var(--accent); background:var(--accent-bg); }
+/* 바로 아래 b 만 한 줄을 차지한다. 안내 문장 안의 b 까지 블록이 되면
+   "3 MB" 한 조각마다 줄이 바뀐다. */
+.fl-drop-in > b{ display:block; font-size:var(--fs-caption); color:var(--text-primary); }
+.fl-drop-in > span{ display:block; font-size:var(--fs-footnote); color:var(--text-tertiary); margin-top:2px; }
+.fl-drop-in > span b{ color:var(--text-secondary); font-weight:var(--fw-bold); }
+.fl-pick{ color:var(--accent); font-weight:var(--fw-bold); text-decoration:underline; }
+.fl-picked[hidden]{ display:none; }   /* 클래스의 display 가 hidden 을 이겨버린다 */
+.fl-picked{
+  display:flex; align-items:center; gap:var(--sp-3); flex-wrap:wrap;
+  margin-top:var(--sp-3); padding:var(--sp-3) var(--sp-4);
+  border-radius:var(--radius-md); background:var(--surface-sunken);
+  border:1px solid var(--border); font-size:var(--fs-caption);
+}
+.fl-picked .nm{ color:var(--text-primary); font-weight:var(--fw-medium); word-break:break-all; }
+.fl-picked .sz{ color:var(--text-secondary); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.fl-picked .tag{
+  font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+  padding:2px var(--sp-2); border-radius:var(--radius-sm);
+  background:var(--success-bg); color:var(--success-strong); white-space:nowrap;
+}
+.fl-picked .tag.big{ background:var(--warning-bg); color:var(--warning-strong); }
+.fl-picked .drop-x{ margin-left:auto; }
+.fl-hint{ font-size:var(--fs-footnote); color:var(--text-tertiary); margin-top:var(--sp-2); }
+.fl-hint.warn{ color:var(--warning-strong); }
 .fl-check{ display:flex; align-items:center; gap:var(--sp-2); font-size:var(--fs-caption); color:var(--text-secondary); cursor:pointer; }
 .fl-check input{ width:16px; height:16px; accent-color:var(--accent); cursor:pointer; flex:none; }
 .fl-actions{ display:flex; align-items:center; gap:var(--sp-2); flex-wrap:wrap; }
@@ -2592,7 +2627,8 @@ if (/[?&]room=\d+/.test(location.search)) {
       </div>
       <div class="foot-note" style="margin-top:0;margin-bottom:14px;">
         설치 파일 · 패치 · 스킨 · 타겟을 한자리에 모읍니다 ·
-        파일은 <b>구글 드라이브 · MEGA 같은 곳에 올려두고 받는 주소를 적어주세요</b> ·
+        <b>3MB 이하 파일은 여기에 바로 담기고</b>, 그보다 큰 설치 파일은
+        구글 드라이브 · MEGA 같은 곳에 올린 뒤 받는 주소를 적어주세요 ·
         올리는 것은 로그인한 회원 누구나, 지우는 것은 올린 사람과 관리자만 할 수 있습니다.
       </div>
 
@@ -2612,12 +2648,27 @@ if (/[?&]room=\d+/.test(location.search)) {
           <input type="text" id="fileTitle" maxlength="80" placeholder="예) 레인보우식스 1998 설치파일 (한글)">
         </div>
         <div class="fl-row">
-          <label class="fl-lab" for="fileUrl">받는 곳</label>
-          <input type="url" id="fileUrl" maxlength="2000" placeholder="https://drive.google.com/... (없으면 비워두세요)">
+          <span class="fl-lab">파일</span>
+          <div>
+            <div class="fl-drop" id="fileDrop" tabindex="0" role="button"
+                 aria-label="파일을 끌어다 놓거나 눌러서 고르기">
+              <div class="fl-drop-in" id="fileDropIn">
+                <b>파일을 여기로 끌어다 놓으세요</b>
+                <span>또는 <span class="fl-pick">첨부하기</span>를 눌러 고르세요 ·
+                      <b id="fileMaxNote">3MB</b> 까지 사이트에 바로 담깁니다</span>
+              </div>
+            </div>
+            <input type="file" id="filePick" hidden>
+            <div class="fl-picked" id="filePicked" hidden></div>
+          </div>
         </div>
         <div class="fl-row">
-          <label class="fl-lab" for="fileSize">용량</label>
-          <input type="text" id="fileSize" maxlength="20" placeholder="예) 1.2 GB" class="fl-narrow">
+          <label class="fl-lab" for="fileUrl">받는 곳</label>
+          <div>
+            <input type="url" id="fileUrl" maxlength="2000"
+                   placeholder="https://drive.google.com/... (파일을 담았으면 비워두세요)">
+            <div class="fl-hint" id="fileUrlHint"></div>
+          </div>
         </div>
         <div class="fl-row">
           <label class="fl-lab" for="fileNote">설명</label>

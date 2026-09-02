@@ -84,7 +84,12 @@ export default async function handler(req, res) {
   try {
     await ensureTable();
     await ensureFileTable();
-    if (req.method === 'GET') return await listAll(res);
+    if (req.method === 'GET') {
+      // 사이트에 담아둔 파일 내려주기. 함수를 더 만들 수 없어 이 주소를 같이 쓴다.
+      const dl = req.query && req.query.download;
+      if (dl) return await sendBlob(req, res, dl);
+      return await listAll(res);
+    }
 
     const { action } = body(req);
     if (action === 'fileCreate') return await fileCreate(req, res);
@@ -102,6 +107,34 @@ export default async function handler(req, res) {
   } catch (e) {
     res.status(500).json({ error: '처리 실패: ' + e.message });
   }
+}
+
+/**
+ * 사이트에 담아둔 파일을 그대로 내려준다.
+ * 받아간 횟수는 여기서 올린다 — 화면이 따로 세면 실패한 내려받기까지 세어진다.
+ */
+async function sendBlob(req, res, idRaw) {
+  const id = Number(idRaw);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: '자료를 찾을 수 없습니다.' });
+
+  const rows = await q(
+    `SELECT f.filename, f.mime, f.title, b.data
+       FROM files f JOIN file_blobs b ON b.file_id = f.id
+      WHERE f.id = $1`, [id]
+  );
+  if (!rows.length) return res.status(404).json({ error: '담아둔 파일이 없습니다.' });
+
+  const r = rows[0];
+  await q(`UPDATE files SET downloads = downloads + 1 WHERE id = $1`, [id]);
+
+  // 이름에 따옴표나 줄바꿈이 섞이면 머리글이 깨진다. 한글 이름은 UTF-8 로 따로 적는다.
+  const name = String(r.filename || r.title || `file-${id}`).replace(/[\r\n"]/g, '_');
+  res.setHeader('Content-Type', r.mime || 'application/octet-stream');
+  res.setHeader('Content-Length', r.data.length);
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Content-Disposition',
+    `attachment; filename="file-${id}"; filename*=UTF-8''${encodeURIComponent(name)}`);
+  res.status(200).send(r.data);
 }
 
 /** 게시판 글과 자료실을 한 번에. 화면은 두 곳 다 첫 화면에서 쓴다. */
@@ -278,6 +311,14 @@ const MAX_NOTE = 500;
 const MAX_URL = 2000;
 const MAX_SIZE_TEXT = 20;
 
+/**
+ * 사이트에 바로 담을 수 있는 크기.
+ * Vercel 은 요청 한 번에 4.5MB 까지만 실어 나르는데, 파일을 글자로 바꿔
+ * 보내면 3분의 4로 불어난다. 3MB 면 바뀐 뒤에도 4MB 남짓이라 안전하다.
+ * 이보다 큰 파일은 구글 드라이브 같은 곳에 두고 주소만 적는다.
+ */
+export const MAX_UPLOAD = 3 * 1024 * 1024;
+
 let filesEnsured = false;
 async function ensureFileTable() {
   if (filesEnsured) return;
@@ -298,6 +339,25 @@ async function ensureFileTable() {
   // 중요글이 맨 앞, 그 다음이 최신순 — 목록이 뽑히는 순서 그대로 색인을 건다
   await q(`CREATE INDEX IF NOT EXISTS idx_files_order
              ON files (pinned DESC, created_at DESC)`);
+
+  // 붙인 파일의 이름·종류·크기. 크기는 브라우저가 재서 보내주므로
+  // 올린 사람이 손으로 적을 일이 없다.
+  const has = await q(
+    `SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'files' AND column_name = 'bytes'`
+  );
+  if (!has.length) {
+    await q(`ALTER TABLE files ADD COLUMN filename TEXT,
+                                ADD COLUMN mime     TEXT,
+                                ADD COLUMN bytes    BIGINT`);
+  }
+
+  // 파일 내용은 따로 담는다. 목록을 뽑을 때마다 수십 MB 를 같이 끌어오면 안 된다.
+  await q(`
+    CREATE TABLE IF NOT EXISTS file_blobs (
+      file_id BIGINT PRIMARY KEY REFERENCES files(id) ON DELETE CASCADE,
+      data    BYTEA NOT NULL
+    )`);
   filesEnsured = true;
 }
 
@@ -314,6 +374,9 @@ function rowToFile(r) {
     note: r.note || '',
     url: r.url || '',
     sizeText: r.size_text || '',
+    filename: r.filename || '',
+    bytes: r.bytes == null ? null : Number(r.bytes),
+    hasBlob: !!r.has_blob,
     pinned: !!r.pinned,
     downloads: Number(r.downloads || 0),
     author: r.author,
@@ -338,7 +401,19 @@ function readFields(req) {
   const note = String(b.note || '').trim();
   const sizeText = String(b.sizeText || '').trim().slice(0, MAX_SIZE_TEXT);
   const url = cleanUrl(b.url);
-  return { title, kind, note, sizeText, url, pinned: !!b.pinned };
+
+  // 붙인 파일. data 가 있으면 사이트에 담고, 없으면 크기만 적어둔다
+  // (너무 큰 파일은 브라우저가 크기만 재서 보낸다).
+  const filename = String(b.filename || '').trim().slice(0, 200);
+  const mime = String(b.mime || '').trim().slice(0, 120);
+  const bytes = Number.isFinite(Number(b.bytes)) && Number(b.bytes) > 0
+    ? Math.floor(Number(b.bytes)) : null;
+  let data = null;
+  if (typeof b.data === 'string' && b.data) {
+    try { data = Buffer.from(b.data, 'base64'); } catch { data = null; }
+  }
+  return { title, kind, note, sizeText, url, pinned: !!b.pinned,
+           filename, mime, bytes, data, dropBlob: b.dropBlob === true };
 }
 
 function checkFields(f) {
@@ -346,7 +421,23 @@ function checkFields(f) {
   if (f.title.length > MAX_TITLE) return `제목은 ${MAX_TITLE}자 이내로 입력해주세요.`;
   if (f.note.length > MAX_NOTE) return `설명은 ${MAX_NOTE}자 이내로 입력해주세요.`;
   if (f.url === null) return '받는 곳 주소는 http:// 또는 https:// 로 시작해야 합니다.';
+  if (f.data && f.data.length > MAX_UPLOAD) {
+    return `사이트에 바로 담을 수 있는 파일은 ${Math.floor(MAX_UPLOAD / 1024 / 1024)}MB 까지입니다.`;
+  }
   return null;
+}
+
+/** 파일 내용을 담거나 지운다. 한 자료에 파일은 하나다. */
+async function putBlob(id, f) {
+  if (f.data) {
+    await q(
+      `INSERT INTO file_blobs (file_id, data) VALUES ($1,$2)
+       ON CONFLICT (file_id) DO UPDATE SET data = EXCLUDED.data`,
+      [id, f.data]
+    );
+  } else if (f.dropBlob) {
+    await q(`DELETE FROM file_blobs WHERE file_id = $1`, [id]);
+  }
 }
 
 /**
@@ -354,8 +445,15 @@ function checkFields(f) {
  * 나누는 일은 화면이 하므로 여기서는 순서만 맞춰 통째로 준다.
  */
 async function fileList() {
-  const rows = await q(`SELECT * FROM files ORDER BY pinned DESC, created_at DESC`);
-  return { files: rows.map(rowToFile), kinds: FILE_KINDS };
+  // data 는 뽑지 않는다 — 목록 한 번에 수십 MB 를 끌어오면 화면이 서지 않는다
+  const rows = await q(
+    `SELECT f.id, f.kind, f.title, f.note, f.url, f.size_text, f.filename, f.mime,
+            f.bytes, f.pinned, f.downloads, f.author, f.created_at, f.updated_at,
+            (b.file_id IS NOT NULL) AS has_blob
+       FROM files f LEFT JOIN file_blobs b ON b.file_id = f.id
+      ORDER BY f.pinned DESC, f.created_at DESC`
+  );
+  return { files: rows.map(rowToFile), kinds: FILE_KINDS, maxUpload: MAX_UPLOAD };
 }
 
 async function fileCreate(req, res) {
@@ -366,12 +464,16 @@ async function fileCreate(req, res) {
   const bad = checkFields(f);
   if (bad) return res.status(400).json({ error: bad });
 
+  const bytes = f.data ? f.data.length : f.bytes;
   const rows = await q(
-    `INSERT INTO files (kind, title, note, url, size_text, pinned, author, created_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-    [f.kind, f.title, f.note, f.url || null, f.sizeText || null, f.pinned, me, Date.now()]
+    `INSERT INTO files (kind, title, note, url, size_text, pinned, author, created_at,
+                        filename, mime, bytes)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
+    [f.kind, f.title, f.note, f.url || null, f.sizeText || null, f.pinned, me, Date.now(),
+     f.filename || null, f.mime || null, bytes]
   );
-  res.status(200).json({ ok: true, file: rowToFile(rows[0]) });
+  await putBlob(rows[0].id, f);
+  res.status(200).json({ ok: true, id: Number(rows[0].id) });
 }
 
 /** 글을 찾고 권한을 확인한다. 고치는 것도 지우는 것도 올린 사람과 관리자만. */
@@ -405,12 +507,18 @@ async function fileUpdate(req, res) {
   const bad = checkFields(f);
   if (bad) return res.status(400).json({ error: bad });
 
-  const rows = await q(
-    `UPDATE files SET kind=$1, title=$2, note=$3, url=$4, size_text=$5, pinned=$6, updated_at=$7
-      WHERE id=$8 RETURNING *`,
-    [f.kind, f.title, f.note, f.url || null, f.sizeText || null, f.pinned, Date.now(), found.row.id]
+  // 새 파일을 붙이지 않았으면 이미 담아둔 크기를 그대로 둔다
+  const bytes = f.data ? f.data.length : (f.bytes != null ? f.bytes : found.row.bytes);
+  await q(
+    `UPDATE files SET kind=$1, title=$2, note=$3, url=$4, size_text=$5, pinned=$6,
+            updated_at=$7, filename=$8, mime=$9, bytes=$10
+      WHERE id=$11`,
+    [f.kind, f.title, f.note, f.url || null, f.sizeText || null, f.pinned, Date.now(),
+     f.filename || found.row.filename || null, f.mime || found.row.mime || null,
+     f.dropBlob && !f.data ? (f.bytes ?? null) : bytes, found.row.id]
   );
-  res.status(200).json({ ok: true, file: rowToFile(rows[0]) });
+  await putBlob(found.row.id, f);
+  res.status(200).json({ ok: true, id: Number(found.row.id) });
 }
 
 async function fileRemove(req, res) {

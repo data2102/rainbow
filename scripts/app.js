@@ -12,6 +12,8 @@ let tMatches = [];          // 대회 경기 기록
 let posts = [];             // 게시판 글
 let files = [];             // 자료실 · 중요글 먼저, 그 다음 최신순 (서버가 맞춰 준다)
 let fileKinds = ['설치', '패치', '스킨', '타겟', '기타'];
+let fileMaxUpload = 3 * 1024 * 1024;   // 서버가 알려주는 값으로 덮인다
+let filePicked = null;                 // 지금 붙여둔 파일 {name, size, mime, data|null}
 let season = null;          // 진행 중인 시즌
 let seasons = [];           // 시즌 목록(진행 중 + 마감)
 let viewSeasonId = null;    // 화면에서 보고 있는 달. null 이면 진행 중인 달
@@ -226,7 +228,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 23;
+const APP_VERSION = 24;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -319,6 +321,7 @@ async function loadPosts() {
     posts = d.posts || [];
     files = d.files || [];
     if (Array.isArray(d.kinds) && d.kinds.length) fileKinds = d.kinds;
+    if (Number(d.maxUpload) > 0) fileMaxUpload = Number(d.maxUpload);
   } catch { posts = []; files = []; }
 }
 const loadFiles = loadPosts;
@@ -1026,6 +1029,21 @@ function renderFileKinds() {
   }).join('');
 }
 
+/** 1258291 → "1.2 MB". 올린 사람이 손으로 적지 않도록 브라우저가 잰 값을 쓴다. */
+function fmtBytes(n) {
+  if (!Number.isFinite(n) || n <= 0) return '';
+  if (n < 1024) return n + ' B';
+  const u = ['KB', 'MB', 'GB', 'TB'];
+  let v = n / 1024, i = 0;
+  while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+  return (v >= 100 ? Math.round(v) : v.toFixed(1).replace(/\.0$/, '')) + ' ' + u[i];
+}
+
+/** 목록에 보일 용량. 잰 값이 있으면 그것을, 없으면 손으로 적은 글자를 쓴다. */
+function fileSizeLabel(f) {
+  return fmtBytes(f.bytes) || f.sizeText || '';
+}
+
 const CLIP_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
   + ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
   + '<path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19'
@@ -1068,13 +1086,16 @@ function renderFiles() {
     const when = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 
     const kindCls = (f.kind === '설치') ? '' : ' k2';
-    const get = f.url
-      ? `<a class="fl-get" href="${esc(f.url)}" target="_blank" rel="noopener noreferrer"
-           data-hit="${f.id}">받기</a>`
-      : '';
+    // 사이트에 담아둔 파일이면 사이트에서 바로 내려준다 (횟수는 서버가 센다)
+    const get = f.hasBlob
+      ? `<a class="fl-get" href="/api/post?download=${f.id}">받기</a>`
+      : (f.url
+        ? `<a class="fl-get" href="${esc(f.url)}" target="_blank" rel="noopener noreferrer"
+             data-hit="${f.id}">받기</a>`
+        : '');
     const own = canManage
       ? `<div class="fl-own">
-           <button class="btn-mini btn-edit" data-file-edit="${f.id}">고치기</button>
+           <button class="btn-mini btn-edit" data-file-edit="${f.id}">수정</button>
            <button class="btn-mini btn-reject" data-file-del="${f.id}">삭제</button>
          </div>`
       : '';
@@ -1085,10 +1106,12 @@ function renderFiles() {
         ${f.pinned ? '<span class="fl-pin">중요</span>' : ''}<span class="fl-t">${esc(f.title)}</span>${get}
         ${f.note ? `<span class="fl-note">${esc(f.note)}</span>` : ''}
       </td>
-      <td class="fl-clip" data-l="첨부">${f.url
-        ? `<span title="첨부파일 있음" aria-label="첨부파일 있음">${CLIP_SVG}</span>`
+      <td class="fl-clip" data-l="첨부">${(f.hasBlob || f.url)
+        ? `<span title="${f.hasBlob ? '사이트에 담긴 파일' : '바깥 주소로 받는 파일'}"
+             aria-label="첨부파일 있음">${CLIP_SVG}</span>`
         : '<span class="fl-none" aria-label="첨부파일 없음">-</span>'}</td>
-      <td class="fl-size" data-l="용량">${f.sizeText ? esc(f.sizeText) : '<span class="fl-none">-</span>'}</td>
+      <td class="fl-size" data-l="용량">${fileSizeLabel(f)
+        ? esc(fileSizeLabel(f)) : '<span class="fl-none">-</span>'}</td>
       <td class="fl-hit" data-l="다운로드">${f.downloads}</td>
       <td class="fl-by" data-l="올린이">${esc(f.author)}
         <span class="fl-note fl-when">${when}</span>${own}</td>
@@ -1140,11 +1163,18 @@ function openFileForm(f) {
   document.getElementById('fileKind').value = f ? f.kind : fileKinds[0];
   document.getElementById('fileTitle').value = f ? f.title : '';
   document.getElementById('fileUrl').value = f ? f.url : '';
-  document.getElementById('fileSize').value = f ? f.sizeText : '';
   document.getElementById('fileNote').value = f ? f.note : '';
   document.getElementById('filePinned').checked = f ? f.pinned : false;
   document.getElementById('fileErr').textContent = '';
-  document.getElementById('fileSave').textContent = f ? '고치기' : '올리기';
+  document.getElementById('fileSave').textContent = f ? '수정' : '올리기';
+  document.getElementById('fileMaxNote').textContent = fmtBytes(fileMaxUpload);
+
+  // 고칠 때는 이미 담아둔 파일을 그대로 보여준다 — 다시 붙이지 않아도 된다
+  filePicked = (f && (f.hasBlob || f.bytes))
+    ? { name: f.filename || f.title, size: f.bytes || 0, mime: '', data: null, kept: true }
+    : null;
+  renderPicked();
+
   form.style.display = 'grid';
   document.getElementById('fileTitle').focus();
 }
@@ -1153,6 +1183,72 @@ function closeFileForm() {
   const form = document.getElementById('fileForm');
   if (form) form.style.display = 'none';
   fileEditId = null;
+  filePicked = null;
+  const pick = document.getElementById('filePick');
+  if (pick) pick.value = '';
+  renderPicked();
+}
+
+/** 붙여둔 파일 한 줄. 담을 수 있는 크기인지도 여기서 알려준다. */
+function renderPicked() {
+  const box = document.getElementById('filePicked');
+  const hint = document.getElementById('fileUrlHint');
+  if (!box) return;
+
+  if (!filePicked) {
+    box.hidden = true; box.innerHTML = '';
+    if (hint) { hint.className = 'fl-hint'; hint.textContent = ''; }
+    return;
+  }
+  const big = filePicked.size > fileMaxUpload;
+  box.hidden = false;
+  box.innerHTML =
+    `<span class="nm">${esc(filePicked.name)}</span>`
+    + `<span class="sz">${esc(fmtBytes(filePicked.size) || '크기 모름')}</span>`
+    + (filePicked.kept
+        ? '<span class="tag">사이트에 담김</span>'
+        : `<span class="tag${big ? ' big' : ''}">${big ? '너무 큼 · 주소로' : '사이트에 담김'}</span>`)
+    + '<button type="button" class="btn-mini btn-reject drop-x" id="filePickX">빼기</button>';
+
+  if (hint) {
+    if (big) {
+      hint.className = 'fl-hint warn';
+      hint.textContent = `이 파일은 ${fmtBytes(fileMaxUpload)} 보다 커서 사이트에 담을 수 없습니다 · `
+        + '구글 드라이브 같은 곳에 올린 뒤 받는 주소를 적어주세요 (용량은 이미 적어뒀습니다).';
+    } else {
+      hint.className = 'fl-hint';
+      hint.textContent = '사이트에 담기므로 받는 곳은 비워두셔도 됩니다.';
+    }
+  }
+}
+
+/**
+ * 고른 파일을 받아 든다.
+ * 담을 수 있는 크기면 내용까지 읽고, 크면 이름과 크기만 적어둔다 —
+ * 크기를 재려고 올릴 필요는 없다.
+ */
+function takeFile(file) {
+  if (!file) return;
+  filePicked = { name: file.name, size: file.size, mime: file.type || '', data: null };
+
+  const title = document.getElementById('fileTitle');
+  if (title && !title.value.trim()) title.value = file.name;
+
+  if (file.size > fileMaxUpload) { renderPicked(); return; }
+
+  const rd = new FileReader();
+  rd.onload = () => {
+    const s = String(rd.result || '');
+    filePicked.data = s.slice(s.indexOf(',') + 1);   // data:...;base64, 뒤만
+    renderPicked();
+  };
+  rd.onerror = () => {
+    document.getElementById('fileErr').textContent = '파일을 읽지 못했습니다.';
+    filePicked = null;
+    renderPicked();
+  };
+  rd.readAsDataURL(file);
+  renderPicked();
 }
 
 async function saveFile() {
@@ -1163,14 +1259,29 @@ async function saveFile() {
     kind: document.getElementById('fileKind').value,
     title: document.getElementById('fileTitle').value.trim(),
     url: document.getElementById('fileUrl').value.trim(),
-    sizeText: document.getElementById('fileSize').value.trim(),
     note: document.getElementById('fileNote').value.trim(),
     pinned: document.getElementById('filePinned').checked,
   };
+  if (filePicked) {
+    payload.filename = filePicked.name;
+    payload.bytes = filePicked.size;
+    if (filePicked.data) { payload.mime = filePicked.mime; payload.data = filePicked.data; }
+  } else {
+    payload.dropBlob = true;   // 붙였던 파일을 뺐다면 담아둔 것도 지운다
+  }
+
   if (!payload.title) { err.textContent = '제목을 입력해주세요.'; return; }
+  // 담지도 않고 받을 곳도 없으면 아무도 받아갈 수 없다
+  const stored = !!(filePicked && (filePicked.data || filePicked.kept));
+  if (!stored && !payload.url) {
+    err.textContent = '파일을 붙이거나, 받는 곳 주소를 적어주세요.';
+    return;
+  }
 
   const btn = document.getElementById('fileSave');
+  const was = btn.textContent;
   btn.disabled = true;
+  if (payload.data) btn.textContent = '올리는 중…';
   try {
     await apiPost('/api/post', payload);
     await loadFiles();
@@ -1183,6 +1294,7 @@ async function saveFile() {
     err.textContent = e.message;
   } finally {
     btn.disabled = false;
+    btn.textContent = was;
   }
 }
 
@@ -1228,6 +1340,37 @@ function initFileEvents() {
 
   const cancel = document.getElementById('fileCancel');
   if (cancel) cancel.addEventListener('click', closeFileForm);
+
+  const drop = document.getElementById('fileDrop');
+  const pick = document.getElementById('filePick');
+  if (drop && pick) {
+    drop.addEventListener('click', () => pick.click());
+    drop.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick.click(); }
+    });
+    pick.addEventListener('change', () => takeFile(pick.files && pick.files[0]));
+
+    // 끌어다 놓기. 판 위에서 놓지 않으면 브라우저가 그 파일을 열어버리므로 다 막는다.
+    for (const type of ['dragenter', 'dragover']) {
+      drop.addEventListener(type, (e) => { e.preventDefault(); drop.classList.add('over'); });
+    }
+    for (const type of ['dragleave', 'dragend']) {
+      drop.addEventListener(type, () => drop.classList.remove('over'));
+    }
+    drop.addEventListener('drop', (e) => {
+      e.preventDefault();
+      drop.classList.remove('over');
+      const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      takeFile(f);
+    });
+  }
+  const picked = document.getElementById('filePicked');
+  if (picked) picked.addEventListener('click', (e) => {
+    if (!e.target.closest('#filePickX')) return;
+    filePicked = null;
+    if (pick) pick.value = '';
+    renderPicked();
+  });
 
   const form = document.getElementById('fileForm');
   if (form) form.addEventListener('submit', (e) => { e.preventDefault(); saveFile(); });
