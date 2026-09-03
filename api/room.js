@@ -28,7 +28,7 @@ export const MAX_TITLE = 24;
 export const PING_VERSION = 3;
 
 /** 사이트가 바뀌었는지 브라우저가 알아채는 표. 배포할 때마다 올린다. */
-export const APP_VERSION = 43;
+export const APP_VERSION = 44;
 
 /** 이 시간 동안 아무 신호가 없으면 나간 것으로 본다 (브라우저를 그냥 닫는 경우) */
 const IDLE_MS = 3 * 60 * 1000;
@@ -202,15 +202,20 @@ async function lobbyList() {
 
 /** 아무도 없는 방은 대화와 실행 상태를 지운다. 다음 사람이 빈 방에서 시작하도록. */
 async function closeEmptyRooms() {
+  // 대화를 지우는 일과 방 상태를 푸는 일은 같은 조건을 본다. 두 번 오갈
+  // 이유가 없어 한 문장으로 보낸다.
   await q(`
-    DELETE FROM room_messages
-     WHERE room <> $1 AND room NOT IN (SELECT DISTINCT room FROM room_members)`, [LOBBY]);
-  // 정원도 함께 푼다 — 다음에 방을 여는 사람이 자기 인원에 맞춰 다시 정한다
-  await q(`
+    WITH dead AS (
+      SELECT room FROM room_state
+       WHERE room <> $1 AND room NOT IN (SELECT DISTINCT room FROM room_members)
+    ), swept AS (
+      DELETE FROM room_messages WHERE room IN (SELECT room FROM dead)
+    )
+    -- 정원도 함께 푼다 — 다음에 방을 여는 사람이 자기 인원에 맞춰 다시 정한다
     UPDATE room_state
-        SET running = false, started_at = NULL, started_by = NULL, address = NULL,
-            cap = NULL, title = NULL
-     WHERE room <> $1 AND room NOT IN (SELECT DISTINCT room FROM room_members)`, [LOBBY]);
+       SET running = false, started_at = NULL, started_by = NULL, address = NULL,
+           cap = NULL, title = NULL
+     WHERE room IN (SELECT room FROM dead)`, [LOBBY]);
 }
 
 /** 대화 한 줄을 담고, 그 방에 남길 만큼만 남긴다. */
@@ -296,17 +301,24 @@ async function snapshot(req, me, withAccount = false) {
 
   // 서로를 기다릴 이유가 없는 것들이라 함께 보낸다.
   // 하나씩 오가면 왕복만 네 번이라, 먼 회선에서는 그것만으로 1초가 넘는다.
-  const [rooms, lobbyMessages, waitingList, mineRows] = await Promise.all([
+  //
+  // 방 대화도 여기 끼워 넣는다. 들어간 직후라면 어느 방인지 이미 알고 있어
+  // 목록을 받아본 뒤에 다시 물어볼 이유가 없다.
+  const knownRoom = me && me.room ? me.room : null;
+  const [rooms, lobbyMessages, waitingList, mineRows, knownMsgs] = await Promise.all([
     listRooms(),
     me ? readMsgs(LOBBY) : Promise.resolve([]),
     lobbyList(),
     me ? q(`SELECT ${cols} FROM players WHERE handle = $1`, [me.handle])
        : Promise.resolve([]),
+    knownRoom ? readMsgs(knownRoom) : Promise.resolve(null),
   ]);
   const mine = me ? rooms.find(r => r.members.includes(me.handle)) : null;
   // 접속 주소는 그 방에 들어와 있는 사람에게만 보인다
   for (const r of rooms) if (r !== mine) r.address = null;
-  const messages = mine ? await readMsgs(mine.room) : [];
+  const messages = knownMsgs !== null && mine && mine.room === knownRoom
+    ? knownMsgs
+    : (mine ? await readMsgs(mine.room) : []);
 
   // 방장이 지난번에 적어둔 주소를 미리 채워준다
   let savedAddress = null;
@@ -409,47 +421,74 @@ export default async function handler(req, res) {
 
 /* ---------- 들어가기 · 나가기 ---------- */
 
+/**
+ * 방에 들어간다.
+ *
+ * 이 하나가 방 창에서 가장 오래 걸리는 일이라, DB 를 몇 번 오가느냐가
+ * 그대로 체감 속도가 된다. 예전에는 확인·정원·주인 확인·삭제·추가·알림을
+ * 하나씩 물어 열 번 넘게 오갔다. 지금은 세 번이면 끝난다.
+ */
 async function enter(req, res) {
-  const me = await requireUser(req, res);
-  if (!me) return;
-  const room = checkRoom(body(req).room);
+  const room = checkRoom(body(req).room);   // 1..ROOM_COUNT 정수임이 보장된다
+  const now = Date.now();
 
+  // 누구인지 확인하는 일과 방을 잠그는 일은 서로 기댈 것이 없다. 나란히
+  // 보내고 쓸 때 기다린다 — 자리를 바꾸는 문장은 확인이 끝난 뒤에야 돈다.
+  const whoP = requireUser(req, res);
+  whoP.catch(() => {});
+  let me = null;
+
+  // 방을 잠근다. 세는 값이 믿을 만하려면 잠금이 먼저 끝나야 한다.
+  // 방 번호는 checkRoom 이 이미 정수임을 보장하므로 문장에 그대로 적어
+  // BEGIN 과 한 번에 보낸다 — 왕복 한 번을 아낀다.
   const out = await tx(async (c) => {
-    // 방을 잠그고 정원을 센다. 동시에 열일곱 번째가 들어오지 못하도록.
-    await c.query(`SELECT pg_advisory_xact_lock($1, $2)`, [77_001, room]);
+    me = await whoP;
+    if (!me) return { unauth: true };   // requireUser 가 이미 401 을 보냈다
 
-    const { rows: here } = await c.query(
-      `SELECT handle FROM room_members WHERE room = $1 AND handle = $2`, [room, me]
+    // 확인하고 앉히고 알리는 일을 한 문장으로 보낸다. 앉힐지 말지는
+    // ok 가 정한다 — 자리가 없거나 이미 있으면 ok 가 비어 아무 일도
+    // 일어나지 않고, 상태(st)만 돌아온다.
+    const { rows: [st] } = await c.query(
+      `WITH st AS (
+         SELECT
+           EXISTS(SELECT 1 FROM room_members WHERE room = $1 AND handle = $2) AS here,
+           (SELECT count(*)::int FROM room_members WHERE room = $1)           AS n,
+           COALESCE((SELECT cap FROM room_state WHERE room = $1), $4::int)    AS cap,
+           (SELECT room FROM room_members WHERE handle = $2)                  AS prev
+       ), ok AS (
+         SELECT * FROM st WHERE NOT here AND n < cap
+       ), seat AS (
+         INSERT INTO room_members (room, handle, joined_at, last_seen)
+         SELECT $1::int, $2::text, $3::bigint, $3::bigint FROM ok
+         ON CONFLICT (handle) DO UPDATE
+           SET room = EXCLUDED.room, joined_at = EXCLUDED.joined_at,
+               last_seen = EXCLUDED.last_seen
+       ), hello AS (
+         INSERT INTO room_messages (room, handle, body, ts)
+         SELECT $1::int, NULL, CASE WHEN ok.n = 0 THEN $5::text ELSE $6::text END,
+                $3::bigint
+           FROM ok
+       ), bye AS (
+         INSERT INTO room_messages (room, handle, body, ts)
+         SELECT ok.prev, NULL, $7::text, $3::bigint FROM ok WHERE ok.prev IS NOT NULL
+       )
+       SELECT * FROM st`,
+      [room, me, now, ROOM_CAPACITY,
+       `${me} 님이 방을 열었습니다. (방장)`, `${me} 님이 들어왔습니다.`,
+       `${me} 님이 나갔습니다.`]
     );
-    if (here.length) return { already: true };
 
-    const { rows: n } = await c.query(
-      `SELECT count(*)::int AS n FROM room_members WHERE room = $1`, [room]
-    );
-    const { rows: capRow } = await c.query(`SELECT cap FROM room_state WHERE room = $1`, [room]);
-    const cap = capRow.length && capRow[0].cap ? Number(capRow[0].cap) : ROOM_CAPACITY;
-    if (n[0].n >= cap) return { full: true, cap };
+    if (st.here) return { already: true };
+    if (st.n >= Number(st.cap)) return { full: true, cap: Number(st.cap) };
+    return { left: st.prev == null ? null : Number(st.prev), first: st.n === 0 };
+  }, `SELECT pg_advisory_xact_lock(77001, ${room})`);
 
-    // 다른 방에 있었다면 그 방에서는 나온다
-    const { rows: before } = await c.query(
-      `DELETE FROM room_members WHERE handle = $1 RETURNING room`, [me]
-    );
-    const now = Date.now();
-    await c.query(
-      `INSERT INTO room_members (room, handle, joined_at, last_seen) VALUES ($1,$2,$3,$3)`,
-      [room, me, now]
-    );
-    return { left: before.length ? before[0].room : null, first: n[0].n === 0 };
-  });
-
+  if (out.unauth) return;
   if (out.full) return res.status(400).json({ error: `${room}번방은 정원(${out.cap}명)이 찼습니다.` });
-  if (!out.already) {
-    if (out.left) await system(out.left, `${me} 님이 나갔습니다.`);
-    await system(room, out.first ? `${me} 님이 방을 열었습니다. (방장)` : `${me} 님이 들어왔습니다.`);
-    if (out.left) await closeEmptyRooms();
-  }
+  // 방을 옮긴 사람만 지나는 길이다. 보통은 이 줄을 밟지 않는다.
+  if (out.left) await closeEmptyRooms();
   // 들어간 직후의 화면을 함께 보낸다 — 받은 쪽이 다시 물어보지 않아도 되도록
-  res.status(200).json({ ok: true, room, ...(await snapshot(req, { handle: me }, true)) });
+  res.status(200).json({ ok: true, room, ...(await snapshot(req, { handle: me, room }, true)) });
 }
 
 async function leave(req, res) {

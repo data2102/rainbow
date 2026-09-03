@@ -228,7 +228,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 43;
+const APP_VERSION = 44;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -3306,7 +3306,17 @@ function myRoomData() {
  */
 const POPUP_KEY = 'r6-room-win';
 const POPUP_FRESH_MS = 8000;
-const roomParam = Number(new URLSearchParams(location.search).get('room')) || 0;
+/**
+ * 이 창이 몇 번 방인가.
+ *
+ * 주소는 `/#room=4` 를 쓴다. `?room=4` 로 열면 브라우저가 방마다 다른
+ * 주소로 보아 300KB 짜리 페이지를 방 번호마다 새로 받아온다. 井 뒤는
+ * 주소의 일부가 아니라, 런쳐를 보던 그 페이지를 그대로 다시 쓴다.
+ * 예전 주소로 열어둔 창도 있으니 둘 다 읽는다.
+ */
+const roomParam =
+  Number(new URLSearchParams(location.hash.replace(/^#/, '')).get('room')) ||
+  Number(new URLSearchParams(location.search).get('room')) || 0;
 const isRoomWindow = roomParam > 0;
 let roomWin = null;
 
@@ -4127,7 +4137,7 @@ function rememberRoomWinSize() {
 function openRoomWindow(room) {
   let w = null;
   try {
-    w = window.open(`/?room=${room}`, `r6room${room}`, roomWinFeatures());
+    w = window.open(`/#room=${room}`, `r6room${room}`, roomWinFeatures());
   } catch { /* 브라우저가 막았다 */ }
   if (!w) {
     showToast('팝업이 막혀 있어 이 화면에서 방을 엽니다 · 주소창의 팝업 허용을 켜주세요.');
@@ -4165,8 +4175,8 @@ function focusRoomWindow(room) {
   } catch { blank = false; }   // 남의 주소라 못 읽는다 = 있던 창이다
 
   if (blank) {
-    try { w.location.replace(`/?room=${room}`); }
-    catch { try { w.location.href = `/?room=${room}`; } catch { /* noop */ } }
+    try { w.location.replace(`/#room=${room}`); }
+    catch { try { w.location.href = `/#room=${room}`; } catch { /* noop */ } }
   }
   roomWin = w;
   try { w.focus(); } catch { /* noop */ }

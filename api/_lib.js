@@ -11,7 +11,7 @@ export function getPool() {
     pool = new pg.Pool({
       connectionString: cs,
       ssl: cs.includes('localhost') || cs.includes('127.0.0.1') ? false : { rejectUnauthorized: false },
-      max: 3,
+      max: 6,   // 한 번에 나란히 보내는 조회가 다섯 개다 — 여기서 줄서면 왕복이 늘어난다
       idleTimeoutMillis: 10_000,
     });
   }
@@ -23,10 +23,17 @@ export async function q(sql, params = []) {
   return r.rows;
 }
 
-export async function tx(fn) {
+/**
+ * 한 덩어리로 처리한다.
+ *
+ * `begin` 을 주면 BEGIN 과 함께 한 번에 보낸다. 트랜잭션을 열자마자
+ * 잠금부터 걸어야 하는 곳이 있는데, 두 번 나눠 보내면 먼 DB 에서는
+ * 그것만으로 왕복 한 번이 더 든다. 값을 끼워 넣지 않는 문장에만 쓴다.
+ */
+export async function tx(fn, begin = '') {
   const client = await getPool().connect();
   try {
-    await client.query('BEGIN');
+    await client.query(begin ? `BEGIN; ${begin}` : 'BEGIN');
     const out = await fn(client);
     await client.query('COMMIT');
     return out;
