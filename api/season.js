@@ -105,6 +105,19 @@ async function career(handle) {
   const rank = totals.filter(t => t.point > me.point).length + 1;
   const tied = totals.filter(t => t.point === me.point).length > 1;
 
+  // 승률 등수는 경기를 치른 사람끼리만 매긴다. 0전 0승을 100% 로 두거나
+  // 0% 로 두면 둘 다 사실이 아니다.
+  // 화면에 보이는 값(소수 첫째 자리)으로 견준다 — 같은 55.6% 인데 등수가
+  // 다르면 보는 사람이 납득할 수가 없다.
+  const pctOf = (t) => {
+    const g = t.wins + t.losses;
+    return g ? Math.round((t.wins / g) * 1000) / 10 : null;
+  };
+  const played = totals.filter(t => t.wins + t.losses > 0);
+  const myPct = pctOf(me);
+  const ratioRank = myPct == null ? null : played.filter(t => pctOf(t) > myPct).length + 1;
+  const ratioTied = myPct == null ? false : played.filter(t => pctOf(t) === myPct).length > 1;
+
   // 같은 편으로 몇 번 뛰었고 그중 몇 번 이겼는가.
   // 늦은 참석자는 어느 편도 아니어서 세지 않는다.
   const map = new Map();
@@ -132,6 +145,9 @@ async function career(handle) {
     rank,
     tied,
     of: totals.length,
+    ratioRank,
+    ratioTied,
+    ratioOf: played.length,
     mates: [...map.values()],
   };
 }

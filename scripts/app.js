@@ -229,7 +229,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 47;
+const APP_VERSION = 48;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -469,10 +469,22 @@ function pcBody(d) {
 
   return `
     <div class="pc-grid">
-      <div class="pc-cell">
+      <div class="pc-cell pc-wide">
         <div class="pc-k">RANK</div>
-        <div class="pc-v"><b>${d.rank}</b><span class="pc-u">위</span></div>
-        <div class="pc-sub">${d.of}명 중${d.tied ? ' · 동점' : ''}</div>
+        <div class="pc-rank-row">
+          <span class="pc-rank-t">포인트</span>
+          <span class="pc-rank-v"><b>${d.rank}</b><span class="pc-u">위</span></span>
+          <span class="pc-rank-x">${d.of}명 중${d.tied ? ' · 동점' : ''}</span>
+        </div>
+        <div class="pc-rank-row">
+          <span class="pc-rank-t">승률</span>
+          <span class="pc-rank-v">${d.ratioRank
+            ? `<b>${d.ratioRank}</b><span class="pc-u">위</span>`
+            : '<b class="none">—</b>'}</span>
+          <span class="pc-rank-x">${d.ratioRank
+            ? `${d.ratioOf}명 중${d.ratioTied ? ' · 동점' : ''}`
+            : '경기 기록 없음'}</span>
+        </div>
       </div>
       <div class="pc-cell">
         <div class="pc-k">POINT</div>
@@ -485,7 +497,7 @@ function pcBody(d) {
           <b class="w">${d.wins}</b><span class="pc-u">승</span>
           <b class="l">${d.losses}</b><span class="pc-u">패</span></div>
       </div>
-      <div class="pc-cell">
+      <div class="pc-cell pc-wide">
         <div class="pc-k">승률</div>
         <div class="pc-v"><b>${pct}</b><span class="pc-u">%</span></div>
         <div class="pc-bar"><div class="pc-bar-fill" style="width:${games ? pct : 0}%"></div></div>
