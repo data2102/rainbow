@@ -1304,6 +1304,11 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   line-height:var(--lh-body);
 }
 .rflow-note b{ color:var(--text-secondary); font-weight:var(--fw-bold); }
+.rnote{
+  margin-top:var(--sp-3); font-size:var(--fs-caption);
+  color:var(--text-tertiary); line-height:var(--lh-body);
+}
+.rnote b{ color:var(--text-secondary); font-weight:var(--fw-bold); }
 .rwarn{
   margin-top:var(--sp-3); font-size:var(--fs-caption);
   color:var(--warm); line-height:var(--lh-body);
@@ -2183,7 +2188,7 @@ if (/[?&]room=\d+/.test(location.search)) {
     <button class="tab-btn" data-tab="history">리폿(경기결과)</button>
     <button class="tab-btn" data-tab="attendance">출석</button>
     <button class="tab-btn" data-tab="tournament">대회</button>
-    <button class="tab-btn" data-tab="rules">규정<span class="tab-wip">(준비중)</span></button>
+    <button class="tab-btn" data-tab="rules">규정</button>
     <button class="tab-btn" data-tab="board">게시판</button>
     <button class="tab-btn" data-tab="files">자료실</button>
     <button class="tab-btn" data-tab="launcher">런쳐<span class="tab-wip">(준비중)</span></button>
@@ -2724,8 +2729,12 @@ if (/[?&]room=\d+/.test(location.search)) {
         <article class="rcard">
           <div class="rcard-h"><span class="rnum">2</span>인원이 홀수일 경우</div>
           <div class="rcard-b">
-            <p class="rtext">한 명 많은 쪽이 생깁니다.
+            <p class="rtext">한 명 많은 쪽이 생길 경우
               <b>제일 마지막에 접속한 1명</b>은 무조건 <b>호스트 반대편</b>에서 플레이합니다.</p>
+            <p class="rnote"><b>JOIN GAME</b>에 가장 늦게 접속한 사람이
+              <b>&ldquo;늦은 참석자&rdquo;</b>가 됩니다.</p>
+            <div class="rwarn">※ 제일 먼저 왔더라도 <b>게임 조인이 가장 늦은 사람</b>,
+              흡연으로 인해 <b>조인이 늦을 경우</b> 모두 해당됩니다.</div>
             <div class="rex">
               <div class="rex-h">예시</div>
               <div class="rex-row"><b class="n">7명</b><span class="ar">→</span><b class="sc">4 : 3</b></div>
@@ -3445,7 +3454,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 39;
+const APP_VERSION = 40;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
