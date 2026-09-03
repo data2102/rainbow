@@ -2146,6 +2146,99 @@ button.room-n:hover{ color:var(--accent); text-decoration:underline; }
   accent-color:var(--accent); cursor:pointer;
 }
 
+/* ── 선수 카드 ── */
+/* 누를 수 있는 이름. 표 안에서 튀지 않되, 누를 수 있다는 것은 보여야 한다. */
+.who-id{ cursor:pointer; border-bottom:1px dashed var(--border-strong); }
+.who-id:hover{ color:var(--accent); border-bottom-color:var(--accent); }
+.who-id:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; border-radius:2px; }
+/* 칩은 그 자체가 덩어리라 밑줄이 붙으면 지저분하다 */
+.h-chip.who-id, .slot-name.who-id{ border-bottom:none; }
+.h-chip.who-id:hover, .slot-name.who-id:hover{ filter:brightness(1.12); }
+
+.pc-head{ margin:0 0 var(--sp-5); padding-right:var(--sp-8); }
+.pc-id{
+  font-size:var(--fs-title); font-weight:var(--fw-bold);
+  letter-spacing:var(--ls-tight); line-height:1.25; word-break:break-all;
+}
+.pc-clan{ margin-top:var(--sp-1); font-size:var(--fs-caption); color:var(--text-tertiary); }
+
+.pc-grid{
+  display:grid; grid-template-columns:repeat(2, minmax(0,1fr));
+  gap:var(--sp-3);
+}
+.pc-cell{
+  background:var(--surface-sunken); border:1px solid var(--border);
+  border-radius:var(--radius-lg); padding:var(--sp-4);
+}
+.pc-k{
+  font-size:var(--fs-footnote); font-weight:var(--fw-medium);
+  color:var(--text-tertiary); letter-spacing:0.4px;
+}
+.pc-v{ margin-top:var(--sp-1); font-size:var(--fs-body); color:var(--text-secondary); }
+.pc-v b{ font-size:var(--fs-heading); font-weight:var(--fw-bold); color:var(--text-primary); }
+.pc-v b.w{ color:var(--success-strong); }
+.pc-v b.l{ color:var(--danger-strong); }
+.pc-u{ margin:0 var(--sp-2) 0 1px; font-size:var(--fs-footnote); color:var(--text-tertiary); }
+.pc-rec{ white-space:nowrap; }
+.pc-rec b{ font-size:var(--fs-heading); }
+.pc-rec .pc-u{ margin-right:var(--sp-1); }
+.pc-sub{ margin-top:var(--sp-1); font-size:var(--fs-footnote); color:var(--text-tertiary); }
+.pc-bar{
+  margin-top:var(--sp-3); height:4px; border-radius:var(--radius-pill);
+  background:var(--border); overflow:hidden;
+}
+.pc-bar-fill{ height:100%; background:var(--accent); border-radius:var(--radius-pill); }
+
+.pc-sec{ margin-top:var(--sp-6); }
+.pc-sec-h{
+  display:flex; align-items:baseline; gap:var(--sp-2); flex-wrap:wrap;
+  margin-bottom:var(--sp-3);
+  font-size:var(--fs-caption); font-weight:var(--fw-bold); color:var(--text-primary);
+}
+.pc-sec-note{ font-size:var(--fs-footnote); font-weight:var(--fw-regular); color:var(--text-tertiary); }
+.pc-mate{
+  display:grid; grid-template-columns:auto minmax(0,1fr) auto auto;
+  align-items:center; gap:var(--sp-3);
+  padding:var(--sp-3) var(--sp-4);
+  border:1px solid var(--border); border-radius:var(--radius-md);
+  margin-bottom:var(--sp-2);
+}
+.pc-medal{
+  width:20px; height:20px; flex:none; border-radius:50%;
+  display:inline-flex; align-items:center; justify-content:center;
+  font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+  background:var(--surface-sunken); color:var(--text-tertiary);
+}
+.pc-medal.m1{ background:#f7d774; color:#5a4300; }
+.pc-medal.m2{ background:#d8dde4; color:#454b53; }
+.pc-medal.m3{ background:#e6c0a0; color:#5d3c1c; }
+.pc-mate-id{
+  justify-self:start; font-size:var(--fs-caption);
+  font-weight:var(--fw-medium); word-break:break-all;
+}
+.pc-mate-rec{ font-size:var(--fs-footnote); color:var(--text-tertiary); white-space:nowrap; }
+.pc-mate-rec b{ font-weight:var(--fw-bold); }
+.pc-mate-rec b.w{ color:var(--success-strong); }
+.pc-mate-rec b.l{ color:var(--danger-strong); }
+.pc-mate-pct{
+  font-size:var(--fs-caption); font-weight:var(--fw-bold);
+  color:var(--accent); white-space:nowrap;
+}
+.pc-mate-pct.thin{ color:var(--text-tertiary); font-weight:var(--fw-medium); }
+.pc-empty{
+  padding:var(--sp-5); text-align:center;
+  font-size:var(--fs-caption); color:var(--text-tertiary);
+  background:var(--surface-sunken); border-radius:var(--radius-md);
+}
+.pc-foot{ margin-top:var(--sp-2); font-size:var(--fs-footnote); color:var(--text-tertiary); }
+
+@media (max-width:420px){
+  .pc-grid{ grid-template-columns:minmax(0,1fr); }
+  .pc-mate{ grid-template-columns:auto minmax(0,1fr) auto; row-gap:var(--sp-1); }
+  .pc-mate-pct{ grid-column:3; grid-row:1; }
+  .pc-mate-rec{ grid-column:2 / 4; grid-row:2; }
+}
+
 #connBanner{
   display:none; border-radius:var(--radius-md);
   background:var(--danger-bg); color:var(--danger-strong);
@@ -3496,7 +3589,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 45;
+const APP_VERSION = 46;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -3628,6 +3721,164 @@ function esc(s) {
   ));
 }
 
+/* ---------- 선수 카드 ---------- */
+
+/**
+ * 표 안의 이름을 누를 수 있게 감싼다.
+ *
+ * 순위표에서 이름만 보고는 그 사람이 누구와 잘 맞는지, 몇 승을 했는지
+ * 알 수가 없었다. 이름을 누르면 그 사람 한 장이 열린다.
+ */
+function whoName(handle) {
+  return `<span class="who-id" data-pcard="${esc(handle)}" role="button" tabindex="0">${esc(handle)}</span>`;
+}
+
+/** 궁합을 따질 때 이만큼은 함께 뛰어야 한다. 한 판 이겨서 100% 가 되는 것을 막는다. */
+const MATE_MIN_GAMES = 3;
+const MATE_TOP = 3;
+
+/**
+ * 누구와 같은 편이었고, 그때 몇 번 이겼는가.
+ *
+ * 리폿에 남은 승리 팀·패배 팀 명단을 그대로 읽는다. 늦은 참석자는 어느
+ * 편도 아니어서 세지 않는다. 취소된 경기도 뺀다 — 점수가 되돌려진 경기다.
+ */
+function mateStats(handle) {
+  const map = new Map();
+  for (const m of viewMatches()) {
+    if (m.voidedAt) continue;
+    const win = (m.winners || []).map(w => w.handle);
+    const lose = m.losers || [];
+    const won = win.includes(handle);
+    const side = won ? win : (lose.includes(handle) ? lose : null);
+    if (!side) continue;
+    for (const h of side) {
+      if (h === handle) continue;
+      const st = map.get(h) || { handle: h, games: 0, wins: 0 };
+      st.games += 1;
+      if (won) st.wins += 1;
+      map.set(h, st);
+    }
+  }
+  return [...map.values()].map(st => ({
+    ...st,
+    losses: st.games - st.wins,
+    pct: Math.round((st.wins / st.games) * 1000) / 10,
+  }));
+}
+
+/**
+ * 궁합 BEST 3.
+ *
+ * 함께 세 판 이상 뛴 사람 가운데 승률이 높은 순이다. 그런 사람이 셋이
+ * 안 되면 많이 함께 뛴 사람으로 채운다 — 자리를 비워두면 왜 비었는지
+ * 알 수가 없다.
+ */
+function bestMates(handle) {
+  const all = mateStats(handle);
+  const enough = all.filter(x => x.games >= MATE_MIN_GAMES)
+    .sort((a, b) => b.pct - a.pct || b.wins - a.wins || b.games - a.games
+                    || a.handle.localeCompare(b.handle));
+  const rest = all.filter(x => x.games < MATE_MIN_GAMES)
+    .sort((a, b) => b.games - a.games || b.pct - a.pct || a.handle.localeCompare(b.handle));
+  return [...enough, ...rest].slice(0, MATE_TOP);
+}
+
+/** 포인트 순위. 같은 점수는 같은 등수다. */
+function pointRank(handle) {
+  const list = viewPlayers();
+  const p = list.find(x => x.handle === handle);
+  if (!p) return null;
+  const above = list.filter(x => x.point > p.point).length;
+  const tied = list.filter(x => x.point === p.point).length;
+  return { rank: above + 1, tied: tied > 1, of: list.length };
+}
+
+/** 이름을 누르면 열리는 한 장. */
+function showPlayerCard(handle) {
+  const p = viewPlayers().find(x => x.handle === handle);
+  if (!p) {
+    openModal(`<button class="modal-x" onclick="closeModal()" aria-label="닫기">&times;</button>
+      <h3>${esc(handle)}</h3>
+      <div class="pc-empty">이 달 명단에 없는 아이디입니다.</div>`);
+    return;
+  }
+
+  const games = p.wins + p.losses;
+  const r = pointRank(handle);
+  const mates = bestMates(handle);
+  const cur = viewSeason();
+  // 시즌 이름은 "2026년 8월 27일 ~ 9월 30일" 처럼 길어 칸을 두 줄로 밀어낸다.
+  // 달 이름 한 줄이면 어느 달 기록인지는 충분히 전해진다.
+  const monthText = (monthOptions().find(o => cur && o.id === cur.id) || {}).text || '';
+
+  const mateRows = mates.length
+    ? mates.map((x, i) => `<div class="pc-mate">
+        <span class="pc-medal m${i + 1}">${i + 1}</span>
+        <span class="pc-mate-id who-id" data-pcard="${esc(x.handle)}" role="button" tabindex="0">${esc(x.handle)}</span>
+        <span class="pc-mate-rec">함께 ${x.games}전 <b class="w">${x.wins}승</b> <b class="l">${x.losses}패</b></span>
+        <span class="pc-mate-pct${x.games >= MATE_MIN_GAMES ? '' : ' thin'}">${x.pct}%</span>
+      </div>`).join('')
+    : '<div class="pc-empty">아직 같은 편으로 뛴 기록이 없습니다.</div>';
+
+  const thin = mates.some(x => x.games < MATE_MIN_GAMES);
+
+  openModal(`
+    <button class="modal-x" onclick="closeModal()" aria-label="닫기">&times;</button>
+    <div class="pc-head">
+      <div class="pc-id">${esc(p.handle)}</div>
+      <div class="pc-clan">${esc(p.clan && p.clan !== '-' ? p.clan : '무소속')}</div>
+    </div>
+
+    <div class="pc-grid">
+      <div class="pc-cell">
+        <div class="pc-k">RANK</div>
+        <div class="pc-v"><b>${r ? r.rank : '-'}</b><span class="pc-u">위</span></div>
+        <div class="pc-sub">${r ? `${r.of}명 중${r.tied ? ' · 동점' : ''}` : ''}</div>
+      </div>
+      <div class="pc-cell">
+        <div class="pc-k">POINT</div>
+        <div class="pc-v"><b>${p.point}</b><span class="pc-u">점</span></div>
+        <div class="pc-sub">${esc(monthText)}</div>
+      </div>
+      <div class="pc-cell">
+        <div class="pc-k">전적</div>
+        <div class="pc-v pc-rec"><b>${games}</b><span class="pc-u">전</span>
+          <b class="w">${p.wins}</b><span class="pc-u">승</span>
+          <b class="l">${p.losses}</b><span class="pc-u">패</span></div>
+      </div>
+      <div class="pc-cell">
+        <div class="pc-k">승률</div>
+        <div class="pc-v"><b>${ratio(p)}</b><span class="pc-u">%</span></div>
+        <div class="pc-bar"><div class="pc-bar-fill" style="width:${games ? ratio(p) : 0}%"></div></div>
+      </div>
+    </div>
+
+    <div class="pc-sec">
+      <div class="pc-sec-h">궁합 BEST ${MATE_TOP}
+        <span class="pc-sec-note">같은 편으로 뛰었을 때</span></div>
+      ${mateRows}
+      ${thin ? `<div class="pc-foot">${MATE_MIN_GAMES}경기 미만은 표본이 적어 흐리게 두었습니다.</div>` : ''}
+    </div>`);
+}
+
+/** 이름을 누르는 길은 화면마다 따로 두지 않는다. 문서 한 곳에서 받는다. */
+function initWhoCard() {
+  const open = (el) => {
+    const h = el.getAttribute('data-pcard');
+    if (h) showPlayerCard(h);
+  };
+  document.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-pcard]');
+    if (el) { e.preventDefault(); open(el); }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const el = e.target.closest && e.target.closest('[data-pcard]');
+    if (el) { e.preventDefault(); open(el); }
+  });
+}
+
 function sortedPlayers() {
   const arr = [...viewPlayers()];
   arr.sort((a, b) => {
@@ -3669,7 +3920,7 @@ function renderStanding() {
     const topRow = p.rank <= STANDING_HIGHLIGHT ? ' class="top-rank-row"' : '';
     return `<tr${topRow}>
       <td class="rank-cell ${medalClass(p.rank)}">${p.rank}</td>
-      <td>${esc(p.handle)}</td>
+      <td>${whoName(p.handle)}</td>
       <td class="clan-tag">${esc(p.clan)}</td>
       <td>${p.point}</td>
       <td>${p.wins + p.losses}</td>
@@ -3691,13 +3942,13 @@ function renderTop5() {
   const byWin = [...list].sort((a, b) => b.wins - a.wins).slice(0, TOP_N);
 
   document.getElementById('topPointBody').innerHTML = byPoint.map((p, i) => `
-    <tr><td class="rank-cell ${medalClass(i + 1)}">${i + 1}</td><td>${esc(p.handle)}</td>
+    <tr><td class="rank-cell ${medalClass(i + 1)}">${i + 1}</td><td>${whoName(p.handle)}</td>
     <td class="clan-tag">${esc(p.clan)}</td><td>${p.point}</td>
     <td>${p.wins + p.losses}</td>
     <td class="win-txt">${p.wins}</td><td class="loss-txt">${p.losses}</td></tr>`).join('');
 
   document.getElementById('topWinBody').innerHTML = byWin.map((p, i) => `
-    <tr><td class="rank-cell ${medalClass(i + 1)}">${i + 1}</td><td>${esc(p.handle)}</td>
+    <tr><td class="rank-cell ${medalClass(i + 1)}">${i + 1}</td><td>${whoName(p.handle)}</td>
     <td class="clan-tag">${esc(p.clan)}</td>
     <td>${p.wins + p.losses}</td>
     <td class="win-txt">${p.wins}</td><td class="loss-txt">${p.losses}</td><td>${ratio(p)}%</td></tr>`).join('');
@@ -3714,7 +3965,7 @@ function renderTop5() {
   const ratioBody = document.getElementById('topRatioBody');
   if (ratioBody) {
     ratioBody.innerHTML = byRatio.map((p, i) => `
-      <tr><td class="rank-cell ${medalClass(i + 1)}">${i + 1}</td><td>${esc(p.handle)}</td>
+      <tr><td class="rank-cell ${medalClass(i + 1)}">${i + 1}</td><td>${whoName(p.handle)}</td>
       <td class="clan-tag">${esc(p.clan)}</td>
       <td>${ratio(p)}%</td>
       <td>${p.wins + p.losses}</td>
@@ -4054,18 +4305,18 @@ function renderHistory() {
     const time = `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
 
     const winChips = winners.map(w =>
-      `<span class="h-chip w">${esc(w.handle)}<span class="h-gain">+${w.gained !== undefined ? w.gained : '-'}</span></span>`
+      `<span class="h-chip w who-id" data-pcard="${esc(w.handle)}" role="button" tabindex="0">${esc(w.handle)}<span class="h-gain">+${w.gained !== undefined ? w.gained : '-'}</span></span>`
     ).join('') || '<span class="h-chip l">-</span>';
     // 진 사람도 나온 값은 있다. 이긴 쪽만 +3 이 붙어 있으니 진 쪽은
     // 아무것도 못 받은 것처럼 보였다 — 실제로는 다 같이 +1 을 받는다.
     const loseChips = losers.map(h =>
-      `<span class="h-chip l">${esc(h)}<span class="h-gain">+${LOSS_GAIN}</span></span>`).join('')
+      `<span class="h-chip l who-id" data-pcard="${esc(h)}" role="button" tabindex="0">${esc(h)}<span class="h-gain">+${LOSS_GAIN}</span></span>`).join('')
       || '<span class="h-none">-</span>';
     // 늦은 참석자는 칸을 따로 갖는다. 패배 칸에 이어 붙였더니 진 사람과
     // 섞여 보였다 — 이 사람들은 지지 않았고, 이긴 것도 아니다.
     const late = m.late || [];
     const lateChips = late.map(h =>
-      `<span class="h-chip x">${esc(h)}<span class="h-gain">+${LOSS_GAIN}</span></span>`).join('')
+      `<span class="h-chip x who-id" data-pcard="${esc(h)}" role="button" tabindex="0">${esc(h)}<span class="h-gain">+${LOSS_GAIN}</span></span>`).join('')
       || '<span class="h-none">-</span>';
 
     // 번호는 취소된 기록까지 세어 붙인다. 취소했다고 뒤 번호가 밀리면
@@ -4776,7 +5027,7 @@ function renderVoteStats() {
     const cls = pct >= 70 ? '' : (pct >= 40 ? ' mid' : ' low');
     return `<tr class="${r.voted ? '' : 'v-zero'}">
       <td class="v-rank">${i + 1}</td>
-      <td><span class="v-id">${esc(r.handle)}</span></td>
+      <td><span class="v-id who-id" data-pcard="${esc(r.handle)}" role="button" tabindex="0">${esc(r.handle)}</span></td>
       <td class="v-n">${r.voted}일</td>
       <td class="v-n"><span class="v-miss${miss === days ? ' bad' : ''}">${miss}일</span></td>
       <td class="v-rate"><div class="v-bar">
@@ -4827,7 +5078,7 @@ function renderSlotSummary() {
         <span class="slot-col-n">${names.length}명</span>
       </div>
       <div class="slot-names">${names.length
-        ? names.map(h => `<span class="slot-name">${esc(h)}</span>`).join('')
+        ? names.map(h => `<span class="slot-name who-id" data-pcard="${esc(h)}" role="button" tabindex="0">${esc(h)}</span>`).join('')
         : '<span class="slot-none">아직 없음</span>'}</div>
     </div>`;
   }).join('')
@@ -4839,7 +5090,7 @@ function renderSlotSummary() {
       </div>
       ${idle.length
         ? `<div class="novote-grid">${idle.map(p =>
-            `<div class="nv-row"><span class="nv-id">${esc(p.handle)}</span>`
+            `<div class="nv-row"><span class="nv-id who-id" data-pcard="${esc(p.handle)}" role="button" tabindex="0">${esc(p.handle)}</span>`
             + `<span class="nv-clan">${esc(p.clan && p.clan !== '-' ? p.clan : '')}</span></div>`
           ).join('')}</div>`
         : '<span class="slot-none">모두 투표했습니다.</span>'}
@@ -8043,6 +8294,7 @@ async function boot() {
   initFileEvents();
   initAdminPagers();
   initVoteStats();
+  initWhoCard();
   renderAuthBar();
   try {
     if (isRoomWindow) {

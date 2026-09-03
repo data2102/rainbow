@@ -2146,6 +2146,99 @@ button.room-n:hover{ color:var(--accent); text-decoration:underline; }
   accent-color:var(--accent); cursor:pointer;
 }
 
+/* ── 선수 카드 ── */
+/* 누를 수 있는 이름. 표 안에서 튀지 않되, 누를 수 있다는 것은 보여야 한다. */
+.who-id{ cursor:pointer; border-bottom:1px dashed var(--border-strong); }
+.who-id:hover{ color:var(--accent); border-bottom-color:var(--accent); }
+.who-id:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; border-radius:2px; }
+/* 칩은 그 자체가 덩어리라 밑줄이 붙으면 지저분하다 */
+.h-chip.who-id, .slot-name.who-id{ border-bottom:none; }
+.h-chip.who-id:hover, .slot-name.who-id:hover{ filter:brightness(1.12); }
+
+.pc-head{ margin:0 0 var(--sp-5); padding-right:var(--sp-8); }
+.pc-id{
+  font-size:var(--fs-title); font-weight:var(--fw-bold);
+  letter-spacing:var(--ls-tight); line-height:1.25; word-break:break-all;
+}
+.pc-clan{ margin-top:var(--sp-1); font-size:var(--fs-caption); color:var(--text-tertiary); }
+
+.pc-grid{
+  display:grid; grid-template-columns:repeat(2, minmax(0,1fr));
+  gap:var(--sp-3);
+}
+.pc-cell{
+  background:var(--surface-sunken); border:1px solid var(--border);
+  border-radius:var(--radius-lg); padding:var(--sp-4);
+}
+.pc-k{
+  font-size:var(--fs-footnote); font-weight:var(--fw-medium);
+  color:var(--text-tertiary); letter-spacing:0.4px;
+}
+.pc-v{ margin-top:var(--sp-1); font-size:var(--fs-body); color:var(--text-secondary); }
+.pc-v b{ font-size:var(--fs-heading); font-weight:var(--fw-bold); color:var(--text-primary); }
+.pc-v b.w{ color:var(--success-strong); }
+.pc-v b.l{ color:var(--danger-strong); }
+.pc-u{ margin:0 var(--sp-2) 0 1px; font-size:var(--fs-footnote); color:var(--text-tertiary); }
+.pc-rec{ white-space:nowrap; }
+.pc-rec b{ font-size:var(--fs-heading); }
+.pc-rec .pc-u{ margin-right:var(--sp-1); }
+.pc-sub{ margin-top:var(--sp-1); font-size:var(--fs-footnote); color:var(--text-tertiary); }
+.pc-bar{
+  margin-top:var(--sp-3); height:4px; border-radius:var(--radius-pill);
+  background:var(--border); overflow:hidden;
+}
+.pc-bar-fill{ height:100%; background:var(--accent); border-radius:var(--radius-pill); }
+
+.pc-sec{ margin-top:var(--sp-6); }
+.pc-sec-h{
+  display:flex; align-items:baseline; gap:var(--sp-2); flex-wrap:wrap;
+  margin-bottom:var(--sp-3);
+  font-size:var(--fs-caption); font-weight:var(--fw-bold); color:var(--text-primary);
+}
+.pc-sec-note{ font-size:var(--fs-footnote); font-weight:var(--fw-regular); color:var(--text-tertiary); }
+.pc-mate{
+  display:grid; grid-template-columns:auto minmax(0,1fr) auto auto;
+  align-items:center; gap:var(--sp-3);
+  padding:var(--sp-3) var(--sp-4);
+  border:1px solid var(--border); border-radius:var(--radius-md);
+  margin-bottom:var(--sp-2);
+}
+.pc-medal{
+  width:20px; height:20px; flex:none; border-radius:50%;
+  display:inline-flex; align-items:center; justify-content:center;
+  font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+  background:var(--surface-sunken); color:var(--text-tertiary);
+}
+.pc-medal.m1{ background:#f7d774; color:#5a4300; }
+.pc-medal.m2{ background:#d8dde4; color:#454b53; }
+.pc-medal.m3{ background:#e6c0a0; color:#5d3c1c; }
+.pc-mate-id{
+  justify-self:start; font-size:var(--fs-caption);
+  font-weight:var(--fw-medium); word-break:break-all;
+}
+.pc-mate-rec{ font-size:var(--fs-footnote); color:var(--text-tertiary); white-space:nowrap; }
+.pc-mate-rec b{ font-weight:var(--fw-bold); }
+.pc-mate-rec b.w{ color:var(--success-strong); }
+.pc-mate-rec b.l{ color:var(--danger-strong); }
+.pc-mate-pct{
+  font-size:var(--fs-caption); font-weight:var(--fw-bold);
+  color:var(--accent); white-space:nowrap;
+}
+.pc-mate-pct.thin{ color:var(--text-tertiary); font-weight:var(--fw-medium); }
+.pc-empty{
+  padding:var(--sp-5); text-align:center;
+  font-size:var(--fs-caption); color:var(--text-tertiary);
+  background:var(--surface-sunken); border-radius:var(--radius-md);
+}
+.pc-foot{ margin-top:var(--sp-2); font-size:var(--fs-footnote); color:var(--text-tertiary); }
+
+@media (max-width:420px){
+  .pc-grid{ grid-template-columns:minmax(0,1fr); }
+  .pc-mate{ grid-template-columns:auto minmax(0,1fr) auto; row-gap:var(--sp-1); }
+  .pc-mate-pct{ grid-column:3; grid-row:1; }
+  .pc-mate-rec{ grid-column:2 / 4; grid-row:2; }
+}
+
 #connBanner{
   display:none; border-radius:var(--radius-md);
   background:var(--danger-bg); color:var(--danger-strong);
