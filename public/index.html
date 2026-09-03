@@ -3510,6 +3510,7 @@ async function handleRes(r) {
 
 async function loadState() {
   const d = await apiGet('/api/state');
+  careerCache = {};   // 경기가 하나 늘면 누적도 등수도 달라진다
   season = d.season || null;
   players = d.players || [];
   matches = d.matches || [];
@@ -3589,7 +3590,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 46;
+const APP_VERSION = 47;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -3738,34 +3739,11 @@ const MATE_MIN_GAMES = 3;
 const MATE_TOP = 3;
 
 /**
- * 누구와 같은 편이었고, 그때 몇 번 이겼는가.
- *
- * 리폿에 남은 승리 팀·패배 팀 명단을 그대로 읽는다. 늦은 참석자는 어느
- * 편도 아니어서 세지 않는다. 취소된 경기도 뺀다 — 점수가 되돌려진 경기다.
+ * 한 번 받아온 누적 성적은 들고 있는다.
+ * 카드를 열 때마다 서버를 두드리면 이름 하나 눌러보는 일이 무거워진다.
+ * 새 경기가 들어오면(loadState) 비운다.
  */
-function mateStats(handle) {
-  const map = new Map();
-  for (const m of viewMatches()) {
-    if (m.voidedAt) continue;
-    const win = (m.winners || []).map(w => w.handle);
-    const lose = m.losers || [];
-    const won = win.includes(handle);
-    const side = won ? win : (lose.includes(handle) ? lose : null);
-    if (!side) continue;
-    for (const h of side) {
-      if (h === handle) continue;
-      const st = map.get(h) || { handle: h, games: 0, wins: 0 };
-      st.games += 1;
-      if (won) st.wins += 1;
-      map.set(h, st);
-    }
-  }
-  return [...map.values()].map(st => ({
-    ...st,
-    losses: st.games - st.wins,
-    pct: Math.round((st.wins / st.games) * 1000) / 10,
-  }));
-}
+let careerCache = {};
 
 /**
  * 궁합 BEST 3.
@@ -3774,8 +3752,12 @@ function mateStats(handle) {
  * 안 되면 많이 함께 뛴 사람으로 채운다 — 자리를 비워두면 왜 비었는지
  * 알 수가 없다.
  */
-function bestMates(handle) {
-  const all = mateStats(handle);
+function bestMates(mates) {
+  const all = (mates || []).map(x => ({
+    ...x,
+    losses: x.games - x.wins,
+    pct: Math.round((x.wins / x.games) * 1000) / 10,
+  }));
   const enough = all.filter(x => x.games >= MATE_MIN_GAMES)
     .sort((a, b) => b.pct - a.pct || b.wins - a.wins || b.games - a.games
                     || a.handle.localeCompare(b.handle));
@@ -3784,33 +3766,56 @@ function bestMates(handle) {
   return [...enough, ...rest].slice(0, MATE_TOP);
 }
 
-/** 포인트 순위. 같은 점수는 같은 등수다. */
-function pointRank(handle) {
-  const list = viewPlayers();
-  const p = list.find(x => x.handle === handle);
-  if (!p) return null;
-  const above = list.filter(x => x.point > p.point).length;
-  const tied = list.filter(x => x.point === p.point).length;
-  return { rank: above + 1, tied: tied > 1, of: list.length };
+function pcRatio(wins, losses) {
+  const total = wins + losses;
+  return total ? Math.round((wins / total) * 1000) / 10 : 0;
 }
 
-/** 이름을 누르면 열리는 한 장. */
-function showPlayerCard(handle) {
+/** 카드 겉틀. 속만 갈아 끼우면 되도록 따로 둔다. */
+function pcShell(handle, clan, inner) {
+  return `<button class="modal-x" onclick="closeModal()" aria-label="닫기">&times;</button>
+    <div class="pc-head">
+      <div class="pc-id">${esc(handle)}</div>
+      <div class="pc-clan">${esc(clan || '')}</div>
+    </div>
+    ${inner}`;
+}
+
+/**
+ * 이름을 누르면 열리는 한 장.
+ *
+ * 성적은 이번 달이 아니라 지금까지의 전부다. 순위표는 달마다 0 에서
+ * 다시 시작하지만, 이 카드는 "이 사람이 지금껏 어땠나"를 묻는 자리다.
+ */
+async function showPlayerCard(handle) {
+  const known = careerCache[handle];
   const p = viewPlayers().find(x => x.handle === handle);
-  if (!p) {
-    openModal(`<button class="modal-x" onclick="closeModal()" aria-label="닫기">&times;</button>
-      <h3>${esc(handle)}</h3>
-      <div class="pc-empty">이 달 명단에 없는 아이디입니다.</div>`);
+  const clanNow = p ? (p.clan && p.clan !== '-' ? p.clan : '무소속') : '';
+
+  if (known) { openModal(pcShell(handle, known.clanText, pcBody(known))); return; }
+
+  // 기다리는 동안에도 누구의 카드인지는 보여야 한다
+  openModal(pcShell(handle, clanNow, '<div class="pc-empty">불러오는 중…</div>'));
+
+  let d;
+  try {
+    d = await apiGet('/api/season?career=' + encodeURIComponent(handle));
+  } catch (e) {
+    openModal(pcShell(handle, clanNow, `<div class="pc-empty">${esc(e.message)}</div>`));
     return;
   }
+  d.clanText = d.clan && d.clan !== '-' ? d.clan : '무소속';
+  careerCache[handle] = d;
+  // 기다리는 사이에 다른 카드를 열었을 수도 있다
+  const open = document.querySelector('#modalContent .pc-id');
+  if (!open || open.textContent !== handle) return;
+  openModal(pcShell(handle, d.clanText, pcBody(d)));
+}
 
-  const games = p.wins + p.losses;
-  const r = pointRank(handle);
-  const mates = bestMates(handle);
-  const cur = viewSeason();
-  // 시즌 이름은 "2026년 8월 27일 ~ 9월 30일" 처럼 길어 칸을 두 줄로 밀어낸다.
-  // 달 이름 한 줄이면 어느 달 기록인지는 충분히 전해진다.
-  const monthText = (monthOptions().find(o => cur && o.id === cur.id) || {}).text || '';
+function pcBody(d) {
+  const games = d.wins + d.losses;
+  const pct = pcRatio(d.wins, d.losses);
+  const mates = bestMates(d.mates);
 
   const mateRows = mates.length
     ? mates.map((x, i) => `<div class="pc-mate">
@@ -3823,34 +3828,28 @@ function showPlayerCard(handle) {
 
   const thin = mates.some(x => x.games < MATE_MIN_GAMES);
 
-  openModal(`
-    <button class="modal-x" onclick="closeModal()" aria-label="닫기">&times;</button>
-    <div class="pc-head">
-      <div class="pc-id">${esc(p.handle)}</div>
-      <div class="pc-clan">${esc(p.clan && p.clan !== '-' ? p.clan : '무소속')}</div>
-    </div>
-
+  return `
     <div class="pc-grid">
       <div class="pc-cell">
         <div class="pc-k">RANK</div>
-        <div class="pc-v"><b>${r ? r.rank : '-'}</b><span class="pc-u">위</span></div>
-        <div class="pc-sub">${r ? `${r.of}명 중${r.tied ? ' · 동점' : ''}` : ''}</div>
+        <div class="pc-v"><b>${d.rank}</b><span class="pc-u">위</span></div>
+        <div class="pc-sub">${d.of}명 중${d.tied ? ' · 동점' : ''}</div>
       </div>
       <div class="pc-cell">
         <div class="pc-k">POINT</div>
-        <div class="pc-v"><b>${p.point}</b><span class="pc-u">점</span></div>
-        <div class="pc-sub">${esc(monthText)}</div>
+        <div class="pc-v"><b>${d.point}</b><span class="pc-u">점</span></div>
+        <div class="pc-sub">전체 누적</div>
       </div>
       <div class="pc-cell">
         <div class="pc-k">전적</div>
         <div class="pc-v pc-rec"><b>${games}</b><span class="pc-u">전</span>
-          <b class="w">${p.wins}</b><span class="pc-u">승</span>
-          <b class="l">${p.losses}</b><span class="pc-u">패</span></div>
+          <b class="w">${d.wins}</b><span class="pc-u">승</span>
+          <b class="l">${d.losses}</b><span class="pc-u">패</span></div>
       </div>
       <div class="pc-cell">
         <div class="pc-k">승률</div>
-        <div class="pc-v"><b>${ratio(p)}</b><span class="pc-u">%</span></div>
-        <div class="pc-bar"><div class="pc-bar-fill" style="width:${games ? ratio(p) : 0}%"></div></div>
+        <div class="pc-v"><b>${pct}</b><span class="pc-u">%</span></div>
+        <div class="pc-bar"><div class="pc-bar-fill" style="width:${games ? pct : 0}%"></div></div>
       </div>
     </div>
 
@@ -3859,7 +3858,8 @@ function showPlayerCard(handle) {
         <span class="pc-sec-note">같은 편으로 뛰었을 때</span></div>
       ${mateRows}
       ${thin ? `<div class="pc-foot">${MATE_MIN_GAMES}경기 미만은 표본이 적어 흐리게 두었습니다.</div>` : ''}
-    </div>`);
+    </div>
+    <div class="pc-foot">모든 달의 기록을 더한 값입니다 · 취소된 경기는 빠집니다.</div>`;
 }
 
 /** 이름을 누르는 길은 화면마다 따로 두지 않는다. 문서 한 곳에서 받는다. */
