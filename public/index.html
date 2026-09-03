@@ -3454,7 +3454,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 42;
+const APP_VERSION = 43;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -7400,6 +7400,10 @@ function focusRoomWindow(room) {
 }
 
 async function leaveRoom() {
+  // 방만 띄운 창에서는 나가는 순간 보여줄 것이 없다. 목록을 기다렸다가
+  // 빈 화면을 그리는 대신, 나간다고 알리고 창을 바로 닫는다.
+  if (isRoomWindow) { leaveAndCloseRoomWindow(); return; }
+
   leavingOnPurpose = true;
   try {
     await apiPost('/api/room', { action: 'leave' });
@@ -7407,6 +7411,35 @@ async function leaveRoom() {
     renderLauncher();
   } catch (e) { showToast(e.message); }
   finally { leavingOnPurpose = false; }
+}
+
+/**
+ * 방 창에서 나가기를 눌렀을 때.
+ *
+ * 응답을 기다리면 창이 그만큼 멈춰 있고, 기다린 끝에 그릴 화면도 없다.
+ * keepalive 로 보내두면 창이 닫혀도 요청은 끝까지 간다 — 창을 닫을 때
+ * 쓰는 길과 같다. 못 가더라도 3분 뒤 서버가 알아서 자리를 비운다.
+ */
+function leaveAndCloseRoomWindow() {
+  leavingOnPurpose = true;
+  clearRoomWindow();
+  sendLeaveBeacon();
+  try { window.close(); } catch { /* noop */ }
+  // 스스로 열지 않은 창은 브라우저가 닫아주지 않는다. 검은 화면만 남지 않도록.
+  setTimeout(() => {
+    if (!window.closed) showRoomFail('방에서 나왔습니다 · 창을 닫아주세요.');
+  }, 400);
+}
+
+/** 창이 닫히는 중에도 끝까지 가는 나가기 요청 */
+function sendLeaveBeacon() {
+  try {
+    fetch('/api/room', {
+      method: 'POST', keepalive: true,
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + authToken },
+      body: JSON.stringify({ action: 'leave' }),
+    }).catch(() => {});
+  } catch { /* noop */ }
 }
 
 /* ---------- 방장이 명단에서 하는 일 ---------- */
@@ -7890,16 +7923,23 @@ async function bootRoomWindow() {
   // 탭만 켠다. activateTab 은 켜면서 목록을 또 받아오는데, 바로 아래에서
   // 들어가기 응답으로 같은 것을 받으므로 왕복이 한 번 헛돈다.
   showTabOnly('launcher');
-  if (!isLoggedIn()) { showRoomFail('로그인이 풀렸습니다 · 창을 닫고 다시 들어와주세요.'); return; }
+  if (!authToken) { showRoomFail('로그인이 풀렸습니다 · 창을 닫고 다시 들어와주세요.'); return; }
+
+  let d = null;
   try {
     // 창을 열면서 이미 보내둔 것이 있으면 그것을 쓴다
-    applyRooms(await (entering || apiPost('/api/room', { action: 'enter', room: roomParam })));
+    d = await (entering || apiPost('/api/room', { action: 'enter', room: roomParam }));
   } catch (e) {
     // 이 창에는 방 목록이 없다. 못 들어간 이유를 여기서 말해주지 않으면
     // 빈 화면만 남아 무슨 일이 났는지 알 수가 없다.
     showRoomFail(e.message);
     return;
   }
+  // 들어가기 응답이 계정도 실어 온다. 누구인지 따로 물어볼 일이 없다.
+  if (d.account) me = d.account;
+  else await restoreLogin();   // 아직 옛 서버라면
+  renderAuthBar();
+  applyRooms(d);
   hideRoomLoad();
   renderLauncher();
   roomWindowTitle();
@@ -7914,6 +7954,18 @@ async function bootRoomWindow() {
 let entering = null;
 
 async function boot() {
+  // 방 창이면 무엇보다 먼저 들어가기를 띄운다. 화면을 꾸미는 동안 서버가
+  // 나란히 일하도록 — 이 요청이 방 창에서 가장 오래 걸리는 일이다.
+  if (isRoomWindow) {
+    authToken = readKey(TOKEN_KEY);
+    if (authToken) {
+      entering = apiPost('/api/room', { action: 'enter', room: roomParam });
+      // 여기서 한 번 받아두지 않으면 await 전에 실패했을 때 "처리되지 않은
+      // 거부"로 잡힌다. 실제 처리는 bootRoomWindow 가 한다.
+      entering.catch(() => {});
+    }
+  }
+
   initTheme();
   initTabs();
   initStandingEvents();
@@ -7937,33 +7989,20 @@ async function boot() {
   initVoteStats();
   renderAuthBar();
   try {
-    // 방 창은 들어가기를 먼저 띄워두고 확인과 나란히 기다린다
-    if (isRoomWindow && readKey(TOKEN_KEY)) {
-      authToken = readKey(TOKEN_KEY);
-      entering = apiPost('/api/room', { action: 'enter', room: roomParam });
-      // 아래에서 await 하기 전에 실패하면 "처리되지 않은 거부"로 잡히므로
-      // 미리 한 번 받아둔다. 실제 처리는 bootRoomWindow 가 한다.
-      entering.catch(() => {});
+    if (isRoomWindow) {
+      // 방 창이 할 일은 방에 들어가는 것 하나뿐이다. 누구인지 확인하는
+      // 왕복은 들어가기 응답이 대신해준다 — 서버를 한 번만 두드린다.
+      if (entering) await bootRoomWindow();
+      else { showRoomFail('로그인이 풀렸습니다 · 창을 닫고 다시 들어와주세요.'); return; }
+      window.addEventListener('pagehide', () => {
+        clearRoomWindow();
+        sendLeaveBeacon();
+      });
+      return;
     }
     // 표를 먼저 확인해야 첫 화면부터 로그인한 사람으로 그려진다
     await restoreLogin();
     renderAuthBar();
-    if (isRoomWindow) {
-      await bootRoomWindow();
-      window.addEventListener('pagehide', () => {
-        clearRoomWindow();
-        // 창을 닫는 중이라 응답을 기다릴 수 없다. keepalive 로 보내두고 끝낸다.
-        // 이 요청이 못 가더라도 3분 뒤 서버가 알아서 자리를 비운다.
-        try {
-          fetch('/api/room', {
-            method: 'POST', keepalive: true,
-            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + authToken },
-            body: JSON.stringify({ action: 'leave' }),
-          });
-        } catch { /* noop */ }
-      });
-      return;
-    }
     await refreshAll();
     // 초기 비밀번호를 그대로 쓰거나 이메일이 없으면 여기서도 창이 떠야 한다
     if (me) runRequiredSetup();

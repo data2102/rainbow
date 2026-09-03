@@ -1,4 +1,5 @@
-import { q, tx, body, methodGuard, currentUser, requireUser, clientIp, isReachableIp } from './_lib.js';
+import { q, tx, body, methodGuard, currentUser, requireUser, clientIp, isReachableIp,
+         verifyPw, TEMP_PASSWORD } from './_lib.js';
 
 /**
  * 런쳐. 1번방부터 8번방까지, 방마다 최대 16명이 모여 이야기를 나누고
@@ -27,7 +28,7 @@ export const MAX_TITLE = 24;
 export const PING_VERSION = 3;
 
 /** 사이트가 바뀌었는지 브라우저가 알아채는 표. 배포할 때마다 올린다. */
-export const APP_VERSION = 42;
+export const APP_VERSION = 43;
 
 /** 이 시간 동안 아무 신호가 없으면 나간 것으로 본다 (브라우저를 그냥 닫는 경우) */
 const IDLE_MS = 3 * 60 * 1000;
@@ -286,14 +287,20 @@ async function listRooms() {
  * 목록을 읽을 때도, 방에 들어간 직후에도 같은 것이 필요하다. 들어가고 나서
  * 다시 물어보면 왕복이 한 번 더 생기므로, 들어가기 응답에도 이것을 실어 보낸다.
  */
-async function snapshot(req, me) {
+async function snapshot(req, me, withAccount = false) {
+  // 방 창은 계정 확인만을 위해 요청을 한 번 더 보내지 않는다. 어차피 여기서
+  // 그 사람의 players 줄을 읽으므로, 달라고 하면 계정도 같이 실어 보낸다.
+  const cols = withAccount
+    ? 'handle, clan, email, role, pw_hash, radmin_ip, conn_mode'
+    : 'radmin_ip, conn_mode';
+
   // 서로를 기다릴 이유가 없는 것들이라 함께 보낸다.
   // 하나씩 오가면 왕복만 네 번이라, 먼 회선에서는 그것만으로 1초가 넘는다.
   const [rooms, lobbyMessages, waitingList, mineRows] = await Promise.all([
     listRooms(),
     me ? readMsgs(LOBBY) : Promise.resolve([]),
     lobbyList(),
-    me ? q(`SELECT radmin_ip, conn_mode FROM players WHERE handle = $1`, [me.handle])
+    me ? q(`SELECT ${cols} FROM players WHERE handle = $1`, [me.handle])
        : Promise.resolve([]),
   ]);
   const mine = me ? rooms.find(r => r.members.includes(me.handle)) : null;
@@ -312,7 +319,19 @@ async function snapshot(req, me) {
   // 지금 이 사람이 어느 주소에서 들어왔는지. 방장이 되면 이 주소로 사람들이 찾아온다.
   const publicIp = clientIp(req);
 
+  // 계정을 달라고 했을 때만 넣는다. 목록을 받아올 때마다 넣으면 비밀번호
+  // 확인(scrypt)이 매번 돌아 오히려 느려진다.
+  const account = withAccount && mineRows.length ? {
+    handle: mineRows[0].handle,
+    role: mineRows[0].role || 'member',
+    clan: mineRows[0].clan,
+    email: mineRows[0].email || null,
+    mustChangePw: verifyPw(TEMP_PASSWORD, mineRows[0].pw_hash),
+    mustSetEmail: !mineRows[0].email,
+  } : null;
+
   return {
+    account,
     rooms, messages, lobbyMessages, savedAddress, connMode, publicIp,
     publicIpUsable: isReachableIp(publicIp),
     myRoom: mine ? mine.room : null,
@@ -430,7 +449,7 @@ async function enter(req, res) {
     if (out.left) await closeEmptyRooms();
   }
   // 들어간 직후의 화면을 함께 보낸다 — 받은 쪽이 다시 물어보지 않아도 되도록
-  res.status(200).json({ ok: true, room, ...(await snapshot(req, { handle: me })) });
+  res.status(200).json({ ok: true, room, ...(await snapshot(req, { handle: me }, true)) });
 }
 
 async function leave(req, res) {
