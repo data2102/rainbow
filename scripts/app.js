@@ -228,7 +228,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 41;
+const APP_VERSION = 42;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -3703,8 +3703,8 @@ function initRoomJump() {
     const live = roomWindowInfo();
     const here = myRoomData();
     const room = live ? live.room : (here ? here.room : 0);
-    // 같은 이름으로 열면 브라우저가 새 창을 만들지 않고 그 창을 앞으로 낸다
-    if (room) openRoomWindow(room);
+    // 이미 떠 있는 창이면 다시 띄우지 않고 앞으로만 낸다
+    if (room) focusRoomWindow(room);
   });
   // 방 창이 표시를 새로 적을 때마다 따라 그린다 — 서버는 건드리지 않는다
   window.addEventListener('storage', (e) => {
@@ -4138,6 +4138,41 @@ function openRoomWindow(room) {
   return true;
 }
 
+/**
+ * 이미 열려 있는 방 창을 앞으로만 낸다. ALT+TAB 하듯이.
+ *
+ * window.open 에 주소를 같이 주면 브라우저는 그 창을 찾아준 다음 그 주소로
+ * 다시 보낸다 — 방이 처음부터 새로 뜨는 이유가 이것이다. 주소를 빈 문자열로
+ * 주면 찾기만 하고 보내지는 않는다. 다만 그 이름의 창이 없으면 빈 창이
+ * 새로 생기니, 빈 창일 때만 방 주소로 보내준다.
+ */
+function focusRoomWindow(room) {
+  if (roomWin && !roomWin.closed) {
+    try { roomWin.focus(); return true; } catch { /* 창이 사라졌다 */ }
+  }
+
+  let w = null;
+  try {
+    w = window.open('', `r6room${room}`, roomWinFeatures());
+  } catch { /* 브라우저가 막았다 */ }
+  if (!w) return openRoomWindow(room);
+
+  // 방금 만들어진 빈 창인지, 원래 있던 방 창인지
+  let blank = false;
+  try {
+    const href = w.location.href;
+    blank = !href || href === 'about:blank';
+  } catch { blank = false; }   // 남의 주소라 못 읽는다 = 있던 창이다
+
+  if (blank) {
+    try { w.location.replace(`/?room=${room}`); }
+    catch { try { w.location.href = `/?room=${room}`; } catch { /* noop */ } }
+  }
+  roomWin = w;
+  try { w.focus(); } catch { /* noop */ }
+  return true;
+}
+
 async function leaveRoom() {
   leavingOnPurpose = true;
   try {
@@ -4322,7 +4357,7 @@ function initLauncherEvents() {
   const reopen = document.getElementById('lcAwayOpen');
   if (reopen) reopen.addEventListener('click', () => {
     const r = myRoomData();
-    if (r) openRoomWindow(r.room);
+    if (r) focusRoomWindow(r.room);
   });
   const awayLeave = document.getElementById('lcAwayLeave');
   if (awayLeave) awayLeave.addEventListener('click', () => {
