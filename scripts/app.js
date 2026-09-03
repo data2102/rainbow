@@ -228,7 +228,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 44;
+const APP_VERSION = 45;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -4714,6 +4714,8 @@ async function bootRoomWindow() {
     // 창을 열면서 이미 보내둔 것이 있으면 그것을 쓴다
     d = await (entering || apiPost('/api/room', { action: 'enter', room: roomParam }));
   } catch (e) {
+    // 표가 만료됐으면 들고 있어봐야 계속 튕긴다
+    if (e.status === 401) { authToken = null; me = null; clearLogin(); }
     // 이 창에는 방 목록이 없다. 못 들어간 이유를 여기서 말해주지 않으면
     // 빈 화면만 남아 무슨 일이 났는지 알 수가 없다.
     showRoomFail(e.message);
@@ -4741,8 +4743,10 @@ async function boot() {
   // 방 창이면 무엇보다 먼저 들어가기를 띄운다. 화면을 꾸미는 동안 서버가
   // 나란히 일하도록 — 이 요청이 방 창에서 가장 오래 걸리는 일이다.
   if (isRoomWindow) {
-    authToken = readKey(TOKEN_KEY);
-    if (authToken) {
+    authToken = window.__enterToken || readKey(TOKEN_KEY);
+    // 문서 첫머리에서 이미 띄워둔 것이 있으면 그것을 쓴다. 없을 때만 여기서 던진다.
+    if (window.__enter) entering = window.__enter;
+    else if (authToken) {
       entering = apiPost('/api/room', { action: 'enter', room: roomParam });
       // 여기서 한 번 받아두지 않으면 await 전에 실패했을 때 "처리되지 않은
       // 거부"로 잡힌다. 실제 처리는 bootRoomWindow 가 한다.

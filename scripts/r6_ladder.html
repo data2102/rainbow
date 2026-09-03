@@ -34,6 +34,48 @@
     document.documentElement.setAttribute("data-theme", t);
   })();
 </script>
+<script>
+  /*
+   * 방 창이면 들어가기를 여기서 먼저 띄운다.
+   *
+   * 이 아래로 300KB 짜리 화면이 이어진다. 그것을 다 읽고 나서 서버를
+   * 부르면, 읽는 동안 회선은 놀고 회선을 쓰는 동안 화면은 멈춘다.
+   * 여기서 먼저 던져두면 둘이 나란히 간다.
+   *
+   * 아래 app.js 가 window.__enter 를 그대로 받아 쓴다.
+   */
+  (function () {
+    try {
+      var q = new URLSearchParams(location.hash.replace(/^#/, ''));
+      var room = Number(q.get('room')) ||
+                 Number(new URLSearchParams(location.search).get('room')) || 0;
+      if (!room) return;
+      // 방만 띄운 창이라는 것을 첫 페인트 전에 알린다. 머리글도 메뉴도
+      // 순위표도 그려졌다 지워지지 않고, 처음부터 방만 자리를 잡는다.
+      document.documentElement.classList.add('room-only');
+      var t = null;
+      try {
+        t = localStorage.getItem('r6-token') || sessionStorage.getItem('r6-token');
+      } catch (e) { /* 저장이 막혀 있다 */ }
+      if (!t) return;
+      window.__enterToken = t;
+      window.__enter = fetch('/api/room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + t },
+        body: JSON.stringify({ action: 'enter', room: room }),
+      }).then(function (r) {
+        return r.json().catch(function () { return null; }).then(function (d) {
+          if (r.ok) return d;
+          var e = new Error((d && d.error) || ('서버 오류 (' + r.status + ')'));
+          e.status = r.status;
+          throw e;
+        });
+      });
+      // 아래에서 받아 쓰기 전에 실패하면 "처리되지 않은 거부"로 잡힌다
+      window.__enter.catch(function () {});
+    } catch (e) { /* 무슨 일이 있어도 화면은 떠야 한다 */ }
+  })();
+</script>
 <style>
 /* ── 여백(Yeobaek) 디자인시스템 토큰 · data2102/design-system ── */
 /* ============================================================

@@ -1,4 +1,5 @@
 import { q, tx, body, methodGuard, currentUser, requireUser, clientIp, isReachableIp,
+         ensureAccounts,
          verifyPw, TEMP_PASSWORD } from './_lib.js';
 
 /**
@@ -28,7 +29,7 @@ export const MAX_TITLE = 24;
 export const PING_VERSION = 3;
 
 /** 사이트가 바뀌었는지 브라우저가 알아채는 표. 배포할 때마다 올린다. */
-export const APP_VERSION = 44;
+export const APP_VERSION = 45;
 
 /** 이 시간 동안 아무 신호가 없으면 나간 것으로 본다 (브라우저를 그냥 닫는 경우) */
 const IDLE_MS = 3 * 60 * 1000;
@@ -361,7 +362,9 @@ async function snapshot(req, me, withAccount = false) {
 export default async function handler(req, res) {
   if (!methodGuard(req, res, ['GET', 'POST'])) return;
   try {
-    await ensureTables();
+    // enter 는 requireUser 를 거치지 않으므로 계정 정리도 여기서 챙긴다.
+    // 둘 다 인스턴스마다 한 번뿐이라, 나란히 보내 첫 요청을 덜 기다리게 한다.
+    await Promise.all([ensureTables(), ensureAccounts()]);
 
     if (req.method === 'GET') {
       const me = await currentUser(req);
@@ -426,69 +429,78 @@ export default async function handler(req, res) {
  *
  * 이 하나가 방 창에서 가장 오래 걸리는 일이라, DB 를 몇 번 오가느냐가
  * 그대로 체감 속도가 된다. 예전에는 확인·정원·주인 확인·삭제·추가·알림을
- * 하나씩 물어 열 번 넘게 오갔다. 지금은 세 번이면 끝난다.
+ * 하나씩 물어 열네 번 오갔다. 지금은 세 번이면 끝난다.
+ *
+ * 누구인지 확인하는 일도 이 문장 안에 있다. 표가 없으면 who 가 비고,
+ * 그 뒤가 모두 who 에 기대고 있어 아무 일도 일어나지 않는다 — 로그인하지
+ * 않은 요청이 자리를 차지할 길이 없다.
+ *
+ * 잠금은 반드시 이 문장보다 먼저, 따로 걸어야 한다. 한 문장 안에 넣으면
+ * 잠기기도 전에 그 문장이 읽을 시점이 정해져 버려(READ COMMITTED),
+ * 동시에 들어온 사람들이 저마다 옛날 인원 수를 보고 다 같이 앉는다.
+ * 실제로 정원 5명인 방에 9명이 앉았다. 그래서 BEGIN 과 잠금을 먼저 보내고,
+ * 잠긴 뒤에 다시 세는 이 문장을 보낸다.
  */
+const ENTER_SQL = `
+  WITH who AS (
+    SELECT p.handle FROM sessions s
+      JOIN players p ON p.handle = s.admin_id
+     WHERE s.token = $1 AND s.expires_at > now()
+  ), st AS (
+    SELECT who.handle,
+      EXISTS(SELECT 1 FROM room_members WHERE room = $2 AND handle = who.handle) AS here,
+      (SELECT count(*)::int FROM room_members WHERE room = $2)                   AS n,
+      COALESCE((SELECT cap FROM room_state WHERE room = $2), $3::int)            AS cap,
+      (SELECT room FROM room_members WHERE handle = who.handle)                  AS prev
+      FROM who
+  ), ok AS (
+    SELECT * FROM st WHERE NOT here AND n < cap
+  ), seat AS (
+    INSERT INTO room_members (room, handle, joined_at, last_seen)
+    SELECT $2::int, ok.handle, $4::bigint, $4::bigint FROM ok
+    ON CONFLICT (handle) DO UPDATE
+      SET room = EXCLUDED.room, joined_at = EXCLUDED.joined_at,
+          last_seen = EXCLUDED.last_seen
+  ), hello AS (
+    INSERT INTO room_messages (room, handle, body, ts)
+    SELECT $2::int, NULL,
+           ok.handle || CASE WHEN ok.n = 0 THEN ' 님이 방을 열었습니다. (방장)'
+                                           ELSE ' 님이 들어왔습니다.' END,
+           $4::bigint
+      FROM ok
+  ), bye AS (
+    INSERT INTO room_messages (room, handle, body, ts)
+    SELECT ok.prev, NULL, ok.handle || ' 님이 나갔습니다.', $4::bigint
+      FROM ok WHERE ok.prev IS NOT NULL
+  )
+  SELECT * FROM st`;
+
 async function enter(req, res) {
   const room = checkRoom(body(req).room);   // 1..ROOM_COUNT 정수임이 보장된다
-  const now = Date.now();
+  const auth = req.headers?.authorization || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  if (!token) return res.status(401).json({ error: '로그인이 필요합니다.' });
 
-  // 누구인지 확인하는 일과 방을 잠그는 일은 서로 기댈 것이 없다. 나란히
-  // 보내고 쓸 때 기다린다 — 자리를 바꾸는 문장은 확인이 끝난 뒤에야 돈다.
-  const whoP = requireUser(req, res);
-  whoP.catch(() => {});
-  let me = null;
+  // 방 번호는 checkRoom 이 정수임을 보장하므로 문장에 그대로 적어 BEGIN 과
+  // 한 번에 보낸다 — 왕복 한 번을 아낀다.
+  const st = await tx(
+    async (c) => (await c.query(ENTER_SQL, [token, room, ROOM_CAPACITY, Date.now()])).rows[0],
+    `SELECT pg_advisory_xact_lock(77001, ${room})`
+  );
 
-  // 방을 잠근다. 세는 값이 믿을 만하려면 잠금이 먼저 끝나야 한다.
-  // 방 번호는 checkRoom 이 이미 정수임을 보장하므로 문장에 그대로 적어
-  // BEGIN 과 한 번에 보낸다 — 왕복 한 번을 아낀다.
-  const out = await tx(async (c) => {
-    me = await whoP;
-    if (!me) return { unauth: true };   // requireUser 가 이미 401 을 보냈다
+  // 표가 맞지 않으면 who 가 비어 아무것도 돌아오지 않는다
+  if (!st) return res.status(401).json({ error: '로그인이 필요합니다.' });
 
-    // 확인하고 앉히고 알리는 일을 한 문장으로 보낸다. 앉힐지 말지는
-    // ok 가 정한다 — 자리가 없거나 이미 있으면 ok 가 비어 아무 일도
-    // 일어나지 않고, 상태(st)만 돌아온다.
-    const { rows: [st] } = await c.query(
-      `WITH st AS (
-         SELECT
-           EXISTS(SELECT 1 FROM room_members WHERE room = $1 AND handle = $2) AS here,
-           (SELECT count(*)::int FROM room_members WHERE room = $1)           AS n,
-           COALESCE((SELECT cap FROM room_state WHERE room = $1), $4::int)    AS cap,
-           (SELECT room FROM room_members WHERE handle = $2)                  AS prev
-       ), ok AS (
-         SELECT * FROM st WHERE NOT here AND n < cap
-       ), seat AS (
-         INSERT INTO room_members (room, handle, joined_at, last_seen)
-         SELECT $1::int, $2::text, $3::bigint, $3::bigint FROM ok
-         ON CONFLICT (handle) DO UPDATE
-           SET room = EXCLUDED.room, joined_at = EXCLUDED.joined_at,
-               last_seen = EXCLUDED.last_seen
-       ), hello AS (
-         INSERT INTO room_messages (room, handle, body, ts)
-         SELECT $1::int, NULL, CASE WHEN ok.n = 0 THEN $5::text ELSE $6::text END,
-                $3::bigint
-           FROM ok
-       ), bye AS (
-         INSERT INTO room_messages (room, handle, body, ts)
-         SELECT ok.prev, NULL, $7::text, $3::bigint FROM ok WHERE ok.prev IS NOT NULL
-       )
-       SELECT * FROM st`,
-      [room, me, now, ROOM_CAPACITY,
-       `${me} 님이 방을 열었습니다. (방장)`, `${me} 님이 들어왔습니다.`,
-       `${me} 님이 나갔습니다.`]
-    );
-
-    if (st.here) return { already: true };
-    if (st.n >= Number(st.cap)) return { full: true, cap: Number(st.cap) };
-    return { left: st.prev == null ? null : Number(st.prev), first: st.n === 0 };
-  }, `SELECT pg_advisory_xact_lock(77001, ${room})`);
-
-  if (out.unauth) return;
-  if (out.full) return res.status(400).json({ error: `${room}번방은 정원(${out.cap}명)이 찼습니다.` });
+  const cap = Number(st.cap);
+  if (!st.here && st.n >= cap) {
+    return res.status(400).json({ error: `${room}번방은 정원(${cap}명)이 찼습니다.` });
+  }
   // 방을 옮긴 사람만 지나는 길이다. 보통은 이 줄을 밟지 않는다.
-  if (out.left) await closeEmptyRooms();
+  const left = st.prev == null ? null : Number(st.prev);
+  if (!st.here && left !== null && left !== room) await closeEmptyRooms();
+
   // 들어간 직후의 화면을 함께 보낸다 — 받은 쪽이 다시 물어보지 않아도 되도록
-  res.status(200).json({ ok: true, room, ...(await snapshot(req, { handle: me, room }, true)) });
+  res.status(200).json({ ok: true, room, ...(await snapshot(req, { handle: st.handle, room }, true)) });
 }
 
 async function leave(req, res) {
