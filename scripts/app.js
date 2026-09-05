@@ -229,7 +229,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 48;
+const APP_VERSION = 49;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -3310,9 +3310,7 @@ const HOST_SETTLED_MS = 15000;
  * 사람은 이것을 보고 CREATE GAME 이나 JOIN GAME 까지 알아서 들어간다.
  * 기본판은 이 꼬리표를 무시하고 게임만 켠다.
  */
-async function launchGame(address, mode) {
-  if (address) await copyText(address);
-
+function launchGame(address, mode) {
   // 참가자는 켜자마자 방장을 두드리므로, 방장 게임이 아직 뜨는 중이면
   // 헛걸음이 된다. 그래서 런쳐가 몇 초 기다렸다 켠다. 다만 방장이 켠 지
   // 한참 지난 뒤에 조인하기를 누른 사람은 기다릴 이유가 없다 —
@@ -3324,22 +3322,42 @@ async function launchGame(address, mode) {
   const url = mode === 'create'
     ? GAME_PROTOCOL + 'create'
     : GAME_PROTOCOL + 'join' + (settled ? '/now' : '') + (address ? '/' + address : '');
-  // 부르기 전에 방에 먼저 남긴다. 프로토콜이 등록돼 있지 않으면 브라우저가
-  // 아무 일도 하지 않고 조용히 끝나는데, 그때도 "누가 눌렀는지"는 남아야
-  // 누구 컴퓨터가 문제인지 가릴 수 있다. 알림일 뿐이라 실패해도 넘어간다.
-  try {
-    await apiPost('/api/room', { action: 'report', event: mode, address });
-  } catch { /* noop */ }
 
-  window.location.href = url;
+  /*
+   * 게임부터 켠다.
+   *
+   * 예전에는 주소를 복사하고 기록을 남긴 뒤에야 게임을 불렀다. 그런데
+   * 크롬은 창이 맨 앞에 있지 않으면 clipboard.writeText 가 끝나지도
+   * 실패하지도 않고 그대로 매달린다. 카운트다운 3초 사이에 다른 창을
+   * 보고 있었다면 — 방 창을 뒤에 두고 있는 참가자는 늘 그렇다 — 복사를
+   * 기다리다 게임을 영영 못 켰다. 화면은 멀쩡한데 아무 일도 일어나지
+   * 않던 것이 이것이다.
+   *
+   * 복사도 기록도 있으면 좋은 것이지, 게임보다 먼저일 수는 없다.
+   */
   startPlaying();
+  try { window.location.href = url; } catch { /* 프로토콜이 없으면 조용히 끝난다 */ }
+
+  // 주소는 뒤따라 복사한다. 기다리지 않으므로 매달려도 게임에는 지장이 없다.
+  if (address) { try { copyText(address).catch(() => {}); } catch { /* noop */ } }
+
+  // 누가 눌렀는지 남긴다. 프로토콜이 등록돼 있지 않으면 브라우저가 아무
+  // 일도 하지 않고 조용히 끝나는데, 그때도 이 기록이 있어야 누구 컴퓨터가
+  // 문제인지 가릴 수 있다. 게임이 뜨면서 창이 뒤로 밀려도 끝까지 가도록
+  // keepalive 로 던지고, 응답은 기다리지 않는다.
+  try {
+    fetch('/api/room', {
+      method: 'POST', keepalive: true,
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ action: 'report', event: mode, address }),
+    }).catch(() => {});
+  } catch { /* noop */ }
 
   showToast(mode === 'create'
     ? '게임을 켭니다 · 로비에서 사람들을 기다려주세요.'
     : (address
       ? `게임을 켭니다 · ${address} 로 붙습니다 (주소는 복사해뒀습니다)`
       : '게임을 켭니다 · 방장 주소가 없어 자동으로 붙지 못할 수 있습니다.'));
-
 }
 
 /** 클립보드. 막혀 있으면 옛 방식으로 한 번 더 시도한다. */
@@ -4499,11 +4517,12 @@ async function startRoom(known) {
     const d = await apiPost('/api/room', { action: 'start', address });
     closeModal();
     if (connMode === 'radmin') savedAddress = address || savedAddress;
-    await loadRooms();
-    renderLauncher();
     // 3·2·1 을 세고 게임을 띄운다. 방에 있는 사람들도 같은 시각에 맞춰 함께 센다.
     // 서버가 정한 주소를 그대로 쓴다 (공인 IP 방식이면 서버만 알고 있다).
+    // 목록 새로고침을 기다리고 나서 세면 그만큼 3초가 깎인다. 먼저 세고,
+    // 화면은 뒤따라 맞춘다.
     playCountdown(d.startedAt || Date.now(), () => launchGame(d.address, 'create'));
+    loadRooms().then(renderLauncher).catch(() => {});
   } catch (e) {
     if (err) err.textContent = e.message;
     else showToast(e.message);
