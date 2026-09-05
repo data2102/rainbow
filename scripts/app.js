@@ -229,7 +229,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 49;
+const APP_VERSION = 50;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -3310,7 +3310,34 @@ const HOST_SETTLED_MS = 15000;
  * 사람은 이것을 보고 CREATE GAME 이나 JOIN GAME 까지 알아서 들어간다.
  * 기본판은 이 꼬리표를 무시하고 게임만 켠다.
  */
+/** 26.131.188.239 처럼 생겼는가. 아니면 게임에 넘길 값이 아니다. */
+function looksLikeAddress(v) {
+  return /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?::\d{1,5})?$/.test(String(v || '').trim());
+}
+
 function launchGame(address, mode) {
+  /*
+   * 주소 없이 조인하면 게임은 켜지되 아무 데도 못 붙는다.
+   *
+   * 어느 회원의 런쳐 기록에 `RUN = -client / 2346` 이 남아 있었다. 주소
+   * 자리에 빗금 하나가 들어간 것인데, 게임은 그것을 주소로 알고 켜져서
+   * 영영 붙지 못하는 화면에 서 있었다. 사이트가 빈 주소를 그대로 넘긴
+   * 탓이다. 켜기 전에 주소부터 본다.
+   *
+   * 눌린 순간의 방 상태에서 다시 읽는다 — 버튼을 그릴 때의 값을 들고
+   * 있으면, 그리고 나서 방장이 주소를 정한 경우 옛 값(없음)이 넘어간다.
+   */
+  const here0 = myRoomData();
+  if (mode === 'join') {
+    const fresh = here0 && here0.address ? here0.address : address;
+    if (!looksLikeAddress(fresh)) {
+      showToast('방장 접속 주소가 아직 없습니다 · 방장이 실행하기를 누른 뒤에 조인해주세요.');
+      loadRooms().then(renderLauncher).catch(() => {});
+      return;
+    }
+    address = fresh;
+  }
+
   // 참가자는 켜자마자 방장을 두드리므로, 방장 게임이 아직 뜨는 중이면
   // 헛걸음이 된다. 그래서 런쳐가 몇 초 기다렸다 켠다. 다만 방장이 켠 지
   // 한참 지난 뒤에 조인하기를 누른 사람은 기다릴 이유가 없다 —

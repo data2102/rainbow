@@ -80,6 +80,12 @@ goto :check
 
 :runjoin
 if "%IP%"=="" goto :noip
+rem  A join url with no address behind it leaves a stray "/" or a word
+rem  here, and the game would open and sit on a screen it can never
+rem  leave. Four dot-separated pieces is what an address looks like.
+set "IPOK="
+for /f "tokens=1-4 delims=." %%A in ("%IP%") do if not "%%D"=="" set "IPOK=1"
+if not "%IPOK%"=="1" goto :badip
 call :log "RUN     = -client %IP% %PORT%"
 start "" "%GAME%" -client %IP% %PORT%
 goto :check
@@ -146,6 +152,20 @@ goto :stop
 call :log "RESULT  = no host address"
 echo   No host address was passed.
 echo   The host must pick a connection mode on the site first.
+goto :stop
+
+:badip
+rem  A join url with no address behind it lands here. Starting the game
+rem  with a stray "/" as the host looks like it worked - the game opens
+rem  and then sits on a screen it can never leave. Say so instead.
+call :log "RESULT  = bad host address (%IP%)"
+echo   The address handed over is not an IP address:
+echo     %IP%
+echo.
+echo   This happens when Join is pressed before the host has started,
+echo   or before the host has entered a Radmin address.
+echo.
+echo   Ask the host to press Start on the site, then press Join again.
 goto :stop
 
 :already
