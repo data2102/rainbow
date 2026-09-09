@@ -229,7 +229,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 51;
+const APP_VERSION = 52;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -562,11 +562,13 @@ function renderStanding() {
 
   tbody.innerHTML = filtered.map(p => {
     let streakCell;
-    if (p.streak >= 5)       streakCell = `<span class="up-badge">▲ +${p.streak}(UP)</span>`;
-    else if (p.streak <= -5) streakCell = `<span class="down-badge">▼ ${p.streak}(DOWN)</span>`;
-    else if (p.streak > 0)   streakCell = `<span class="streak-pos">+${p.streak}</span>`;
-    else if (p.streak < 0)   streakCell = `<span class="streak-neg">${p.streak}</span>`;
-    else                     streakCell = '0';
+    // 연승은 5부터 배지를 달아 치켜세운다. 연패에는 배지를 달지 않는다 —
+    // 못하고 있다는 것은 숫자만으로 이미 충분히 보이고, 거기에 붉은 딱지까지
+    // 붙여 남들 화면에 띄울 이유가 없다.
+    if (p.streak >= 5)     streakCell = `<span class="up-badge">▲ +${p.streak}(UP)</span>`;
+    else if (p.streak > 0) streakCell = `<span class="streak-pos">+${p.streak}</span>`;
+    else if (p.streak < 0) streakCell = `<span class="streak-neg">${p.streak}</span>`;
+    else                   streakCell = '0';
     // 상위 등수는 STANDING 표에서만 색을 달리한다 (2페이지 순위표는 그대로 둔다)
     const topRow = p.rank <= STANDING_HIGHLIGHT ? ' class="top-rank-row"' : '';
     return `<tr${topRow}>
