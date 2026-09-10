@@ -1373,9 +1373,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 }
 .team-card.is-merc{ background:var(--warm-bg); border-color:transparent; }
 .tc-name{ font-size:var(--fs-subhead); font-weight:var(--fw-bold); }
-.tc-roster{ font-size:var(--fs-caption); color:var(--text-secondary); margin-top:var(--sp-1); }
-.tc-roster em{ font-style:normal; color:var(--text-tertiary); }
-/* 본선 명단은 한 사람에 한 줄. 가운뎃점으로 이으면 어디까지가 한 사람인지
+/* 명단은 한 사람에 한 줄. 가운뎃점으로 이으면 어디까지가 한 사람인지
    흐려진다 — 아이디에 밑줄과 대소문자가 섞여 있어 더 그렇다. */
 .tc-list{
   margin-top:var(--sp-2);
@@ -2729,7 +2727,6 @@ if (/[?&]room=\d+/.test(location.search)) {
 
       <div class="tsec">
         <div class="tsec-h">■ 조편성 (본선)</div>
-        <div class="tsec-sub">4개 팀 · 팀당 5명 · 예선에서 쓰던 팀 이름을 그대로 씁니다</div>
         <div class="team-cards" id="teamCardsFinal"></div>
       </div>
 

@@ -34,11 +34,11 @@ let vpn = { network: '', password: null };  // Radmin 네트워크 안내 (비�
 
 /* 대회 참가 팀. api/tournament.js 의 TEAMS 와 id 가 일치해야 합니다. */
 const TOURNAMENT_TEAMS = [
-  { id: 'A', label: 'A팀', members: ['레나', '네오', '블루베리', '렌보짱'] },
-  { id: 'B', label: 'B팀', members: ['현정', '구짭', '범상', '짱가'] },
-  { id: 'C', label: 'C팀', members: ['멘탈', '메가', '소소', '보리'] },
-  { id: 'D', label: 'D팀', members: ['진원', '람보', '플라스', '수까락'] },
-  { id: 'E', label: 'E팀', members: ['벨리', '까를', '티얼', '조커'] },
+  { id: 'A', label: 'A팀', members: ['SNC_LeNa', 'SNC_NEo', 'SNC_BlueBerry', 'Ranbo_zzang'] },
+  { id: 'B', label: 'B팀', members: ['oK_Hyunjung', 'SNC_Gjplayer', '2MaNstorY_zZangGa', 'GET_Bumsang24'] },
+  { id: 'C', label: 'C팀', members: ['oK_mEntAl', 'LOTUS_MEGA', 'soso', 'KIMPO_BORY'] },
+  { id: 'D', label: 'D팀', members: ['LOTUS_JINWON2', 'Rambo702', 'PAC_Plus', 'oK_SkyLacK'] },
+  { id: 'E', label: 'E팀', members: ['NE_Valley', 'oK_Carlos', 'PSN_JOKER', 'LOTUS_TeaRs'] },
 ];
 
 /**
@@ -55,7 +55,7 @@ const TOURNAMENT_TEAMS_FINAL = [
   { label: 'E팀', members: ['NE_Valley', 'oK_Carlos', 'PSN_JOKER', 'LOTUS_TeaRs', 'oK_Hyunjung'] },
 ];
 
-const MERCENARIES = ['럭키', '호신', '실장'];
+const MERCENARIES = ['RID_HoSiN', 'oK_LuCkY', 'SiLJanG', 'LOTUS_NaiLaRt'];
 const ADVANCING = 4;        // 예선 통과 팀 수
 const CLAN_TOP = 5;         // 클랜 순위에 보여줄 등수
 const TOP_N = 5;            // 개인 순위 표에 보여줄 인원
@@ -244,7 +244,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 54;
+const APP_VERSION = 55;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -1948,12 +1948,13 @@ function renderTeamCards() {
   const teams = TOURNAMENT_TEAMS.map(t => `
     <div class="team-card">
       <div class="tc-name">${esc(t.label)}</div>
-      <div class="tc-roster">${t.members.map(esc).join(' · ')}</div>
+      <div class="tc-list">${t.members.map(h => `<div>${esc(h)}</div>`).join('')}</div>
     </div>`).join('');
   el.innerHTML = teams + `
     <div class="team-card is-merc">
       <div class="tc-name">용병</div>
-      <div class="tc-roster">${MERCENARIES.map(esc).join(' · ')}<br><em>그 외 상황 봐서</em></div>
+      <div class="tc-list">${MERCENARIES.map(h => `<div>${esc(h)}</div>`).join('')}</div>
+      <div class="tc-reserve">그 외 상황 봐서</div>
     </div>`;
 }
 
