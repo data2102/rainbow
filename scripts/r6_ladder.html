@@ -1441,6 +1441,12 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .br-team.adv{ color:var(--success-strong); background:var(--success-bg); border-color:transparent; }
 .br-team.drop{ color:var(--danger-strong); background:var(--danger-bg); border-color:transparent; }
 .br-team.gold{ color:var(--warning-strong); background:var(--warning-bg); border-color:transparent; }
+/* 아직 누가 올라올지 모르는 자리 */
+.br-team.wait{ color:var(--text-tertiary); }
+/* 이긴 팀은 한눈에 가려져야 한다 — 대진표를 보는 이유가 그것이다 */
+.br-team.won{ font-weight:var(--fw-bold); box-shadow:inset 0 0 0 1px currentColor; }
+.br-team.won::after{ content:' ✓'; }
+.final-box.done .final-vs{ color:var(--warning-strong); }
 
 .final-box{
   border:1px solid var(--border); border-radius:var(--radius-lg);
@@ -2759,66 +2765,13 @@ if (/[?&]room=\d+/.test(location.search)) {
         </ul>
 
         <div class="tsec-h" style="font-size:var(--fs-caption);color:var(--success-strong);margin-top:18px;">승자조</div>
-        <div class="bracket-wrap">
-          <div class="bracket">
-            <div class="br-col">
-              <div class="br-col-h">1차전</div>
-              <div class="br-match">
-                <div class="br-team seed">C팀</div>
-                <div class="br-team seed">E팀</div>
-              </div>
-              <div class="br-match">
-                <div class="br-team seed">A팀</div>
-                <div class="br-team seed">D팀</div>
-              </div>
-            </div>
-            <div class="br-col">
-              <div class="br-col-h">2차전</div>
-              <div class="br-match spread">
-                <div class="br-team adv">승자</div>
-                <div class="br-team adv">승자</div>
-              </div>
-            </div>
-            <div class="br-col">
-              <div class="br-col-h">승자조 결승</div>
-              <div class="br-match">
-                <div class="br-team gold">★ 결승 직행</div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <div class="bracket-wrap"><div class="bracket" id="winnersBracket"></div></div>
 
         <div class="tsec-h" style="font-size:var(--fs-caption);color:var(--danger-strong);margin-top:20px;">패자조</div>
-        <div class="bracket-wrap">
-          <div class="bracket">
-            <div class="br-col">
-              <div class="br-col-h">패자 1차전</div>
-              <div class="br-match">
-                <div class="br-team drop">1차전 패자</div>
-                <div class="br-team drop">1차전 패자</div>
-              </div>
-            </div>
-            <div class="br-col">
-              <div class="br-col-h">패자 2차전</div>
-              <div class="br-match">
-                <div class="br-team adv">승자</div>
-                <div class="br-team drop">승자조 최종 패자</div>
-              </div>
-            </div>
-            <div class="br-col">
-              <div class="br-col-h">패자조 결승</div>
-              <div class="br-match">
-                <div class="br-team gold">★ 결승 진출</div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <div class="bracket-wrap"><div class="bracket" id="losersBracket"></div></div>
 
-        <div class="final-box">
-          <div class="final-label">★ 결승 ★</div>
-          <div class="final-vs">무패팀 <span>VS</span> 생존팀</div>
-          <div class="final-note">승자조를 무패로 통과한 팀과, 패자조를 뚫고 살아남은 팀의 대결</div>
-        </div>
+        <div id="finalBox"></div>
+        <div class="foot-note" id="bracketNote" style="margin-top:10px;"></div>
       </div>
 
       <div class="tsec">

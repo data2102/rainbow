@@ -1441,6 +1441,12 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .br-team.adv{ color:var(--success-strong); background:var(--success-bg); border-color:transparent; }
 .br-team.drop{ color:var(--danger-strong); background:var(--danger-bg); border-color:transparent; }
 .br-team.gold{ color:var(--warning-strong); background:var(--warning-bg); border-color:transparent; }
+/* 아직 누가 올라올지 모르는 자리 */
+.br-team.wait{ color:var(--text-tertiary); }
+/* 이긴 팀은 한눈에 가려져야 한다 — 대진표를 보는 이유가 그것이다 */
+.br-team.won{ font-weight:var(--fw-bold); box-shadow:inset 0 0 0 1px currentColor; }
+.br-team.won::after{ content:' ✓'; }
+.final-box.done .final-vs{ color:var(--warning-strong); }
 
 .final-box{
   border:1px solid var(--border); border-radius:var(--radius-lg);
@@ -2759,66 +2765,13 @@ if (/[?&]room=\d+/.test(location.search)) {
         </ul>
 
         <div class="tsec-h" style="font-size:var(--fs-caption);color:var(--success-strong);margin-top:18px;">승자조</div>
-        <div class="bracket-wrap">
-          <div class="bracket">
-            <div class="br-col">
-              <div class="br-col-h">1차전</div>
-              <div class="br-match">
-                <div class="br-team seed">C팀</div>
-                <div class="br-team seed">E팀</div>
-              </div>
-              <div class="br-match">
-                <div class="br-team seed">A팀</div>
-                <div class="br-team seed">D팀</div>
-              </div>
-            </div>
-            <div class="br-col">
-              <div class="br-col-h">2차전</div>
-              <div class="br-match spread">
-                <div class="br-team adv">승자</div>
-                <div class="br-team adv">승자</div>
-              </div>
-            </div>
-            <div class="br-col">
-              <div class="br-col-h">승자조 결승</div>
-              <div class="br-match">
-                <div class="br-team gold">★ 결승 직행</div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <div class="bracket-wrap"><div class="bracket" id="winnersBracket"></div></div>
 
         <div class="tsec-h" style="font-size:var(--fs-caption);color:var(--danger-strong);margin-top:20px;">패자조</div>
-        <div class="bracket-wrap">
-          <div class="bracket">
-            <div class="br-col">
-              <div class="br-col-h">패자 1차전</div>
-              <div class="br-match">
-                <div class="br-team drop">1차전 패자</div>
-                <div class="br-team drop">1차전 패자</div>
-              </div>
-            </div>
-            <div class="br-col">
-              <div class="br-col-h">패자 2차전</div>
-              <div class="br-match">
-                <div class="br-team adv">승자</div>
-                <div class="br-team drop">승자조 최종 패자</div>
-              </div>
-            </div>
-            <div class="br-col">
-              <div class="br-col-h">패자조 결승</div>
-              <div class="br-match">
-                <div class="br-team gold">★ 결승 진출</div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <div class="bracket-wrap"><div class="bracket" id="losersBracket"></div></div>
 
-        <div class="final-box">
-          <div class="final-label">★ 결승 ★</div>
-          <div class="final-vs">무패팀 <span>VS</span> 생존팀</div>
-          <div class="final-note">승자조를 무패로 통과한 팀과, 패자조를 뚫고 살아남은 팀의 대결</div>
-        </div>
+        <div id="finalBox"></div>
+        <div class="foot-note" id="bracketNote" style="margin-top:10px;"></div>
       </div>
 
       <div class="tsec">
@@ -3652,7 +3605,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 57;
+const APP_VERSION = 58;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -5378,6 +5331,151 @@ function renderFinalTeamCards() {
     </div>`).join('');
 }
 
+/* ---------- 본선 대진표 ---------- */
+
+/**
+ * 승자조 1차전 두 판. 추첨으로 정해진 자리다.
+ * 여기만 고치면 아래 대진표 전체가 그 결과를 따라 흐른다.
+ */
+const FINAL_SEEDS = [['C', 'E'], ['A', 'D']];
+
+/**
+ * 기록된 본선 경기를 대진표 자리에 끼워 넣는다.
+ *
+ * 기록에는 몇 차전인지가 남지 않는다. 대신 누가 누구와 붙었는지는 남으므로,
+ * 앞선 판이 정해지면 다음 판에 누가 올라오는지도 정해진다 — 그 짝을 가진
+ * 경기를 찾으면 그 자리가 채워진다. 같은 두 팀이 두 번 만날 수도 있어
+ * (패자조를 뚫고 올라와 결승에서 다시 만나는 경우) 한 번 쓴 기록은
+ * 다시 쓰지 않는다.
+ */
+function finalBracket() {
+  const pool = tMatches
+    .filter(m => m.stage === 'final')
+    .slice()
+    .sort((a, b) => a.ts - b.ts);
+  const used = new Set();
+
+  const take = (a, b) => {
+    if (!a || !b) return null;
+    const m = pool.find(x => !used.has(x.id)
+      && ((x.teamA === a && x.teamB === b) || (x.teamA === b && x.teamB === a)));
+    if (m) used.add(m.id);
+    return m || null;
+  };
+  const won = m => (m ? m.winner : null);
+  const lost = m => (m ? (m.winner === m.teamA ? m.teamB : m.teamA) : null);
+
+  const wb1 = take(FINAL_SEEDS[0][0], FINAL_SEEDS[0][1]);
+  const wb2 = take(FINAL_SEEDS[1][0], FINAL_SEEDS[1][1]);
+  const wbf = take(won(wb1), won(wb2));       // 승자조 결승
+  const lb1 = take(lost(wb1), lost(wb2));     // 패자 1차전
+  const lb2 = take(won(lb1), lost(wbf));      // 패자 2차전
+  const fin = take(won(wbf), won(lb2));       // 결승
+
+  return {
+    wb1, wb2, wbf, lb1, lb2, fin, won, lost,
+    left: pool.filter(x => !used.has(x.id)),
+  };
+}
+
+/** 대진표 한 칸. 팀이 정해졌으면 이름을, 아니면 자리 이름을 보여준다. */
+function brTeam(handleOrNull, fallback, cls, isWinner) {
+  const known = !!handleOrNull;
+  const text = known ? teamLabel(handleOrNull) : fallback;
+  const kind = known ? cls : 'wait';
+  return `<div class="br-team ${kind}${isWinner ? ' won' : ''}">${esc(text)}</div>`;
+}
+
+/** 두 팀이 붙는 한 판 */
+function brMatch(m, aSeed, bSeed, aWait, bWait, cls) {
+  const a = m ? m.teamA : aSeed;
+  const b = m ? m.teamB : bSeed;
+  return `<div class="br-match">
+    ${brTeam(a, aWait, cls, m && m.winner === a)}
+    ${brTeam(b, bWait, cls, m && m.winner === b)}
+  </div>`;
+}
+
+function renderFinalBracket() {
+  const wEl = document.getElementById('winnersBracket');
+  const lEl = document.getElementById('losersBracket');
+  const fEl = document.getElementById('finalBox');
+  const note = document.getElementById('bracketNote');
+  if (!wEl || !lEl || !fEl) return;
+
+  const b = finalBracket();
+  const champ = b.fin ? b.fin.winner : null;
+
+  wEl.innerHTML = `
+    <div class="br-col">
+      <div class="br-col-h">1차전</div>
+      ${brMatch(b.wb1, FINAL_SEEDS[0][0], FINAL_SEEDS[0][1], '', '', 'seed')}
+      ${brMatch(b.wb2, FINAL_SEEDS[1][0], FINAL_SEEDS[1][1], '', '', 'seed')}
+    </div>
+    <div class="br-col">
+      <div class="br-col-h">2차전</div>
+      <div class="br-match spread">
+        ${brTeam(b.won(b.wb1), '승자', 'adv', b.wbf && b.wbf.winner === b.won(b.wb1))}
+        ${brTeam(b.won(b.wb2), '승자', 'adv', b.wbf && b.wbf.winner === b.won(b.wb2))}
+      </div>
+    </div>
+    <div class="br-col">
+      <div class="br-col-h">승자조 결승</div>
+      <div class="br-match">
+        ${b.wbf
+          ? `<div class="br-team gold">★ ${esc(teamLabel(b.wbf.winner))} 결승 직행</div>`
+          : '<div class="br-team gold">★ 결승 직행</div>'}
+      </div>
+    </div>`;
+
+  lEl.innerHTML = `
+    <div class="br-col">
+      <div class="br-col-h">패자 1차전</div>
+      ${brMatch(b.lb1, null, null, '1차전 패자', '1차전 패자', 'drop')}
+    </div>
+    <div class="br-col">
+      <div class="br-col-h">패자 2차전</div>
+      <div class="br-match">
+        ${brTeam(b.won(b.lb1), '승자', 'adv', b.lb2 && b.lb2.winner === b.won(b.lb1))}
+        ${brTeam(b.lost(b.wbf), '승자조 최종 패자', 'drop', b.lb2 && b.lb2.winner === b.lost(b.wbf))}
+      </div>
+    </div>
+    <div class="br-col">
+      <div class="br-col-h">패자조 결승</div>
+      <div class="br-match">
+        ${b.lb2
+          ? `<div class="br-team gold">★ ${esc(teamLabel(b.lb2.winner))} 결승 진출</div>`
+          : '<div class="br-team gold">★ 결승 진출</div>'}
+      </div>
+    </div>`;
+
+  const a = b.won(b.wbf);
+  const c = b.won(b.lb2);
+  fEl.innerHTML = champ
+    ? `<div class="final-box done">
+         <div class="final-label">★ 우승 ★</div>
+         <div class="final-vs">${esc(teamLabel(champ))}</div>
+         <div class="final-note">${esc(teamLabel(b.fin.teamA))} vs ${esc(teamLabel(b.fin.teamB))} 에서 가려졌습니다</div>
+       </div>`
+    : `<div class="final-box">
+         <div class="final-label">★ 결승 ★</div>
+         <div class="final-vs">${esc(a ? teamLabel(a) : '무패팀')}
+           <span>VS</span> ${esc(c ? teamLabel(c) : '생존팀')}</div>
+         <div class="final-note">승자조를 무패로 통과한 팀과, 패자조를 뚫고 살아남은 팀의 대결</div>
+       </div>`;
+
+  if (note) {
+    // 대진표가 삼키지 못한 기록이 있으면 알려준다. 같은 경기를 두 번 적었거나
+    // 대진에 없는 짝을 적으면 여기 남는다 — 조용히 사라지면 찾을 수가 없다.
+    note.innerHTML = b.left.length
+      ? `대진표에 넣지 못한 본선 기록 ${b.left.length}건: `
+        + b.left.map(m => `<b>${esc(teamLabel(m.winner))} 승 `
+            + `${esc(teamLabel(m.winner === m.teamA ? m.teamB : m.teamA))}</b>`).join(', ')
+        + ' · 같은 경기를 두 번 적었거나 대진에 없는 짝입니다. 아래 기록에서 지워주세요.'
+      : '';
+  }
+}
+
 function renderGroupTable() {
   const tbody = document.querySelector('#groupTable tbody');
   if (!tbody) return;
@@ -5529,6 +5627,7 @@ function renderTournamentLog() {
 function renderTournament() {
   renderTeamCards();
   renderFinalTeamCards();
+  renderFinalBracket();
   renderGroupTable();
   renderGroupFixtures();
   renderTournamentForm();
