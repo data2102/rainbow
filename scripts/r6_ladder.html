@@ -1446,6 +1446,13 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 /* 이긴 팀은 한눈에 가려져야 한다 — 대진표를 보는 이유가 그것이다 */
 .br-team.won{ font-weight:var(--fw-bold); box-shadow:inset 0 0 0 1px currentColor; }
 .br-team.won::after{ content:' ✓'; }
+/* 진 팀. 끝난 판이라는 표시다 */
+.br-team.lost{ opacity:0.45; }
+/* 아직 안 한 판 */
+.br-vs{
+  text-align:center; font-size:var(--fs-footnote);
+  color:var(--text-tertiary); padding:1px 0;
+}
 .final-box.done .final-vs{ color:var(--warning-strong); }
 
 .final-box{

@@ -244,7 +244,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 59;
+const APP_VERSION = 60;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -2017,12 +2017,19 @@ function finalBracket() {
   };
 }
 
-/** 대진표 한 칸. 팀이 정해졌으면 이름을, 아니면 자리 이름을 보여준다. */
-function brTeam(handleOrNull, fallback, cls, isWinner) {
+/**
+ * 대진표 한 칸. 팀이 정해졌으면 이름을, 아니면 자리 이름을 보여준다.
+ *
+ * 진 팀은 흐리게 둔다. 그래야 "이 판은 끝났다"가 한눈에 보인다 — 아직
+ * 안 한 경기의 두 팀과 구분되지 않으면, 붙을 자리를 잡아둔 것뿐인데
+ * 결과가 기록된 것으로 읽힌다.
+ */
+function brTeam(handleOrNull, fallback, cls, isWinner, isLoser) {
   const known = !!handleOrNull;
   const text = known ? teamLabel(handleOrNull) : fallback;
   const kind = known ? cls : 'wait';
-  return `<div class="br-team ${kind}${isWinner ? ' won' : ''}">${esc(text)}</div>`;
+  const mark = isWinner ? ' won' : (isLoser ? ' lost' : '');
+  return `<div class="br-team ${kind}${mark}">${esc(text)}</div>`;
 }
 
 /**
@@ -2035,9 +2042,12 @@ function brTeam(handleOrNull, fallback, cls, isWinner) {
 function brMatch(m, aSeed, bSeed, cls) {
   const a = m ? m.teamA : aSeed;
   const b = m ? m.teamB : bSeed;
+  // 아직 안 한 경기에는 vs 를 끼워 넣는다. 자리만 잡아둔 것과 결과가 나온
+  // 것을 눈으로 가려내지 못하면, 안 한 경기를 했다고 읽는다.
   return `<div class="br-match">
-    ${brTeam(a, '', cls, m && m.winner === a)}
-    ${brTeam(b, '', cls, m && m.winner === b)}
+    ${brTeam(a, '', cls, m && m.winner === a, m && m.winner !== a)}
+    ${m ? '' : '<div class="br-vs">vs</div>'}
+    ${brTeam(b, '', cls, m && m.winner === b, m && m.winner !== b)}
   </div>`;
 }
 
@@ -2060,8 +2070,8 @@ function renderFinalBracket() {
     <div class="br-col">
       <div class="br-col-h">2차전</div>
       <div class="br-match spread">
-        ${brTeam(b.won(b.wb1), '승자', 'adv', b.wbf && b.wbf.winner === b.won(b.wb1))}
-        ${brTeam(b.won(b.wb2), '승자', 'adv', b.wbf && b.wbf.winner === b.won(b.wb2))}
+        ${brTeam(b.won(b.wb1), '승자', 'adv', b.wbf && b.wbf.winner === b.won(b.wb1), b.wbf && b.wbf.winner !== b.won(b.wb1))}
+        ${brTeam(b.won(b.wb2), '승자', 'adv', b.wbf && b.wbf.winner === b.won(b.wb2), b.wbf && b.wbf.winner !== b.won(b.wb2))}
       </div>
     </div>
     <div class="br-col">
@@ -2077,15 +2087,15 @@ function renderFinalBracket() {
     <div class="br-col">
       <div class="br-col-h">패자 1차전</div>
       <div class="br-match">
-        ${brTeam(b.lost(b.wb1), '1차전 패자', 'drop', b.lb1 && b.lb1.winner === b.lost(b.wb1))}
-        ${brTeam(b.lost(b.wb2), '1차전 패자', 'drop', b.lb1 && b.lb1.winner === b.lost(b.wb2))}
+        ${brTeam(b.lost(b.wb1), '1차전 패자', 'drop', b.lb1 && b.lb1.winner === b.lost(b.wb1), b.lb1 && b.lb1.winner !== b.lost(b.wb1))}
+        ${brTeam(b.lost(b.wb2), '1차전 패자', 'drop', b.lb1 && b.lb1.winner === b.lost(b.wb2), b.lb1 && b.lb1.winner !== b.lost(b.wb2))}
       </div>
     </div>
     <div class="br-col">
       <div class="br-col-h">패자 2차전</div>
       <div class="br-match">
-        ${brTeam(b.won(b.lb1), '승자', 'adv', b.lb2 && b.lb2.winner === b.won(b.lb1))}
-        ${brTeam(b.lost(b.wbf), '승자조 최종 패자', 'drop', b.lb2 && b.lb2.winner === b.lost(b.wbf))}
+        ${brTeam(b.won(b.lb1), '승자', 'adv', b.lb2 && b.lb2.winner === b.won(b.lb1), b.lb2 && b.lb2.winner !== b.won(b.lb1))}
+        ${brTeam(b.lost(b.wbf), '승자조 최종 패자', 'drop', b.lb2 && b.lb2.winner === b.lost(b.wbf), b.lb2 && b.lb2.winner !== b.lost(b.wbf))}
       </div>
     </div>
     <div class="br-col">
