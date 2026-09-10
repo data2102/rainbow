@@ -244,7 +244,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 53;
+const APP_VERSION = 54;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -1964,7 +1964,7 @@ function renderFinalTeamCards() {
   el.innerHTML = TOURNAMENT_TEAMS_FINAL.map(t => `
     <div class="team-card">
       <div class="tc-name">${esc(t.label)}</div>
-      <div class="tc-roster">${t.members.map(esc).join(' · ')}</div>
+      <div class="tc-list">${t.members.map(h => `<div>${esc(h)}</div>`).join('')}</div>
       ${t.reserve ? `<div class="tc-reserve">예비 · ${esc(t.reserve)}</div>` : ''}
     </div>`).join('');
 }
