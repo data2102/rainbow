@@ -40,6 +40,21 @@ const TOURNAMENT_TEAMS = [
   { id: 'D', label: 'D팀', members: ['진원', '람보', '플라스', '수까락'] },
   { id: 'E', label: 'E팀', members: ['벨리', '까를', '티얼', '조커'] },
 ];
+
+/**
+ * 본선에 오른 팀.
+ *
+ * 예선에서 쓰던 글자(A·C·D·E)를 그대로 이어 쓴다 — 5위로 떨어진 B팀 자리는
+ * 비워둔다. 예선 명단과 사람 수도 이름 적는 방식도 다르므로 따로 둔다.
+ */
+const TOURNAMENT_TEAMS_FINAL = [
+  { label: 'A팀', members: ['SNC_LeNa', 'SNC_NEo', 'SNC_BlueBerry', 'Ranbo_zzang', 'RID_HoSiN'] },
+  { label: 'C팀', members: ['oK_mEntAl', 'LOTUS_MEGA', 'soso', 'KIMPO_BORY', 'SNC_Gjplayer'],
+    reserve: 'LOTUS_NaiLaRt' },
+  { label: 'D팀', members: ['LOTUS_JINWON2', 'Rambo702', 'PAC_Plus', 'oK_SkyLacK', 'oK_LuCkY'] },
+  { label: 'E팀', members: ['NE_Valley', 'oK_Carlos', 'PSN_JOKER', 'LOTUS_TeaRs', 'oK_Hyunjung'] },
+];
+
 const MERCENARIES = ['럭키', '호신', '실장'];
 const ADVANCING = 4;        // 예선 통과 팀 수
 const CLAN_TOP = 5;         // 클랜 순위에 보여줄 등수
@@ -229,7 +244,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 52;
+const APP_VERSION = 53;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -1942,6 +1957,18 @@ function renderTeamCards() {
     </div>`;
 }
 
+/** 본선 조편성. 용병 칸은 예선에만 둔다 — 본선은 명단이 정해져 있다. */
+function renderFinalTeamCards() {
+  const el = document.getElementById('teamCardsFinal');
+  if (!el) return;
+  el.innerHTML = TOURNAMENT_TEAMS_FINAL.map(t => `
+    <div class="team-card">
+      <div class="tc-name">${esc(t.label)}</div>
+      <div class="tc-roster">${t.members.map(esc).join(' · ')}</div>
+      ${t.reserve ? `<div class="tc-reserve">예비 · ${esc(t.reserve)}</div>` : ''}
+    </div>`).join('');
+}
+
 function renderGroupTable() {
   const tbody = document.querySelector('#groupTable tbody');
   if (!tbody) return;
@@ -2092,6 +2119,7 @@ function renderTournamentLog() {
 
 function renderTournament() {
   renderTeamCards();
+  renderFinalTeamCards();
   renderGroupTable();
   renderGroupFixtures();
   renderTournamentForm();
