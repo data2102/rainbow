@@ -244,7 +244,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 58;
+const APP_VERSION = 59;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -2025,13 +2025,19 @@ function brTeam(handleOrNull, fallback, cls, isWinner) {
   return `<div class="br-team ${kind}${isWinner ? ' won' : ''}">${esc(text)}</div>`;
 }
 
-/** 두 팀이 붙는 한 판 */
-function brMatch(m, aSeed, bSeed, aWait, bWait, cls) {
+/**
+ * 승자조 1차전 한 판. 두 팀은 추첨으로 이미 정해져 있다.
+ *
+ * 나머지 자리는 이 함수를 쓰지 않는다. 한 자리씩 따로 채워야 하기 때문이다 —
+ * 짝이 다 차야 채우면, E팀이 졌는데도 옆자리가 안 정해졌다는 이유로 패자조에
+ * 나타나지 않는다.
+ */
+function brMatch(m, aSeed, bSeed, cls) {
   const a = m ? m.teamA : aSeed;
   const b = m ? m.teamB : bSeed;
   return `<div class="br-match">
-    ${brTeam(a, aWait, cls, m && m.winner === a)}
-    ${brTeam(b, bWait, cls, m && m.winner === b)}
+    ${brTeam(a, '', cls, m && m.winner === a)}
+    ${brTeam(b, '', cls, m && m.winner === b)}
   </div>`;
 }
 
@@ -2048,8 +2054,8 @@ function renderFinalBracket() {
   wEl.innerHTML = `
     <div class="br-col">
       <div class="br-col-h">1차전</div>
-      ${brMatch(b.wb1, FINAL_SEEDS[0][0], FINAL_SEEDS[0][1], '', '', 'seed')}
-      ${brMatch(b.wb2, FINAL_SEEDS[1][0], FINAL_SEEDS[1][1], '', '', 'seed')}
+      ${brMatch(b.wb1, FINAL_SEEDS[0][0], FINAL_SEEDS[0][1], 'seed')}
+      ${brMatch(b.wb2, FINAL_SEEDS[1][0], FINAL_SEEDS[1][1], 'seed')}
     </div>
     <div class="br-col">
       <div class="br-col-h">2차전</div>
@@ -2070,7 +2076,10 @@ function renderFinalBracket() {
   lEl.innerHTML = `
     <div class="br-col">
       <div class="br-col-h">패자 1차전</div>
-      ${brMatch(b.lb1, null, null, '1차전 패자', '1차전 패자', 'drop')}
+      <div class="br-match">
+        ${brTeam(b.lost(b.wb1), '1차전 패자', 'drop', b.lb1 && b.lb1.winner === b.lost(b.wb1))}
+        ${brTeam(b.lost(b.wb2), '1차전 패자', 'drop', b.lb1 && b.lb1.winner === b.lost(b.wb2))}
+      </div>
     </div>
     <div class="br-col">
       <div class="br-col-h">패자 2차전</div>
