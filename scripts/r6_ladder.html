@@ -2292,6 +2292,18 @@ button.room-n:hover{ color:var(--accent); text-decoration:underline; }
 .dl-undo .dl-n{ background:var(--surface-sunken); color:var(--text-tertiary); }
 .dl-undo .dl-a{ color:var(--text-secondary); }
 
+/* 자료실 잠금 안내 */
+.fl-gate{
+  padding:var(--sp-10) var(--sp-6); text-align:center;
+  border:1px dashed var(--border-strong); border-radius:var(--radius-lg);
+  background:var(--surface-sunken);
+}
+.fl-gate-t{ font-size:var(--fs-subhead); font-weight:var(--fw-bold); }
+.fl-gate-d{
+  margin:var(--sp-2) 0 var(--sp-5);
+  font-size:var(--fs-caption); color:var(--text-secondary); line-height:var(--lh-body);
+}
+
 #connBanner{
   display:none; border-radius:var(--radius-md);
   background:var(--danger-bg); color:var(--danger-strong);
@@ -3081,6 +3093,14 @@ if (/[?&]room=\d+/.test(location.search)) {
         <b>3MB 이하 파일은 여기에 바로 담기고</b>, 그보다 큰 설치 파일은
         구글 드라이브 · MEGA 같은 곳에 올린 뒤 받는 주소를 적어주세요 ·
         올리는 것은 로그인한 회원 누구나, 지우는 것은 올린 사람과 관리자만 할 수 있습니다.
+      </div>
+
+      <!-- 로그인하지 않은 사람에게 보이는 안내 -->
+      <div class="fl-gate" id="fileGate" style="display:none;">
+        <div class="fl-gate-t">회원만 볼 수 있습니다</div>
+        <div class="fl-gate-d">설치 파일과 스킨은 클랜 회원에게만 열어둡니다.
+          로그인하면 목록이 보이고 내려받을 수 있습니다.</div>
+        <button type="button" class="auth-btn" id="fileLoginBtn">로그인</button>
       </div>
 
       <!-- 목록 화면 -->

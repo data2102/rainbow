@@ -2292,6 +2292,18 @@ button.room-n:hover{ color:var(--accent); text-decoration:underline; }
 .dl-undo .dl-n{ background:var(--surface-sunken); color:var(--text-tertiary); }
 .dl-undo .dl-a{ color:var(--text-secondary); }
 
+/* 자료실 잠금 안내 */
+.fl-gate{
+  padding:var(--sp-10) var(--sp-6); text-align:center;
+  border:1px dashed var(--border-strong); border-radius:var(--radius-lg);
+  background:var(--surface-sunken);
+}
+.fl-gate-t{ font-size:var(--fs-subhead); font-weight:var(--fw-bold); }
+.fl-gate-d{
+  margin:var(--sp-2) 0 var(--sp-5);
+  font-size:var(--fs-caption); color:var(--text-secondary); line-height:var(--lh-body);
+}
+
 #connBanner{
   display:none; border-radius:var(--radius-md);
   background:var(--danger-bg); color:var(--danger-strong);
@@ -3083,6 +3095,14 @@ if (/[?&]room=\d+/.test(location.search)) {
         올리는 것은 로그인한 회원 누구나, 지우는 것은 올린 사람과 관리자만 할 수 있습니다.
       </div>
 
+      <!-- 로그인하지 않은 사람에게 보이는 안내 -->
+      <div class="fl-gate" id="fileGate" style="display:none;">
+        <div class="fl-gate-t">회원만 볼 수 있습니다</div>
+        <div class="fl-gate-d">설치 파일과 스킨은 클랜 회원에게만 열어둡니다.
+          로그인하면 목록이 보이고 내려받을 수 있습니다.</div>
+        <button type="button" class="auth-btn" id="fileLoginBtn">로그인</button>
+      </div>
+
       <!-- 목록 화면 -->
       <div id="fileListView">
         <div class="fl-top">
@@ -3380,7 +3400,8 @@ let tMatches = [];          // 대회 경기 기록
 let posts = [];             // 게시판 글
 let files = [];             // 자료실 · 중요글 먼저, 그 다음 최신순 (서버가 맞춰 준다)
 let fileKinds = ['설치', '패치', '스킨', '타겟', '이미지', '기타'];
-let fileMaxUpload = 3 * 1024 * 1024;   // 서버가 알려주는 값으로 덮인다
+let fileMaxUpload = 3 * 1024 * 1024;
+let filesLocked = false;   // 서버가 자료 목록을 보내지 않은 상태인가   // 서버가 알려주는 값으로 덮인다
 let filePicked = null;                 // 지금 붙여둔 파일 {name, size, mime, data|null}
 let season = null;          // 진행 중인 시즌
 let seasons = [];           // 시즌 목록(진행 중 + 마감)
@@ -3612,7 +3633,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 61;
+const APP_VERSION = 62;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -3704,6 +3725,7 @@ async function loadPosts() {
     const d = await apiGet('/api/post');
     posts = d.posts || [];
     files = d.files || [];
+    filesLocked = !!d.filesLocked;
     if (Array.isArray(d.kinds) && d.kinds.length) fileKinds = d.kinds;
     if (Number(d.maxUpload) > 0) fileMaxUpload = Number(d.maxUpload);
   } catch { posts = []; files = []; }
@@ -4612,6 +4634,20 @@ function renderFiles() {
   const empty = document.getElementById('fileEmpty');
   if (!tbody || !wrap || !empty) return;
 
+  // 로그인하지 않았으면 목록 대신 안내만 둔다. 서버도 자료를 보내지 않으므로
+  // 여기서 가리는 것은 화면을 위한 것이지, 이것이 잠금 장치는 아니다.
+  const gate = document.getElementById('fileGate');
+  const listView = document.getElementById('fileListView');
+  const formView = document.getElementById('fileFormView');
+  const locked = !isLoggedIn();
+  if (gate) gate.style.display = locked ? 'block' : 'none';
+  if (listView) listView.style.display = locked ? 'none' : '';
+  if (locked) {
+    if (formView) formView.hidden = true;
+    tbody.innerHTML = '';
+    return;
+  }
+
   renderFileKinds();
   renderFileForm();
 
@@ -4890,6 +4926,9 @@ async function hitFile(id) {
 }
 
 function initFileEvents() {
+  const gateBtn = document.getElementById('fileLoginBtn');
+  if (gateBtn) gateBtn.addEventListener('click', showLoginModal);
+
   const panel = document.getElementById('tab-files');
   if (!panel) return;
 

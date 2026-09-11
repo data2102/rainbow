@@ -1,4 +1,4 @@
-import { q, body, methodGuard, currentAdmin, requireUser, requireAdmin, audit } from './_lib.js';
+import { q, body, methodGuard, currentUser, currentAdmin, requireUser, requireAdmin, audit } from './_lib.js';
 
 const MAX_BODY = 1000;
 const MAX_COMMENT = 300;
@@ -88,7 +88,7 @@ export default async function handler(req, res) {
       // 사이트에 담아둔 파일 내려주기. 함수를 더 만들 수 없어 이 주소를 같이 쓴다.
       const dl = req.query && req.query.download;
       if (dl) return await sendBlob(req, res, dl);
-      return await listAll(res);
+      return await listAll(req, res);
     }
 
     const { action } = body(req);
@@ -114,6 +114,10 @@ export default async function handler(req, res) {
  * 받아간 횟수는 여기서 올린다 — 화면이 따로 세면 실패한 내려받기까지 세어진다.
  */
 async function sendBlob(req, res, idRaw) {
+  // 주소만 알면 받아갈 수 있어서는 가려둔 뜻이 없다
+  const me = await currentUser(req);
+  if (!me) return res.status(401).json({ error: '로그인이 필요합니다.' });
+
   const id = Number(idRaw);
   if (!Number.isInteger(id)) return res.status(400).json({ error: '자료를 찾을 수 없습니다.' });
 
@@ -138,10 +142,25 @@ async function sendBlob(req, res, idRaw) {
 }
 
 /** 게시판 글과 자료실을 한 번에. 화면은 두 곳 다 첫 화면에서 쓴다. */
-async function listAll(res) {
-  const [board, files] = await Promise.all([listPosts(), fileList()]);
+/**
+ * 게시판과 자료실을 한 번에 내려준다.
+ *
+ * 자료실은 로그인한 사람에게만 보낸다. 화면에서 가리는 것만으로는 주소를
+ * 아는 사람이 그대로 받아갈 수 있어, 목록 자체를 보내지 않는다.
+ * 게시판은 예전처럼 누구나 볼 수 있다.
+ */
+async function listAll(req, res) {
+  const me = await currentUser(req);
+  const [board, files] = await Promise.all([
+    listPosts(),
+    me ? fileList() : Promise.resolve(null),
+  ]);
   res.setHeader('Cache-Control', 'no-store');
-  res.status(200).json({ ...board, ...files });
+  res.status(200).json({
+    ...board,
+    ...(files || { files: [], kinds: FILE_KINDS, maxUpload: MAX_UPLOAD }),
+    filesLocked: !me,
+  });
 }
 
 async function listPosts() {
@@ -536,6 +555,9 @@ async function fileRemove(req, res) {
  * 로그인을 요구하지 않는다 — 세는 것뿐이고, 막아서 얻는 것이 없다.
  */
 async function fileHit(req, res) {
+  const me = await requireUser(req, res);
+  if (!me) return;
+
   const { id } = body(req);
   if (!Number.isInteger(Number(id))) return res.status(400).json({ error: '자료를 찾을 수 없습니다.' });
   const rows = await q(

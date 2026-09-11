@@ -12,7 +12,8 @@ let tMatches = [];          // 대회 경기 기록
 let posts = [];             // 게시판 글
 let files = [];             // 자료실 · 중요글 먼저, 그 다음 최신순 (서버가 맞춰 준다)
 let fileKinds = ['설치', '패치', '스킨', '타겟', '이미지', '기타'];
-let fileMaxUpload = 3 * 1024 * 1024;   // 서버가 알려주는 값으로 덮인다
+let fileMaxUpload = 3 * 1024 * 1024;
+let filesLocked = false;   // 서버가 자료 목록을 보내지 않은 상태인가   // 서버가 알려주는 값으로 덮인다
 let filePicked = null;                 // 지금 붙여둔 파일 {name, size, mime, data|null}
 let season = null;          // 진행 중인 시즌
 let seasons = [];           // 시즌 목록(진행 중 + 마감)
@@ -244,7 +245,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 61;
+const APP_VERSION = 62;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -336,6 +337,7 @@ async function loadPosts() {
     const d = await apiGet('/api/post');
     posts = d.posts || [];
     files = d.files || [];
+    filesLocked = !!d.filesLocked;
     if (Array.isArray(d.kinds) && d.kinds.length) fileKinds = d.kinds;
     if (Number(d.maxUpload) > 0) fileMaxUpload = Number(d.maxUpload);
   } catch { posts = []; files = []; }
@@ -1244,6 +1246,20 @@ function renderFiles() {
   const empty = document.getElementById('fileEmpty');
   if (!tbody || !wrap || !empty) return;
 
+  // 로그인하지 않았으면 목록 대신 안내만 둔다. 서버도 자료를 보내지 않으므로
+  // 여기서 가리는 것은 화면을 위한 것이지, 이것이 잠금 장치는 아니다.
+  const gate = document.getElementById('fileGate');
+  const listView = document.getElementById('fileListView');
+  const formView = document.getElementById('fileFormView');
+  const locked = !isLoggedIn();
+  if (gate) gate.style.display = locked ? 'block' : 'none';
+  if (listView) listView.style.display = locked ? 'none' : '';
+  if (locked) {
+    if (formView) formView.hidden = true;
+    tbody.innerHTML = '';
+    return;
+  }
+
   renderFileKinds();
   renderFileForm();
 
@@ -1522,6 +1538,9 @@ async function hitFile(id) {
 }
 
 function initFileEvents() {
+  const gateBtn = document.getElementById('fileLoginBtn');
+  if (gateBtn) gateBtn.addEventListener('click', showLoginModal);
+
   const panel = document.getElementById('tab-files');
   if (!panel) return;
 
