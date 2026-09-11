@@ -77,20 +77,23 @@ async function detail(id, current) {
  * (마감할 때 players 를 0 으로 되돌리므로 겹쳐 세지 않는다)
  */
 async function career(handle) {
-  const [totals, mine, past, mate] = await Promise.all([
+  const [totals, mine, mate] = await Promise.all([
     // 모두의 누적 점수. 등수를 매기려면 남들 것도 있어야 한다.
+    //
+    // 지금 명단에 있는 사람만 센다. 경기 기록은 계정을 지워도 남으므로
+    // (지난 랭킹이 어긋나지 않도록) 그대로 두면 탈퇴한 사람이 등수에도,
+    // 궁합에도 계속 나온다. 순위 페이지는 이미 명단만 보고 있으니
+    // 이 카드도 같은 것을 봐야 한다.
     q(`SELECT handle,
               sum(point)::int  AS point,
               sum(wins)::int   AS wins,
               sum(losses)::int AS losses
          FROM ( SELECT handle, point, wins, losses FROM season_standings
+                 WHERE handle IN (SELECT handle FROM players)
                 UNION ALL
                 SELECT handle, point, wins, losses FROM players ) t
         GROUP BY handle`),
     q(`SELECT handle, clan FROM players WHERE handle = $1`, [handle]),
-    // 명단에서 빠진 사람도 지난 기록은 남는다. 클랜은 마지막으로 적힌 것을 쓴다.
-    q(`SELECT clan FROM season_standings WHERE handle = $1
-        ORDER BY season_id DESC LIMIT 1`, [handle]),
     // 이 사람이 낀 경기만 가져온다. 취소된 경기는 점수가 되돌려진 경기다.
     q(`SELECT winners, losers FROM matches
         WHERE voided_at IS NULL
@@ -120,6 +123,8 @@ async function career(handle) {
 
   // 같은 편으로 몇 번 뛰었고 그중 몇 번 이겼는가.
   // 늦은 참석자는 어느 편도 아니어서 세지 않는다.
+  // 명단에서 빠진 사람도 세지 않는다 — 없는 사람과의 궁합은 쓸 데가 없다.
+  const roster = new Set(totals.map(t => t.handle));
   const map = new Map();
   for (const m of mate) {
     const win = (m.winners || []).map(w => w.handle);
@@ -128,7 +133,7 @@ async function career(handle) {
     const side = won ? win : (lose.includes(handle) ? lose : null);
     if (!side) continue;
     for (const h of side) {
-      if (h === handle) continue;
+      if (h === handle || !roster.has(h)) continue;
       const st = map.get(h) || { handle: h, games: 0, wins: 0 };
       st.games += 1;
       if (won) st.wins += 1;
@@ -138,7 +143,7 @@ async function career(handle) {
 
   return {
     handle,
-    clan: (mine[0] && mine[0].clan) || (past[0] && past[0].clan) || '',
+    clan: (mine[0] && mine[0].clan) || '',
     point: me.point,
     wins: me.wins,
     losses: me.losses,
