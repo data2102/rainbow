@@ -2304,6 +2304,86 @@ button.room-n:hover{ color:var(--accent); text-decoration:underline; }
   font-size:var(--fs-caption); color:var(--text-secondary); line-height:var(--lh-body);
 }
 
+/* ── 사진첩 ── */
+/* 가로 다섯 장. 좁아지면 넷·셋·둘로 줄어든다 — 다섯을 고집하면 사진이
+   손톱만 해져 무엇인지 알아볼 수가 없다. */
+.ph-grid{
+  display:grid; grid-template-columns:repeat(5, minmax(0,1fr));
+  gap:var(--sp-3);
+}
+@media (max-width:1100px){ .ph-grid{ grid-template-columns:repeat(4, minmax(0,1fr)); } }
+@media (max-width:860px){  .ph-grid{ grid-template-columns:repeat(3, minmax(0,1fr)); } }
+@media (max-width:560px){  .ph-grid{ grid-template-columns:repeat(2, minmax(0,1fr)); } }
+
+.ph-cell{
+  /* figure 는 브라우저가 좌우 40px 여백을 주고 시작한다. 그대로 두면
+     사진이 칸을 다 못 채우고 가운데에 쪼그라든다. */
+  margin:0;
+  position:relative; border:1px solid var(--border);
+  border-radius:var(--radius-md); overflow:hidden;
+  background:var(--surface-sunken);
+}
+.ph-a{ display:block; cursor:zoom-in; }
+/* 사진마다 비율이 달라도 격자가 들쭉날쭉하지 않도록 한 칸을 정사각으로 둔다 */
+.ph-img{
+  display:block; width:100%; aspect-ratio:1/1; object-fit:cover;
+  background:var(--border);
+}
+.ph-cell:hover .ph-img{ filter:brightness(1.08); }
+.ph-note{
+  padding:var(--sp-2) var(--sp-3);
+  font-size:var(--fs-footnote); color:var(--text-secondary);
+  line-height:var(--lh-body);
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+  overflow:hidden;
+}
+.ph-by{
+  padding:0 var(--sp-3) var(--sp-2);
+  font-size:var(--fs-footnote); color:var(--text-tertiary);
+}
+.ph-del{
+  position:absolute; top:var(--sp-2); right:var(--sp-2);
+  border:none; border-radius:var(--radius-sm); cursor:pointer;
+  padding:2px var(--sp-2); font-size:var(--fs-footnote);
+  background:rgba(20,20,24,0.72); color:#fff;
+}
+.ph-del:hover{ background:var(--danger-strong); }
+.ph-count{ font-size:var(--fs-caption); color:var(--text-tertiary); }
+
+.ph-drop{
+  border:1px dashed var(--border-strong); border-radius:var(--radius-lg);
+  background:var(--surface-sunken); padding:var(--sp-8) var(--sp-5);
+  text-align:center; margin-bottom:var(--sp-4);
+}
+.ph-drop.on{ border-color:var(--accent); background:var(--accent-bg); }
+.ph-drop-note{
+  display:block; margin-top:var(--sp-2);
+  font-size:var(--fs-footnote); color:var(--text-tertiary);
+}
+/* 고른 사진 한 장 = 미리보기 + 설명 한 줄 */
+.ph-picked{ display:flex; flex-direction:column; gap:var(--sp-2); margin-bottom:var(--sp-4); }
+.ph-pick{
+  display:flex; align-items:center; gap:var(--sp-3);
+  border:1px solid var(--border); border-radius:var(--radius-md);
+  padding:var(--sp-2); background:var(--surface-sunken);
+}
+.ph-pick img{
+  width:56px; height:56px; flex:none; object-fit:cover;
+  border-radius:var(--radius-sm); background:var(--border);
+}
+.ph-pick input{
+  flex:1 1 auto; min-width:0;
+  background:var(--surface); color:var(--text-primary);
+  border:1px solid var(--border); border-radius:var(--radius-sm);
+  padding:var(--sp-2) var(--sp-3); font-size:var(--fs-caption);
+}
+.ph-pick .ph-size{ font-size:var(--fs-footnote); color:var(--text-tertiary); white-space:nowrap; }
+.ph-pick button{
+  flex:none; border:none; background:none; cursor:pointer;
+  color:var(--text-tertiary); font-size:18px; line-height:1; padding:var(--sp-2);
+}
+.ph-pick button:hover{ color:var(--danger-strong); }
+
 #connBanner{
   display:none; border-radius:var(--radius-md);
   background:var(--danger-bg); color:var(--danger-strong);
@@ -2391,6 +2471,7 @@ if (/[?&]room=\d+/.test(location.search)) {
     <button class="tab-btn" data-tab="rules">규정</button>
     <button class="tab-btn" data-tab="board">게시판</button>
     <button class="tab-btn" data-tab="files">자료실</button>
+    <button class="tab-btn" data-tab="photos">사진첩</button>
     <button class="tab-btn" data-tab="launcher">런쳐<span class="tab-wip">(준비중)</span></button>
   </div></nav>
   <div class="panels">
@@ -3188,6 +3269,60 @@ if (/[?&]room=\d+/.test(location.search)) {
   </div>
 
   <!-- LAUNCHER -->
+  <!-- PHOTOS -->
+  <div class="tab-panel" id="tab-photos">
+    <div class="panel hud-corner">
+      <div class="panel-head">
+        <h2>사진첩 · Photos</h2>
+      </div>
+      <div class="foot-note" style="margin-top:0;margin-bottom:14px;">
+        경기 장면과 모임 사진을 모아둡니다 · 사진을 누르면 새 창에서 크게 볼 수 있습니다 ·
+        올리는 것은 로그인한 회원 누구나, 지우는 것은 올린 사람과 관리자만 할 수 있습니다.
+      </div>
+
+      <!-- 로그인하지 않은 사람에게 보이는 안내 -->
+      <div class="fl-gate" id="photoGate" style="display:none;">
+        <div class="fl-gate-t">회원만 볼 수 있습니다</div>
+        <div class="fl-gate-d">사진첩은 클랜 회원에게만 열어둡니다.
+          로그인하면 사진이 보입니다.</div>
+        <button type="button" class="auth-btn" id="photoLoginBtn">로그인</button>
+      </div>
+
+      <div id="photoListView">
+        <div class="fl-top">
+          <span class="ph-count" id="photoCount"></span>
+          <button class="btn-mini btn-approve" id="photoNewBtn">+ 사진 올리기</button>
+        </div>
+
+        <div class="ph-grid" id="photoGrid"></div>
+        <div id="photoEmpty" class="log-empty">아직 올라온 사진이 없습니다.</div>
+        <div class="pager" id="photoPager" style="display:none;"></div>
+      </div>
+
+      <!-- 올리기 화면 — 목록 대신 이쪽이 뜬다 -->
+      <div id="photoFormView" hidden>
+        <div class="fl-head">
+          <button type="button" class="btn-mini btn-edit" id="photoBack">← 목록으로</button>
+          <span class="fl-head-t">사진 올리기</span>
+        </div>
+
+        <div class="ph-drop" id="photoDrop">
+          <input type="file" id="photoInput" accept="image/*" multiple hidden>
+          <div class="fl-drop-in">
+            <b>사진을 여기에 끌어다 놓거나</b>
+            <button type="button" class="btn-mini btn-edit" id="photoPick">사진 고르기</button>
+            <span class="ph-drop-note">여러 장을 한 번에 고를 수 있습니다 ·
+              큰 사진은 올리면서 자동으로 줄여 담습니다</span>
+          </div>
+        </div>
+
+        <div class="ph-picked" id="photoPicked"></div>
+        <div class="modal-error" id="photoErr"></div>
+        <button class="btn" id="photoSave" disabled>올리기</button>
+      </div>
+    </div>
+  </div>
+
   <div class="tab-panel" id="tab-launcher">
     <div class="panel hud-corner">
       <div class="panel-head">

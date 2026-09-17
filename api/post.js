@@ -82,12 +82,13 @@ function rowToComment(r) {
 export default async function handler(req, res) {
   if (!methodGuard(req, res, ['GET', 'POST'])) return;
   try {
-    await ensureTable();
-    await ensureFileTable();
+    await Promise.all([ensureTable(), ensureFileTable(), ensurePhotoTable()]);
     if (req.method === 'GET') {
-      // 사이트에 담아둔 파일 내려주기. 함수를 더 만들 수 없어 이 주소를 같이 쓴다.
+      // 사이트에 담아둔 파일·사진 내려주기. 함수를 더 만들 수 없어 이 주소를 같이 쓴다.
       const dl = req.query && req.query.download;
       if (dl) return await sendBlob(req, res, dl);
+      const ph = req.query && req.query.photo;
+      if (ph) return await sendPhoto(req, res, ph, req.query.thumb === '1');
       return await listAll(req, res);
     }
 
@@ -96,6 +97,9 @@ export default async function handler(req, res) {
     if (action === 'fileUpdate') return await fileUpdate(req, res);
     if (action === 'fileRemove') return await fileRemove(req, res);
     if (action === 'fileHit')    return await fileHit(req, res);
+    if (action === 'photoCreate') return await photoCreate(req, res);
+    if (action === 'photoUpdate') return await photoUpdate(req, res);
+    if (action === 'photoRemove') return await photoRemove(req, res);
     if (action === 'create')     return await create(req, res);
     if (action === 'update')     return await update(req, res);
     if (action === 'remove')     return await remove(req, res);
@@ -151,14 +155,16 @@ async function sendBlob(req, res, idRaw) {
  */
 async function listAll(req, res) {
   const me = await currentUser(req);
-  const [board, files] = await Promise.all([
+  const [board, files, photos] = await Promise.all([
     listPosts(),
     me ? fileList() : Promise.resolve(null),
+    me ? photoList() : Promise.resolve(null),
   ]);
   res.setHeader('Cache-Control', 'no-store');
   res.status(200).json({
     ...board,
     ...(files || { files: [], kinds: FILE_KINDS, maxUpload: MAX_UPLOAD }),
+    ...(photos || { photos: [], photoMaxNote: MAX_PHOTO_NOTE }),
     filesLocked: !me,
   });
 }
@@ -566,4 +572,162 @@ async function fileHit(req, res) {
   );
   if (!rows.length) return res.status(404).json({ error: '이미 삭제된 자료입니다.' });
   res.status(200).json({ ok: true, downloads: Number(rows[0].downloads) });
+}
+
+/* ==========================================================
+   사진첩
+   ----------------------------------------------------------
+   자료실과 같은 함수 안에 둔다. Vercel 무료 플랜은 함수를
+   열두 개까지만 올려주는데, 그 벽에 한 번 부딪혀 배포가 조용히
+   깨진 적이 있다. 주소만 나눠 쓴다.
+   ========================================================== */
+
+/** 사진에 붙이는 한 줄 설명 */
+const MAX_PHOTO_NOTE = 100;
+
+let photosEnsured = false;
+async function ensurePhotoTable() {
+  if (photosEnsured) return;
+  await q(`
+    CREATE TABLE IF NOT EXISTS photos (
+      id         BIGSERIAL PRIMARY KEY,
+      note       TEXT,
+      filename   TEXT,
+      mime       TEXT,
+      bytes      BIGINT,
+      author     TEXT NOT NULL,
+      created_at BIGINT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_photos_new ON photos (created_at DESC);
+
+    -- 사진은 따로 담는다. 목록을 뽑을 때마다 원본을 끌어오면 화면이 선다.
+    CREATE TABLE IF NOT EXISTS photo_blobs (
+      photo_id BIGINT PRIMARY KEY REFERENCES photos(id) ON DELETE CASCADE,
+      data     BYTEA NOT NULL,
+      thumb    BYTEA
+    );
+  `);
+  photosEnsured = true;
+}
+
+function rowToPhoto(r) {
+  return {
+    id: Number(r.id),
+    note: r.note || '',
+    filename: r.filename || '',
+    bytes: r.bytes == null ? null : Number(r.bytes),
+    author: r.author,
+    createdAt: Number(r.created_at),
+  };
+}
+
+/** 목록에는 사진을 싣지 않는다. 스무 장이면 수십 MB 다. */
+async function photoList() {
+  const rows = await q(
+    `SELECT id, note, filename, bytes, author, created_at
+       FROM photos ORDER BY created_at DESC, id DESC`
+  );
+  return { photos: rows.map(rowToPhoto), photoMaxNote: MAX_PHOTO_NOTE };
+}
+
+/**
+ * 사진 한 장을 그대로 내려준다.
+ *
+ * 격자에는 작은 것(thumb), 눌러서 크게 볼 때는 원본을 준다. 첨부가 아니라
+ * 화면에 띄우는 것이므로 inline 으로 보낸다 — 새 창이 곧 사진이 된다.
+ */
+async function sendPhoto(req, res, idRaw, wantThumb) {
+  const me = await currentUser(req);
+  if (!me) return res.status(401).json({ error: '로그인이 필요합니다.' });
+
+  const id = Number(idRaw);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: '사진을 찾을 수 없습니다.' });
+
+  const rows = await q(
+    `SELECT p.mime, p.filename, b.data, b.thumb
+       FROM photos p JOIN photo_blobs b ON b.photo_id = p.id
+      WHERE p.id = $1`, [id]
+  );
+  if (!rows.length) return res.status(404).json({ error: '없는 사진입니다.' });
+
+  const r = rows[0];
+  // 작은 것이 없는 옛 사진은 원본으로 대신한다
+  const buf = wantThumb && r.thumb ? r.thumb : r.data;
+  const name = String(r.filename || `photo-${id}`).replace(/[\r\n"]/g, '_');
+  res.setHeader('Content-Type', r.mime || 'image/jpeg');
+  res.setHeader('Content-Length', buf.length);
+  // 사진은 바뀌지 않는다. 한 번 받은 것은 브라우저가 들고 있게 둔다.
+  res.setHeader('Cache-Control', 'private, max-age=86400');
+  res.setHeader('Content-Disposition',
+    `inline; filename="photo-${id}"; filename*=UTF-8''${encodeURIComponent(name)}`);
+  res.status(200).send(buf);
+}
+
+async function photoCreate(req, res) {
+  const me = await requireUser(req, res);
+  if (!me) return;
+
+  const b = body(req);
+  const note = String(b.note || '').trim();
+  if (note.length > MAX_PHOTO_NOTE) {
+    return res.status(400).json({ error: `설명은 ${MAX_PHOTO_NOTE}자 이내로 적어주세요.` });
+  }
+
+  let data = null;
+  let thumb = null;
+  try { if (typeof b.data === 'string' && b.data) data = Buffer.from(b.data, 'base64'); } catch { data = null; }
+  try { if (typeof b.thumb === 'string' && b.thumb) thumb = Buffer.from(b.thumb, 'base64'); } catch { thumb = null; }
+  if (!data || !data.length) return res.status(400).json({ error: '사진을 골라주세요.' });
+  if (data.length > MAX_UPLOAD) {
+    return res.status(400).json({
+      error: `사진 한 장은 ${Math.floor(MAX_UPLOAD / 1024 / 1024)}MB 까지입니다.`,
+    });
+  }
+
+  const mime = String(b.mime || 'image/jpeg').trim().slice(0, 120);
+  if (!/^image\//i.test(mime)) return res.status(400).json({ error: '사진 파일만 올릴 수 있습니다.' });
+
+  const rows = await q(
+    `INSERT INTO photos (note, filename, mime, bytes, author, created_at)
+     VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+    [note, String(b.filename || '').trim().slice(0, 200), mime, data.length, me, Date.now()]
+  );
+  const id = Number(rows[0].id);
+  await q(`INSERT INTO photo_blobs (photo_id, data, thumb) VALUES ($1,$2,$3)`, [id, data, thumb]);
+  res.status(200).json({ ok: true, id });
+}
+
+/** 올린 사람과 관리자만 손댈 수 있다 */
+async function findMyPhoto(req, res) {
+  const me = await requireUser(req, res);
+  if (!me) return null;
+  const id = Number(body(req).id);
+  if (!Number.isInteger(id)) { res.status(400).json({ error: '사진을 찾을 수 없습니다.' }); return null; }
+  const rows = await q(`SELECT id, author FROM photos WHERE id = $1`, [id]);
+  if (!rows.length) { res.status(404).json({ error: '이미 지워진 사진입니다.' }); return null; }
+  const admin = await currentAdmin(req);
+  if (!isFileAuthor(me, rows[0]) && !admin) {
+    res.status(403).json({ error: '올린 사람과 관리자만 지울 수 있습니다.' });
+    return null;
+  }
+  return { row: rows[0], me, admin };
+}
+
+async function photoUpdate(req, res) {
+  const found = await findMyPhoto(req, res);
+  if (!found) return;
+  const note = String(body(req).note || '').trim();
+  if (note.length > MAX_PHOTO_NOTE) {
+    return res.status(400).json({ error: `설명은 ${MAX_PHOTO_NOTE}자 이내로 적어주세요.` });
+  }
+  await q(`UPDATE photos SET note = $1 WHERE id = $2`, [note, found.row.id]);
+  res.status(200).json({ ok: true });
+}
+
+async function photoRemove(req, res) {
+  const found = await findMyPhoto(req, res);
+  if (!found) return;
+  await q(`DELETE FROM photos WHERE id = $1`, [found.row.id]);
+  if (found.admin) await audit(found.admin, 'delete_photo', { id: Number(found.row.id) });
+  res.status(200).json({ ok: true });
 }

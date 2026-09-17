@@ -114,7 +114,7 @@ export async function ensureAccounts() {
   accountsReady = true;
 }
 
-const SESSION_HOURS = 12;
+export const SESSION_HOURS = 12;
 
 /**
  * "로그인 상태 유지"를 켠 사람의 세션 길이.
@@ -122,7 +122,7 @@ const SESSION_HOURS = 12;
  * 비밀번호를 저장해두는 대신 세션을 길게 주는 쪽을 택했다 — 남는 것이
  * 비밀번호가 아니라 이 계정 하나짜리 표라서, 잃어도 되돌리기 쉽다.
  */
-const REMEMBER_DAYS = 30;
+export const REMEMBER_DAYS = 30;
 
 export async function createSession(handle, remember = false) {
   const token = randomUUID() + randomBytes(16).toString('hex');
@@ -135,11 +135,54 @@ export async function createSession(handle, remember = false) {
   return token;
 }
 
+/**
+ * 세션 표를 담아두는 쿠키 이름.
+ *
+ * 표는 원래 머리글(Authorization)로만 오갔다. 그런데 <img> 로 불러오는 사진과
+ * <a href> 로 받는 파일은 머리글을 붙일 수가 없다 — 브라우저가 그냥 주소를
+ * 열 뿐이다. 그래서 같은 표를 쿠키로도 들려보낸다.
+ */
+export const SESSION_COOKIE = 'r6s';
+
+/** 쿠키 한 줄에서 이름 하나를 꺼낸다 */
+function readCookie(req, name) {
+  const raw = req.headers?.cookie;
+  if (!raw) return null;
+  for (const part of raw.split(';')) {
+    const i = part.indexOf('=');
+    if (i < 0) continue;
+    if (part.slice(0, i).trim() === name) {
+      try { return decodeURIComponent(part.slice(i + 1).trim()); } catch { return null; }
+    }
+  }
+  return null;
+}
+
+/** 브라우저에 표를 심거나(값이 있으면) 지운다(null 이면) */
+export function setSessionCookie(req, res, token, days) {
+  const host = String(req.headers?.host || '');
+  const local = host.startsWith('localhost') || host.startsWith('127.0.0.1');
+  const bits = [
+    `${SESSION_COOKIE}=${token ? encodeURIComponent(token) : ''}`,
+    'Path=/',
+    'HttpOnly',
+    // Lax 면 남의 사이트에서 보낸 POST 에는 쿠키가 실리지 않는다.
+    // 주소를 직접 여는 일(사진 새 창, 파일 받기)에는 실린다 — 필요한 건 그것뿐이다.
+    'SameSite=Lax',
+    `Max-Age=${token ? Math.round(days * 24 * 60 * 60) : 0}`,
+  ];
+  if (!local) bits.push('Secure');
+  res.setHeader('Set-Cookie', bits.join('; '));
+}
+
 /** 로그인한 사람. { handle, role } 또는 null */
 export async function currentUser(req) {
   await ensureAccounts();
   const auth = req.headers?.authorization || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  let token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  // 쿠키는 주소를 그냥 여는 요청(GET)에서만 받는다. 값을 바꾸는 요청까지
+  // 쿠키로 받아주면 남의 사이트가 대신 누르게 할 수 있다(CSRF).
+  if (!token && req.method === 'GET') token = readCookie(req, SESSION_COOKIE);
   if (!token) return null;
   const rows = await q(
     `SELECT p.handle, p.role FROM sessions s

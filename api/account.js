@@ -2,6 +2,7 @@ import {
   q, body, methodGuard, audit, hashPw, verifyPw, createSession,
   currentUser, requireAdmin, ensureAccounts,
   genReqId, parseHandle, cleanEmail, ROLES, ROLE_LABEL, TEMP_PASSWORD,
+  setSessionCookie, REMEMBER_DAYS, SESSION_HOURS,
 } from './_lib.js';
 
 /**
@@ -57,6 +58,9 @@ async function login(req, res) {
   }
 
   const token = await createSession(p.handle, !!remember);
+  // 같은 표를 쿠키로도 심는다. 사진과 파일은 주소를 그냥 여는 방식이라
+  // 머리글을 붙일 수가 없어, 쿠키가 없으면 회원인데도 못 본다.
+  setSessionCookie(req, res, token, remember ? REMEMBER_DAYS : SESSION_HOURS / 24);
   res.status(200).json({ ok: true, token, account: toAccount(p) });
 }
 
@@ -81,12 +85,20 @@ async function logout(req, res) {
   const auth = req.headers?.authorization || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
   if (token) await q(`DELETE FROM sessions WHERE token = $1`, [token]);
+  setSessionCookie(req, res, null, 0);
   res.status(200).json({ ok: true });
 }
 
 async function whoami(req, res) {
   const me = await currentUser(req);
   if (!me) return res.status(200).json({ account: null });
+
+  // 쿠키가 생기기 전에 로그인해둔 사람도 있다. 들어올 때마다 한 번씩
+  // 심어주면 아무도 다시 로그인하지 않아도 된다.
+  const auth = req.headers?.authorization || '';
+  if (auth.startsWith('Bearer ')) {
+    setSessionCookie(req, res, auth.slice(7), REMEMBER_DAYS);
+  }
   const rows = await q(`SELECT * FROM players WHERE handle = $1`, [me.handle]);
   res.status(200).json({ account: rows.length ? toAccount(rows[0]) : me });
 }
