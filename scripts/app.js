@@ -245,7 +245,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 67;
+const APP_VERSION = 68;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -3442,6 +3442,21 @@ function roleCell(a) {
   }</select>`;
 }
 
+/** 권한 칸 머리를 누르면 그 순서로 줄을 세운다. key 가 없으면 받아온 차례(아이디순) 그대로. */
+let roleSort = { key: null, dir: -1 };
+
+/** 머리줄에 지금 무엇으로 세웠는지 표시한다. */
+function renderRoleHead() {
+  const th = document.querySelector('#roleTable th[data-role-sort]');
+  if (!th) return;
+  const on = roleSort.key === 'role';
+  th.classList.toggle('sorted', on);
+  th.innerHTML = '권한' + (on ? `<span class="sort-ar">${roleSort.dir > 0 ? '▲' : '▼'}</span>` : '');
+  th.title = on
+    ? (roleSort.dir > 0 ? '낮은 권한부터 · 다시 누르면 높은 권한부터' : '높은 권한부터 · 다시 누르면 낮은 권한부터')
+    : '권한순으로 줄 세우기';
+}
+
 /** 자기 계정은 지울 수 없고, 마스터 계정은 마스터만 지울 수 있다 (서버도 같이 막는다) */
 function canDelete(a) {
   if (me && me.handle === a.handle) return false;
@@ -3465,6 +3480,14 @@ function renderAccounts() {
   const query = search ? search.value.trim().toLowerCase() : '';
   const list = accounts.filter(a =>
     !query || a.handle.toLowerCase().includes(query) || (a.clan || '').toLowerCase().includes(query));
+
+  // 권한으로 세울 때, 같은 권한끼리는 아이디순 — 받아온 차례와 같아 눈에 익다
+  if (roleSort.key === 'role') {
+    list.sort((x, y) =>
+      roleSort.dir * ((ROLE_RANK[x.role] || 0) - (ROLE_RANK[y.role] || 0))
+      || x.handle.toLowerCase().localeCompare(y.handle.toLowerCase()));
+  }
+  renderRoleHead();
 
   const pages = Math.max(1, Math.ceil(list.length / ADMIN_PER_PAGE));
   rolePage = Math.min(Math.max(1, rolePage), pages);
@@ -3999,6 +4022,14 @@ function initAccountEvents() {
   const search = document.getElementById('roleSearch');
   // 검색어를 바꾸면 첫 쪽부터 — 3쪽에 서 있다가 검색하면 빈 화면이 뜬다
   if (search) search.addEventListener('input', () => { rolePage = 1; renderAccounts(); });
+
+  // 권한 칸 머리 — 처음 누르면 마스터부터, 다시 누르면 일반부터
+  const roleTh = document.querySelector('#roleTable th[data-role-sort]');
+  if (roleTh) roleTh.addEventListener('click', () => {
+    roleSort = roleSort.key === 'role' ? { key: 'role', dir: -roleSort.dir } : { key: 'role', dir: -1 };
+    rolePage = 1;               // 순서가 바뀌면 첫 쪽부터 본다
+    renderAccounts();
+  });
 
   const table = document.getElementById('roleTable');
   if (table) {

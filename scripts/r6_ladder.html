@@ -736,6 +736,15 @@ tr.fl-pinned td:first-child{ box-shadow:inset 3px 0 0 var(--danger); }
 .tm-table th[data-tm-sort]:hover{ color:var(--text-primary); }
 .tm-table th.sorted{ color:var(--accent); }
 .tm-table th .sort-ar{ margin-left:2px; font-size:9px; }
+/* 권한 표는 '권한' 칸 머리만 누를 수 있다 — 나머지는 손가락 모양도 주지 않는다 */
+#roleTable th{ cursor:default; }
+#roleTable th:hover{ color:var(--text-tertiary); }
+#roleTable th[data-role-sort]{ cursor:pointer; user-select:none; }
+#roleTable th[data-role-sort]:hover{ color:var(--text-primary); }
+/* 세워둔 칸은 손이 올라가 있어도 계속 강조색이다 (:hover 보다 뒤에 둔다) */
+#roleTable th[data-role-sort].sorted{ color:var(--accent); }
+#roleTable th .sort-ar{ margin-left:2px; font-size:9px; }
+
 .tm-table td{ vertical-align:middle; }
 .tm-table th.tm-ck, .tm-table td.tm-ck{ width:52px; text-align:center; }
 .tm-table th.tm-sel{ width:120px; }
@@ -2720,7 +2729,8 @@ if (/[?&]room=\d+/.test(location.search)) {
         </div>
         <div class="table-wrap">
           <table id="roleTable">
-            <thead><tr><th>ID</th><th>Clan</th><th>이메일</th><th>전적</th><th>권한</th><th>관리</th></tr></thead>
+            <thead><tr><th>ID</th><th>Clan</th><th>이메일</th><th>전적</th>
+              <th data-role-sort="role" title="권한순으로 줄 세우기">권한</th><th>관리</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
