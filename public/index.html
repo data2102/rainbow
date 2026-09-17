@@ -2729,8 +2729,14 @@ if (/[?&]room=\d+/.test(location.search)) {
         </div>
         <div class="table-wrap">
           <table id="roleTable">
-            <thead><tr><th>ID</th><th>Clan</th><th>이메일</th><th>전적</th>
-              <th data-role-sort="role" title="권한순으로 줄 세우기">권한</th><th>관리</th></tr></thead>
+            <thead><tr>
+              <th data-role-sort="handle">ID</th>
+              <th data-role-sort="clan">Clan</th>
+              <th data-role-sort="email">이메일</th>
+              <th data-role-sort="record">전적</th>
+              <th data-role-sort="role">권한</th>
+              <th>관리</th>
+            </tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -3920,7 +3926,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 68;
+const APP_VERSION = 69;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -7117,19 +7123,40 @@ function roleCell(a) {
   }</select>`;
 }
 
-/** 권한 칸 머리를 누르면 그 순서로 줄을 세운다. key 가 없으면 받아온 차례(아이디순) 그대로. */
-let roleSort = { key: null, dir: -1 };
+/** 칸 머리를 누르면 그 순서로 줄을 세운다. key 가 없으면 받아온 차례(아이디순) 그대로. */
+let roleSort = { key: null, dir: 1 };
+
+const ROLE_COL = {
+  handle: { label: 'ID',     first:  1 },   // 글자는 ㄱ→ㅎ 부터
+  clan:   { label: 'Clan',   first:  1 },
+  email:  { label: '이메일',  first:  1 },
+  record: { label: '전적',    first: -1 },   // 숫자는 큰 것부터
+  role:   { label: '권한',    first: -1 },   // 권한은 마스터부터
+};
+
+/** 줄 세울 때 쓰는 값. 비어 있으면 null — 방향과 상관없이 뒤로 보낸다. */
+function roleSortValue(a, key) {
+  switch (key) {
+    case 'handle': return a.handle.toLowerCase();
+    case 'clan':   return (a.clan || '').trim().toLowerCase() || null;
+    case 'email':  return (a.email || '').trim().toLowerCase() || null;
+    case 'record': { const p = findPlayer(a.handle); return p ? p.point : null; }
+    case 'role':   return ROLE_RANK[a.role] || 0;
+    default:       return null;
+  }
+}
 
 /** 머리줄에 지금 무엇으로 세웠는지 표시한다. */
 function renderRoleHead() {
-  const th = document.querySelector('#roleTable th[data-role-sort]');
-  if (!th) return;
-  const on = roleSort.key === 'role';
-  th.classList.toggle('sorted', on);
-  th.innerHTML = '권한' + (on ? `<span class="sort-ar">${roleSort.dir > 0 ? '▲' : '▼'}</span>` : '');
-  th.title = on
-    ? (roleSort.dir > 0 ? '낮은 권한부터 · 다시 누르면 높은 권한부터' : '높은 권한부터 · 다시 누르면 낮은 권한부터')
-    : '권한순으로 줄 세우기';
+  document.querySelectorAll('#roleTable th[data-role-sort]').forEach(th => {
+    const key = th.dataset.roleSort;
+    const col = ROLE_COL[key];
+    if (!col) return;
+    const on = roleSort.key === key;
+    th.classList.toggle('sorted', on);
+    th.innerHTML = esc(col.label) + (on ? `<span class="sort-ar">${roleSort.dir > 0 ? '▲' : '▼'}</span>` : '');
+    th.title = on ? '다시 누르면 반대로 세웁니다' : `${col.label}순으로 줄 세우기`;
+  });
 }
 
 /** 자기 계정은 지울 수 없고, 마스터 계정은 마스터만 지울 수 있다 (서버도 같이 막는다) */
@@ -7156,11 +7183,22 @@ function renderAccounts() {
   const list = accounts.filter(a =>
     !query || a.handle.toLowerCase().includes(query) || (a.clan || '').toLowerCase().includes(query));
 
-  // 권한으로 세울 때, 같은 권한끼리는 아이디순 — 받아온 차례와 같아 눈에 익다
-  if (roleSort.key === 'role') {
-    list.sort((x, y) =>
-      roleSort.dir * ((ROLE_RANK[x.role] || 0) - (ROLE_RANK[y.role] || 0))
-      || x.handle.toLowerCase().localeCompare(y.handle.toLowerCase()));
+  // 세운 값이 같으면 아이디순 — 받아온 차례와 같아 눈에 익다
+  if (roleSort.key && ROLE_COL[roleSort.key]) {
+    const key = roleSort.key;
+    const dir = roleSort.dir;
+    list.sort((x, y) => {
+      const vx = roleSortValue(x, key);
+      const vy = roleSortValue(y, key);
+      // 비어 있는 칸(이메일 없음·명단에 없음)은 오름이든 내림이든 뒤에 둔다
+      if (vx === null && vy !== null) return 1;
+      if (vy === null && vx !== null) return -1;
+      if (vx !== null && vx !== vy) {
+        const c = typeof vx === 'string' ? vx.localeCompare(vy) : (vx < vy ? -1 : 1);
+        return dir * c;
+      }
+      return x.handle.toLowerCase().localeCompare(y.handle.toLowerCase());
+    });
   }
   renderRoleHead();
 
@@ -7698,12 +7736,18 @@ function initAccountEvents() {
   // 검색어를 바꾸면 첫 쪽부터 — 3쪽에 서 있다가 검색하면 빈 화면이 뜬다
   if (search) search.addEventListener('input', () => { rolePage = 1; renderAccounts(); });
 
-  // 권한 칸 머리 — 처음 누르면 마스터부터, 다시 누르면 일반부터
-  const roleTh = document.querySelector('#roleTable th[data-role-sort]');
-  if (roleTh) roleTh.addEventListener('click', () => {
-    roleSort = roleSort.key === 'role' ? { key: 'role', dir: -roleSort.dir } : { key: 'role', dir: -1 };
-    rolePage = 1;               // 순서가 바뀌면 첫 쪽부터 본다
-    renderAccounts();
+  // 칸 머리 — 처음 누르면 그 칸에 어울리는 쪽(글자는 ㄱ부터, 숫자·권한은 큰 것부터),
+  // 다시 누르면 반대
+  document.querySelectorAll('#roleTable th[data-role-sort]').forEach(th => {
+    const key = th.dataset.roleSort;
+    if (!ROLE_COL[key]) return;
+    th.addEventListener('click', () => {
+      roleSort = roleSort.key === key
+        ? { key, dir: -roleSort.dir }
+        : { key, dir: ROLE_COL[key].first };
+      rolePage = 1;               // 순서가 바뀌면 첫 쪽부터 본다
+      renderAccounts();
+    });
   });
 
   const table = document.getElementById('roleTable');

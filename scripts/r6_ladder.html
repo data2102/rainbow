@@ -2729,8 +2729,14 @@ if (/[?&]room=\d+/.test(location.search)) {
         </div>
         <div class="table-wrap">
           <table id="roleTable">
-            <thead><tr><th>ID</th><th>Clan</th><th>이메일</th><th>전적</th>
-              <th data-role-sort="role" title="권한순으로 줄 세우기">권한</th><th>관리</th></tr></thead>
+            <thead><tr>
+              <th data-role-sort="handle">ID</th>
+              <th data-role-sort="clan">Clan</th>
+              <th data-role-sort="email">이메일</th>
+              <th data-role-sort="record">전적</th>
+              <th data-role-sort="role">권한</th>
+              <th>관리</th>
+            </tr></thead>
             <tbody></tbody>
           </table>
         </div>
