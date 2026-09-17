@@ -245,7 +245,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 64;
+const APP_VERSION = 65;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -1482,6 +1482,22 @@ function openPhotoView(id) {
   if (v) v.hidden = false;
   renderPhotoView();
   if (v) v.scrollIntoView({ block: 'start' });
+}
+
+/** 사진첩을 첫 화면(목록)으로 되돌린다. 올리던 화면도, 보던 사진도 접는다. */
+function showPhotoList() {
+  photoOpen = null;
+  photoEdit = false;
+  photoPicked = [];
+  photoPage = 1;
+  const f = document.getElementById('photoFormView');
+  const v = document.getElementById('photoViewView');
+  const l = document.getElementById('photoListView');
+  if (f) f.hidden = true;
+  if (v) v.hidden = true;
+  if (l) l.style.display = '';
+  renderPhotoPicked();   // 고르다 만 사진이 숨은 화면에 남지 않게
+  renderPhotos();
 }
 
 function closePhotoView() {
@@ -5489,6 +5505,9 @@ function activateTab(name) {
   }
   // 자료실은 다른 사람이 방금 올렸을 수 있으니 들어갈 때 새로 받아온다
   if (name === 'files') { showFileView('list'); loadFiles().then(renderFiles); }
+  // 사진첩도 마찬가지다. 지난번에 보던 사진이나 올리던 화면이 그대로 남아
+  // 있으면 다시 들어왔을 때 어리둥절하므로, 언제나 목록부터 보여준다.
+  if (name === 'photos') { showPhotoList(); loadPosts().then(renderPhotos); }
   if (name === 'launcher') { loadRooms().then(renderLauncher); }
 }
 
