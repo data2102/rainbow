@@ -347,7 +347,7 @@ h1{
 /* ---------- 헤더 로고 ----------
    제목을 글자 대신 로고 한 덩어리로 세운다. 그림 파일이 아니라 벡터(SVG)라
    어떤 화면에서도 또렷하고, 화이트/다크 양쪽에서 같은 빨강을 쓴다. */
-.brand{ display:inline-flex; align-items:flex-end; gap:var(--sp-3); }
+.brand{ display:inline-flex; align-items:flex-end; }
 .brand-logo{
   display:block; height:clamp(42px, 8vw, 62px); width:auto;
   filter:drop-shadow(2px 3px 4px rgba(0,0,0,0.20));
@@ -357,11 +357,6 @@ h1{
 .home-link:hover .brand-logo{
   transform:translateY(-1px);
   filter:drop-shadow(2px 5px 7px rgba(0,0,0,0.28));
-}
-.brand-rank{
-  margin-bottom:9px; padding:var(--sp-1) var(--sp-3);
-  border-radius:var(--radius-sm); background:var(--r6-red); color:#fff;
-  font-size:var(--fs-footnote); font-weight:var(--fw-bold); letter-spacing:.12em;
 }
 /* 화면에는 없고 읽어주는 기계와 검색엔진에만 남는 제목 */
 .brand-name{
@@ -2573,7 +2568,6 @@ if (/[?&]room=\d+/.test(location.search)) {
                       stroke="#5b616b" stroke-width="7" paint-order="stroke" fill="#fff">Tom Clancy&apos;s</text>
               </g>
             </svg>
-            <span class="brand-rank" aria-hidden="true">RANK</span>
           </span>
           <span class="brand-name">RAINBOWSIX RANK</span>
         </button>
@@ -3916,7 +3910,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 66;
+const APP_VERSION = 67;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
