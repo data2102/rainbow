@@ -245,7 +245,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 63;
+const APP_VERSION = 64;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -338,7 +338,8 @@ async function loadPosts() {
     posts = d.posts || [];
     files = d.files || [];
     photos = d.photos || [];
-    if (Number(d.photoMaxNote) > 0) photoMaxNote = Number(d.photoMaxNote);
+    if (Number(d.photoMaxTitle) > 0) photoMaxTitle = Number(d.photoMaxTitle);
+    if (Number(d.photoMaxBody) > 0) photoMaxBody = Number(d.photoMaxBody);
     filesLocked = !!d.filesLocked;
     if (Array.isArray(d.kinds) && d.kinds.length) fileKinds = d.kinds;
     if (Number(d.maxUpload) > 0) fileMaxUpload = Number(d.maxUpload);
@@ -1207,7 +1208,10 @@ const PHOTOS_PER_PAGE = 20;
 let photos = [];
 let photoPage = 1;
 let photoPicked = [];        // 올리기 전에 고른 사진들
-let photoMaxNote = 100;
+let photoOpen = null;        // 지금 펼쳐 보고 있는 사진 id
+let photoEdit = false;       // 그 사진의 제목·내용을 고쳐 쓰는 중인가
+let photoMaxTitle = 80;
+let photoMaxBody = 1000;
 
 /** 올릴 때 줄이는 크기. 원본을 그대로 담으면 한 장에 몇 MB 가 된다. */
 const PHOTO_MAX_SIDE = 1600;
@@ -1271,17 +1275,26 @@ function renderPhotos() {
   const gate = document.getElementById('photoGate');
   const listView = document.getElementById('photoListView');
   const formView = document.getElementById('photoFormView');
+  const viewView = document.getElementById('photoViewView');
   const locked = !isLoggedIn();
+  // 올리는 중이거나 한 장을 펼쳐 보는 중이면 목록은 뒤로 물린다
+  const busy = (formView && !formView.hidden) || (viewView && !viewView.hidden);
   if (gate) gate.style.display = locked ? 'block' : 'none';
-  if (listView) listView.style.display = locked ? 'none' : '';
+  if (listView) listView.style.display = (locked || busy) ? 'none' : '';
   if (locked) {
     if (formView) formView.hidden = true;
+    const vv = document.getElementById('photoViewView');
+    if (vv) vv.hidden = true;
     grid.innerHTML = '';
     empty.style.display = 'none';
     const pg = document.getElementById('photoPager');
     if (pg) { pg.innerHTML = ''; pg.style.display = 'none'; }
+    photoOpen = null;
     return;
   }
+
+  // 펼쳐 둔 사진이 있으면 그쪽도 새로 받은 내용으로 다시 그린다
+  if (photoOpen != null) renderPhotoView();
 
   if (count) count.textContent = photos.length ? `${photos.length}장` : '';
 
@@ -1301,20 +1314,16 @@ function renderPhotos() {
   const shown = photos.slice(from, from + PHOTOS_PER_PAGE);
 
   grid.innerHTML = shown.map(p => {
-    const mine = me && String(p.author).toLowerCase() === me.handle.toLowerCase();
     const when = new Date(p.createdAt);
     const day = `${when.getFullYear()}-${pad2(when.getMonth() + 1)}-${pad2(when.getDate())}`;
     return `<figure class="ph-cell">
-      <a class="ph-a" href="/api/post?photo=${p.id}" data-photo="${p.id}"
-         title="${esc(p.note || '크게 보기')}">
-        <img class="ph-img" src="/api/post?photo=${p.id}&thumb=1" alt="${esc(p.note || '사진')}"
+      <a class="ph-a" href="#" data-photo="${p.id}" title="${esc(p.title || '(제목 없음)')}">
+        <img class="ph-img" src="/api/post?photo=${p.id}&thumb=1" alt="${esc(p.title)}"
              loading="lazy">
       </a>
-      ${mine || isAdmin()
-        ? `<button type="button" class="ph-del" data-phdel="${p.id}" aria-label="사진 지우기">✕</button>`
-        : ''}
-      ${p.note ? `<figcaption class="ph-note">${esc(p.note)}</figcaption>` : ''}
-      <div class="ph-by">${esc(p.author)} · ${day}</div>
+      <figcaption class="ph-note">${p.title ? esc(p.title) : '(제목 없음)'}</figcaption>
+      <div class="ph-by">${esc(p.author)} · ${day}${
+        p.comments && p.comments.length ? ` · 댓글 ${p.comments.length}` : ''}</div>
     </figure>`;
   }).join('');
 
@@ -1358,15 +1367,24 @@ function renderPhotoPicked() {
   box.innerHTML = photoPicked.map((p, i) => `
     <div class="ph-pick">
       <img src="data:image/jpeg;base64,${p.thumb}" alt="">
-      <input type="text" data-phnote="${i}" maxlength="${photoMaxNote}"
-             placeholder="설명 (선택) — 예) 9월 정기전 3라운드" value="${esc(p.note)}">
+      <div class="ph-fields">
+        <input type="text" data-phtitle="${i}" maxlength="${photoMaxTitle}"
+               placeholder="제목 (필수) — 예) 9월 정기전 3라운드" value="${esc(p.title)}">
+        <textarea data-phbody="${i}" maxlength="${photoMaxBody}"
+                  placeholder="내용 (선택)">${esc(p.body)}</textarea>
+      </div>
       <span class="ph-size">${fmtBytes(p.bytes)}</span>
       <button type="button" data-phdrop="${i}" aria-label="빼기">&times;</button>
     </div>`).join('');
+  // 제목이 하나라도 비어 있으면 올릴 수 없다
+  const ready = photoPicked.length && photoPicked.every(p => p.title.trim());
   if (save) {
-    save.disabled = !photoPicked.length;
+    save.disabled = !ready;
     save.textContent = photoPicked.length > 1 ? `${photoPicked.length}장 올리기` : '올리기';
   }
+  const err = document.getElementById('photoErr');
+  if (err && photoPicked.length && !ready) err.textContent = '사진마다 제목을 적어주세요.';
+  else if (err && ready) err.textContent = '';
 }
 
 /** 고른 사진을 줄여서 들고 있는다. 올리기를 누를 때까지는 서버에 가지 않는다. */
@@ -1386,7 +1404,7 @@ async function takePhotos(list) {
         shrinkPhoto(f, PHOTO_MAX_SIDE, 0.82),
         shrinkPhoto(f, PHOTO_THUMB_SIDE, 0.75),
       ]);
-      photoPicked.push({ name: f.name, data, thumb, bytes: b64Bytes(data), note: '' });
+      photoPicked.push({ name: f.name, data, thumb, bytes: b64Bytes(data), title: '', body: '' });
     } catch (e) {
       if (err) err.textContent = `${f.name}: ${e.message}`;
     }
@@ -1428,7 +1446,7 @@ async function savePhotos() {
       if (btn) btn.textContent = `올리는 중… ${done + 1}/${photoPicked.length}`;
       await apiPost('/api/post', {
         action: 'photoCreate',
-        note: p.note, filename: p.name, mime: 'image/jpeg',
+        title: p.title, body: p.body, filename: p.name, mime: 'image/jpeg',
         data: p.data, thumb: p.thumb,
       });
       done += 1;
@@ -1448,10 +1466,172 @@ async function savePhotos() {
   }
 }
 
+/** 올린 사람과 관리자만 고치고 지울 수 있다. 서버도 같은 것을 다시 본다. */
+function myPhoto(p) {
+  return !!p && !!me && (String(p.author).toLowerCase() === me.handle.toLowerCase() || isAdmin());
+}
+
+function openPhotoView(id) {
+  photoOpen = Number(id);
+  photoEdit = false;
+  const l = document.getElementById('photoListView');
+  const f = document.getElementById('photoFormView');
+  const v = document.getElementById('photoViewView');
+  if (l) l.style.display = 'none';
+  if (f) f.hidden = true;
+  if (v) v.hidden = false;
+  renderPhotoView();
+  if (v) v.scrollIntoView({ block: 'start' });
+}
+
+function closePhotoView() {
+  photoOpen = null;
+  photoEdit = false;
+  const v = document.getElementById('photoViewView');
+  if (v) v.hidden = true;
+  const l = document.getElementById('photoListView');
+  if (l) l.style.display = '';
+  renderPhotos();
+}
+
+function renderPhotoView() {
+  const box = document.getElementById('photoView');
+  const head = document.getElementById('photoViewTitle');
+  if (!box) return;
+
+  const p = photos.find(x => x.id === photoOpen);
+  // 보고 있는 사이에 지워졌으면 목록으로 되돌린다
+  if (!p) { closePhotoView(); return; }
+
+  const mine = myPhoto(p);
+  const title = p.title ? esc(p.title) : '(제목 없음)';
+  if (head) head.textContent = p.title || '(제목 없음)';
+
+  const cmts = (p.comments || []).map(c => {
+    const t = new Date(c.createdAt);
+    const when = `${t.getFullYear()}-${pad2(t.getMonth() + 1)}-${pad2(t.getDate())} ` +
+                 `${pad2(t.getHours())}:${pad2(t.getMinutes())}`;
+    const canDrop = me && (String(c.author).toLowerCase() === me.handle.toLowerCase() || isAdmin());
+    return `<div class="pv-cmt">
+      <span class="pv-cmt-who who-id" data-pcard="${esc(c.author)}" role="button" tabindex="0">${esc(c.author)}</span>
+      <span class="pv-cmt-b">${esc(c.body)}</span>
+      <span class="pv-cmt-t">${when}</span>
+      ${canDrop ? `<button type="button" class="pv-cmt-x" data-phcdel="${c.id}" aria-label="댓글 지우기">✕</button>` : ''}
+    </div>`;
+  }).join('');
+
+  const d = new Date(p.createdAt);
+  const day = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
+  const head1 = photoEdit
+    ? `<div class="pv-edit">
+         <input type="text" id="phEditTitle" maxlength="${photoMaxTitle}"
+                placeholder="제목 (필수)" value="${esc(p.title)}">
+         <textarea id="phEditBody" maxlength="${photoMaxBody}"
+                   placeholder="내용 (선택)">${esc(p.body)}</textarea>
+         <div class="pv-edit-acts">
+           <button type="button" class="btn-mini btn-approve" id="phEditSave">저장</button>
+           <button type="button" class="btn-mini btn-edit" id="phEditCancel">취소</button>
+         </div>
+         <div class="modal-error" id="phEditErr"></div>
+       </div>`
+    : `<div class="pv-title">${title}</div>
+       <div class="pv-meta">
+         <span class="who-id" data-pcard="${esc(p.author)}" role="button" tabindex="0">${esc(p.author)}</span>
+         <span>${day}</span>
+         ${mine ? `<span class="pv-acts">
+             <button type="button" class="btn-mini btn-edit" data-phedit="${p.id}">수정</button>
+             <button type="button" class="btn-mini btn-reject" data-phdel="${p.id}">삭제</button>
+           </span>` : ''}
+       </div>`;
+
+  box.innerHTML = `<div class="pv-wrap">
+    <img class="pv-shot" src="/api/post?photo=${p.id}" alt="${title}" data-phbig="${p.id}">
+    <div class="pv-head">${head1}</div>
+    ${photoEdit ? '' : `<div class="pv-body">${
+      p.body ? esc(p.body) : '<span class="pv-none">내용이 없습니다.</span>'}</div>`}
+
+    <div class="pv-cmt-h">댓글 ${(p.comments || []).length}</div>
+    <div class="pv-cmts">${cmts || '<div class="pv-none">첫 댓글을 남겨보세요.</div>'}</div>
+    <div class="pv-write">
+      <input type="text" id="phCmtInput" maxlength="300"
+             placeholder="${me ? esc(me.handle) + ' 님으로 댓글을 남깁니다.' : '댓글'}">
+      <button type="button" class="btn-mini btn-approve" id="phCmtSend">등록</button>
+    </div>
+    <div class="modal-error" id="phCmtErr"></div>
+  </div>`;
+
+  if (photoEdit) {
+    const t = document.getElementById('phEditTitle');
+    if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); }
+  }
+}
+
+/** 제목·내용 고쳐 쓰기 */
+async function savePhotoText() {
+  const p = photos.find(x => x.id === photoOpen);
+  if (!p) return;
+  const t = document.getElementById('phEditTitle');
+  const b = document.getElementById('phEditBody');
+  const err = document.getElementById('phEditErr');
+  const btn = document.getElementById('phEditSave');
+  const title = t ? t.value.trim() : '';
+  if (!title) { if (err) err.textContent = '제목을 입력해주세요.'; if (t) t.focus(); return; }
+  if (err) err.textContent = '';
+  if (btn) { btn.disabled = true; btn.textContent = '저장 중…'; }
+  try {
+    await apiPost('/api/post', {
+      action: 'photoUpdate', id: p.id, title, body: b ? b.value.trim() : '',
+    });
+    photoEdit = false;
+    await loadPosts();
+    renderPhotos();
+    showToast('사진 글을 고쳤습니다.');
+  } catch (e) {
+    if (err) err.textContent = e.message;
+    if (btn) { btn.disabled = false; btn.textContent = '저장'; }
+  }
+}
+
+async function sendPhotoComment() {
+  const p = photos.find(x => x.id === photoOpen);
+  if (!p) return;
+  const input = document.getElementById('phCmtInput');
+  const err = document.getElementById('phCmtErr');
+  const btn = document.getElementById('phCmtSend');
+  const text = input ? input.value.trim() : '';
+  if (!text) { if (input) input.focus(); return; }
+  if (err) err.textContent = '';
+  if (btn) btn.disabled = true;
+  try {
+    await apiPost('/api/post', { action: 'photoComment', photoId: p.id, body: text });
+    if (input) input.value = '';
+    await loadPosts();
+    renderPhotos();
+    // 다시 그린 칸으로 자리를 옮겨준다 — 댓글을 잇달아 달 수 있게
+    const next = document.getElementById('phCmtInput');
+    if (next) next.focus();
+  } catch (e) {
+    if (err) err.textContent = e.message;
+  }
+  const b2 = document.getElementById('phCmtSend');
+  if (b2) b2.disabled = false;
+}
+
+async function removePhotoComment(id) {
+  if (!confirm('이 댓글을 지울까요?')) return;
+  try {
+    await apiPost('/api/post', { action: 'photoCommentRemove', id: Number(id) });
+    await loadPosts();
+    renderPhotos();
+  } catch (e) { showToast(e.message); }
+}
+
 async function removePhoto(id) {
   if (!confirm('이 사진을 지울까요?')) return;
   try {
     await apiPost('/api/post', { action: 'photoRemove', id: Number(id) });
+    if (photoOpen === Number(id)) { photoOpen = null; photoEdit = false; closePhotoView(); }
     await loadPosts();
     renderPhotos();
     showToast('사진을 지웠습니다.');
@@ -1497,8 +1677,18 @@ function initPhotoEvents() {
       renderPhotoPicked();
     });
     picked.addEventListener('input', e => {
-      const i = e.target.dataset && e.target.dataset.phnote;
-      if (i != null) photoPicked[Number(i)].note = e.target.value;
+      const d = e.target.dataset || {};
+      if (d.phtitle != null) {
+        photoPicked[Number(d.phtitle)].title = e.target.value;
+        // 제목이 채워지면 올리기 단추가 풀려야 한다. 칸을 다시 그리면
+        // 쓰던 자리가 튀므로 단추만 손본다.
+        const save = document.getElementById('photoSave');
+        const err = document.getElementById('photoErr');
+        const ready = photoPicked.length && photoPicked.every(p => p.title.trim());
+        if (save) save.disabled = !ready;
+        if (err) err.textContent = ready ? '' : '사진마다 제목을 적어주세요.';
+      }
+      if (d.phbody != null) photoPicked[Number(d.phbody)].body = e.target.value;
     });
   }
 
@@ -1507,15 +1697,37 @@ function initPhotoEvents() {
 
   const grid = document.getElementById('photoGrid');
   if (grid) grid.addEventListener('click', e => {
-    const del = e.target.closest('[data-phdel]');
-    if (del) { e.preventDefault(); removePhoto(del.dataset.phdel); return; }
-    // 사진은 새 창에서 크게 본다
     const a = e.target.closest('[data-photo]');
-    if (a) {
-      e.preventDefault();
-      window.open(a.getAttribute('href'), 'r6photo' + a.dataset.photo);
-    }
+    if (a) { e.preventDefault(); openPhotoView(a.dataset.photo); }
   });
+
+  const vback = document.getElementById('photoViewBack');
+  if (vback) vback.addEventListener('click', closePhotoView);
+
+  const view = document.getElementById('photoView');
+  if (view) {
+    view.addEventListener('click', e => {
+      const big = e.target.closest('[data-phbig]');
+      if (big) { window.open(`/api/post?photo=${big.dataset.phbig}`, 'r6photo' + big.dataset.phbig); return; }
+
+      const ed = e.target.closest('[data-phedit]');
+      if (ed) { photoEdit = true; renderPhotoView(); return; }
+
+      const del = e.target.closest('[data-phdel]');
+      if (del) { removePhoto(del.dataset.phdel); return; }
+
+      const cdel = e.target.closest('[data-phcdel]');
+      if (cdel) { removePhotoComment(cdel.dataset.phcdel); return; }
+
+      if (e.target.closest('#phEditSave')) { savePhotoText(); return; }
+      if (e.target.closest('#phEditCancel')) { photoEdit = false; renderPhotoView(); return; }
+      if (e.target.closest('#phCmtSend')) { sendPhotoComment(); return; }
+    });
+    // 댓글은 엔터로도 올린다
+    view.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && e.target.id === 'phCmtInput') { e.preventDefault(); sendPhotoComment(); }
+    });
+  }
 
   bindPager('photoPager', 'phpage', n => { photoPage = n; }, () => {
     renderPhotos();

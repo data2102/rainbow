@@ -2341,13 +2341,6 @@ button.room-n:hover{ color:var(--accent); text-decoration:underline; }
   padding:0 var(--sp-3) var(--sp-2);
   font-size:var(--fs-footnote); color:var(--text-tertiary);
 }
-.ph-del{
-  position:absolute; top:var(--sp-2); right:var(--sp-2);
-  border:none; border-radius:var(--radius-sm); cursor:pointer;
-  padding:2px var(--sp-2); font-size:var(--fs-footnote);
-  background:rgba(20,20,24,0.72); color:#fff;
-}
-.ph-del:hover{ background:var(--danger-strong); }
 .ph-count{ font-size:var(--fs-caption); color:var(--text-tertiary); }
 
 .ph-drop{
@@ -2383,6 +2376,74 @@ button.room-n:hover{ color:var(--accent); text-decoration:underline; }
   color:var(--text-tertiary); font-size:18px; line-height:1; padding:var(--sp-2);
 }
 .ph-pick button:hover{ color:var(--danger-strong); }
+
+/* 사진 한 장 보기 */
+.pv-wrap{ max-width:820px; margin:0 auto; }
+.pv-shot{
+  display:block; width:100%; border-radius:var(--radius-lg);
+  background:var(--surface-sunken); cursor:zoom-in;
+}
+.pv-head{ margin:var(--sp-5) 0 var(--sp-3); }
+.pv-title{
+  font-size:var(--fs-title); font-weight:var(--fw-bold);
+  letter-spacing:var(--ls-tight); line-height:var(--lh-tight);
+}
+.pv-meta{
+  margin-top:var(--sp-2); display:flex; align-items:center;
+  gap:var(--sp-3); flex-wrap:wrap;
+  font-size:var(--fs-footnote); color:var(--text-tertiary);
+}
+.pv-body{
+  font-size:var(--fs-caption); color:var(--text-secondary);
+  line-height:var(--lh-body); white-space:pre-wrap;
+  padding-bottom:var(--sp-5); border-bottom:1px solid var(--border);
+}
+.pv-cmt-h{
+  margin:var(--sp-5) 0 var(--sp-3);
+  font-size:var(--fs-caption); font-weight:var(--fw-bold);
+}
+.pv-cmt{
+  display:flex; align-items:baseline; gap:var(--sp-3);
+  padding:var(--sp-3) 0; border-bottom:1px solid var(--border);
+  font-size:var(--fs-caption);
+}
+.pv-cmt-who{ font-weight:var(--fw-bold); flex:none; }
+.pv-cmt-b{ flex:1 1 auto; min-width:0; color:var(--text-secondary);
+           line-height:var(--lh-body); white-space:pre-wrap; word-break:break-all; }
+.pv-cmt-t{ font-size:var(--fs-footnote); color:var(--text-tertiary); white-space:nowrap; }
+.pv-cmt-x{
+  flex:none; border:none; background:none; cursor:pointer;
+  color:var(--text-tertiary); font-size:16px; line-height:1; padding:0 var(--sp-1);
+}
+.pv-cmt-x:hover{ color:var(--danger-strong); }
+.pv-write{ display:flex; gap:var(--sp-2); margin-top:var(--sp-4); }
+.pv-write input{
+  flex:1 1 auto; min-width:0;
+  background:var(--surface); color:var(--text-primary);
+  border:1px solid var(--border); border-radius:var(--radius-sm);
+  padding:var(--sp-3); font-size:var(--fs-caption);
+}
+.pv-none{ padding:var(--sp-5) 0; font-size:var(--fs-caption); color:var(--text-tertiary); }
+.pv-acts{ display:inline-flex; gap:var(--sp-2); margin-left:auto; }
+.pv-edit{ display:flex; flex-direction:column; gap:var(--sp-3); }
+.pv-edit input, .pv-edit textarea{
+  width:100%; background:var(--surface); color:var(--text-primary);
+  border:1px solid var(--border); border-radius:var(--radius-sm);
+  padding:var(--sp-3); font-size:var(--fs-caption); font-family:inherit;
+}
+.pv-edit input{ font-size:var(--fs-body); font-weight:var(--fw-bold); }
+.pv-edit textarea{ min-height:120px; resize:vertical; line-height:var(--lh-body); }
+.pv-edit-acts{ display:flex; gap:var(--sp-2); }
+/* 올릴 때 한 장마다 제목·내용 */
+.ph-pick{ align-items:flex-start; }
+.ph-pick .ph-fields{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:var(--sp-2); }
+.ph-pick textarea{
+  background:var(--surface); color:var(--text-primary);
+  border:1px solid var(--border); border-radius:var(--radius-sm);
+  padding:var(--sp-2) var(--sp-3); font-size:var(--fs-caption);
+  font-family:inherit; resize:vertical; min-height:56px;
+}
+.ph-req{ color:var(--danger-strong); }
 
 #connBanner{
   display:none; border-radius:var(--radius-md);
@@ -3276,8 +3337,8 @@ if (/[?&]room=\d+/.test(location.search)) {
         <h2>사진첩 · Photos</h2>
       </div>
       <div class="foot-note" style="margin-top:0;margin-bottom:14px;">
-        경기 장면과 모임 사진을 모아둡니다 · 사진을 누르면 새 창에서 크게 볼 수 있습니다 ·
-        올리는 것은 로그인한 회원 누구나, 지우는 것은 올린 사람과 관리자만 할 수 있습니다.
+        경기 장면과 모임 사진을 모아둡니다 · 사진을 누르면 제목 · 내용 · 댓글을 볼 수 있습니다 ·
+        올리는 것은 로그인한 회원 누구나, 고치고 지우는 것은 올린 사람과 관리자만 할 수 있습니다.
       </div>
 
       <!-- 로그인하지 않은 사람에게 보이는 안내 -->
@@ -3319,6 +3380,15 @@ if (/[?&]room=\d+/.test(location.search)) {
         <div class="ph-picked" id="photoPicked"></div>
         <div class="modal-error" id="photoErr"></div>
         <button class="btn" id="photoSave" disabled>올리기</button>
+      </div>
+
+      <!-- 사진 한 장 보기 — 제목 · 내용 · 댓글 -->
+      <div id="photoViewView" hidden>
+        <div class="fl-head">
+          <button type="button" class="btn-mini btn-edit" id="photoViewBack">← 목록으로</button>
+          <span class="fl-head-t" id="photoViewTitle"></span>
+        </div>
+        <div id="photoView"></div>
       </div>
     </div>
   </div>

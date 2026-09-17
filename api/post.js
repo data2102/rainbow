@@ -100,6 +100,8 @@ export default async function handler(req, res) {
     if (action === 'photoCreate') return await photoCreate(req, res);
     if (action === 'photoUpdate') return await photoUpdate(req, res);
     if (action === 'photoRemove') return await photoRemove(req, res);
+    if (action === 'photoComment') return await photoComment(req, res);
+    if (action === 'photoCommentRemove') return await photoCommentRemove(req, res);
     if (action === 'create')     return await create(req, res);
     if (action === 'update')     return await update(req, res);
     if (action === 'remove')     return await remove(req, res);
@@ -164,7 +166,7 @@ async function listAll(req, res) {
   res.status(200).json({
     ...board,
     ...(files || { files: [], kinds: FILE_KINDS, maxUpload: MAX_UPLOAD }),
-    ...(photos || { photos: [], photoMaxNote: MAX_PHOTO_NOTE }),
+    ...(photos || { photos: [], photoMaxTitle: MAX_PHOTO_TITLE, photoMaxBody: MAX_PHOTO_BODY }),
     filesLocked: !me,
   });
 }
@@ -582,8 +584,8 @@ async function fileHit(req, res) {
    깨진 적이 있다. 주소만 나눠 쓴다.
    ========================================================== */
 
-/** 사진에 붙이는 한 줄 설명 */
-const MAX_PHOTO_NOTE = 100;
+const MAX_PHOTO_TITLE = 80;
+const MAX_PHOTO_BODY = 1000;
 
 let photosEnsured = false;
 async function ensurePhotoTable() {
@@ -600,6 +602,20 @@ async function ensurePhotoTable() {
     );
     CREATE INDEX IF NOT EXISTS idx_photos_new ON photos (created_at DESC);
 
+    -- 처음에는 설명 한 줄(note)뿐이었다. 제목과 내용으로 나눈다.
+    ALTER TABLE photos ADD COLUMN IF NOT EXISTS title TEXT;
+    ALTER TABLE photos ADD COLUMN IF NOT EXISTS body  TEXT;
+
+    CREATE TABLE IF NOT EXISTS photo_comments (
+      id         BIGSERIAL PRIMARY KEY,
+      photo_id   BIGINT NOT NULL REFERENCES photos(id) ON DELETE CASCADE,
+      author     TEXT NOT NULL,
+      body       TEXT NOT NULL,
+      created_at BIGINT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_photo_comments
+      ON photo_comments (photo_id, created_at);
+
     -- 사진은 따로 담는다. 목록을 뽑을 때마다 원본을 끌어오면 화면이 선다.
     CREATE TABLE IF NOT EXISTS photo_blobs (
       photo_id BIGINT PRIMARY KEY REFERENCES photos(id) ON DELETE CASCADE,
@@ -607,27 +623,53 @@ async function ensurePhotoTable() {
       thumb    BYTEA
     );
   `);
+  // 예전에 적어둔 설명 한 줄은 제목으로 옮긴다 — 사람들이 제목처럼 적었다
+  await q(`UPDATE photos SET title = note
+            WHERE (title IS NULL OR title = '') AND note IS NOT NULL AND note <> ''`);
   photosEnsured = true;
 }
 
 function rowToPhoto(r) {
   return {
     id: Number(r.id),
-    note: r.note || '',
+    title: r.title || '',
+    body: r.body || '',
     filename: r.filename || '',
     bytes: r.bytes == null ? null : Number(r.bytes),
     author: r.author,
     createdAt: Number(r.created_at),
+    comments: [],
   };
 }
 
-/** 목록에는 사진을 싣지 않는다. 스무 장이면 수십 MB 다. */
+function rowToPhotoComment(r) {
+  return {
+    id: Number(r.id),
+    photoId: Number(r.photo_id),
+    author: r.author,
+    body: r.body,
+    createdAt: Number(r.created_at),
+  };
+}
+
+/** 목록에는 사진을 싣지 않는다. 스무 장이면 수십 MB 다. 댓글은 글자뿐이라 함께 보낸다. */
 async function photoList() {
-  const rows = await q(
-    `SELECT id, note, filename, bytes, author, created_at
-       FROM photos ORDER BY created_at DESC, id DESC`
-  );
-  return { photos: rows.map(rowToPhoto), photoMaxNote: MAX_PHOTO_NOTE };
+  const [rows, comments] = await Promise.all([
+    q(`SELECT id, title, body, filename, bytes, author, created_at
+         FROM photos ORDER BY created_at DESC, id DESC`),
+    q(`SELECT * FROM photo_comments ORDER BY created_at ASC`),
+  ]);
+  const byPhoto = new Map();
+  for (const c of comments) {
+    const key = Number(c.photo_id);
+    if (!byPhoto.has(key)) byPhoto.set(key, []);
+    byPhoto.get(key).push(rowToPhotoComment(c));
+  }
+  return {
+    photos: rows.map(r => ({ ...rowToPhoto(r), comments: byPhoto.get(Number(r.id)) || [] })),
+    photoMaxTitle: MAX_PHOTO_TITLE,
+    photoMaxBody: MAX_PHOTO_BODY,
+  };
 }
 
 /**
@@ -668,10 +710,10 @@ async function photoCreate(req, res) {
   if (!me) return;
 
   const b = body(req);
-  const note = String(b.note || '').trim();
-  if (note.length > MAX_PHOTO_NOTE) {
-    return res.status(400).json({ error: `설명은 ${MAX_PHOTO_NOTE}자 이내로 적어주세요.` });
-  }
+  const bad = checkPhotoText(b);
+  if (bad) return res.status(400).json({ error: bad });
+  const title = String(b.title || '').trim();
+  const text = String(b.body || '').trim();
 
   let data = null;
   let thumb = null;
@@ -688,9 +730,9 @@ async function photoCreate(req, res) {
   if (!/^image\//i.test(mime)) return res.status(400).json({ error: '사진 파일만 올릴 수 있습니다.' });
 
   const rows = await q(
-    `INSERT INTO photos (note, filename, mime, bytes, author, created_at)
-     VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
-    [note, String(b.filename || '').trim().slice(0, 200), mime, data.length, me, Date.now()]
+    `INSERT INTO photos (title, body, filename, mime, bytes, author, created_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+    [title, text, String(b.filename || '').trim().slice(0, 200), mime, data.length, me, Date.now()]
   );
   const id = Number(rows[0].id);
   await q(`INSERT INTO photo_blobs (photo_id, data, thumb) VALUES ($1,$2,$3)`, [id, data, thumb]);
@@ -707,20 +749,68 @@ async function findMyPhoto(req, res) {
   if (!rows.length) { res.status(404).json({ error: '이미 지워진 사진입니다.' }); return null; }
   const admin = await currentAdmin(req);
   if (!isFileAuthor(me, rows[0]) && !admin) {
-    res.status(403).json({ error: '올린 사람과 관리자만 지울 수 있습니다.' });
+    res.status(403).json({ error: '올린 사람과 관리자만 고치거나 지울 수 있습니다.' });
     return null;
   }
   return { row: rows[0], me, admin };
 }
 
+/** 제목은 반드시 있어야 한다. 내용은 없어도 된다. */
+function checkPhotoText(b) {
+  const title = String(b.title || '').trim();
+  const text = String(b.body || '').trim();
+  if (!title) return '제목을 입력해주세요.';
+  if (title.length > MAX_PHOTO_TITLE) return `제목은 ${MAX_PHOTO_TITLE}자 이내로 입력해주세요.`;
+  if (text.length > MAX_PHOTO_BODY) return `내용은 ${MAX_PHOTO_BODY}자 이내로 입력해주세요.`;
+  return null;
+}
+
 async function photoUpdate(req, res) {
   const found = await findMyPhoto(req, res);
   if (!found) return;
-  const note = String(body(req).note || '').trim();
-  if (note.length > MAX_PHOTO_NOTE) {
-    return res.status(400).json({ error: `설명은 ${MAX_PHOTO_NOTE}자 이내로 적어주세요.` });
+  const b = body(req);
+  const bad = checkPhotoText(b);
+  if (bad) return res.status(400).json({ error: bad });
+  await q(`UPDATE photos SET title = $1, body = $2 WHERE id = $3`,
+    [String(b.title).trim(), String(b.body || '').trim(), found.row.id]);
+  res.status(200).json({ ok: true });
+}
+
+async function photoComment(req, res) {
+  const me = await requireUser(req, res);
+  if (!me) return;
+
+  const { photoId, body: text } = body(req);
+  const content = String(text || '').trim();
+  if (!Number.isInteger(Number(photoId))) return res.status(400).json({ error: '댓글을 달 사진을 찾을 수 없습니다.' });
+  if (!content) return res.status(400).json({ error: '댓글 내용을 입력해주세요.' });
+  if (content.length > MAX_COMMENT) return res.status(400).json({ error: `댓글은 ${MAX_COMMENT}자 이내로 입력해주세요.` });
+
+  const exists = await q(`SELECT 1 FROM photos WHERE id = $1`, [Number(photoId)]);
+  if (!exists.length) return res.status(404).json({ error: '이미 지워진 사진입니다.' });
+
+  const rows = await q(
+    `INSERT INTO photo_comments (photo_id, author, body, created_at)
+     VALUES ($1,$2,$3,$4) RETURNING *`,
+    [Number(photoId), me, content, Date.now()]
+  );
+  res.status(200).json({ ok: true, comment: rowToPhotoComment(rows[0]) });
+}
+
+async function photoCommentRemove(req, res) {
+  const me = await requireUser(req, res);
+  if (!me) return;
+
+  const { id } = body(req);
+  if (!Number.isInteger(Number(id))) return res.status(400).json({ error: '삭제할 댓글을 찾을 수 없습니다.' });
+  const rows = await q(`SELECT * FROM photo_comments WHERE id = $1`, [Number(id)]);
+  if (!rows.length) return res.status(404).json({ error: '이미 삭제된 댓글입니다.' });
+
+  const admin = await currentAdmin(req);
+  if (!admin && !isFileAuthor(me, rows[0])) {
+    return res.status(403).json({ error: '내가 쓴 댓글만 삭제할 수 있습니다.' });
   }
-  await q(`UPDATE photos SET note = $1 WHERE id = $2`, [note, found.row.id]);
+  await q(`DELETE FROM photo_comments WHERE id = $1`, [rows[0].id]);
   res.status(200).json({ ok: true });
 }
 
