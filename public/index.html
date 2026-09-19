@@ -3024,6 +3024,21 @@ if (/[?&]room=\d+/.test(location.search)) {
       </div>
 
       <div class="tsec">
+        <div class="tsec-h">■ 상금</div>
+        <div class="tsec-sub">팀원 각자 지급</div>
+        <div class="prize">
+          <div class="prize-card p1">
+            <div class="prize-rank">1위</div>
+            <div class="prize-body">각자 원하는 <b>치킨 1마리</b> + 콜라 쿠폰</div>
+          </div>
+          <div class="prize-card p2">
+            <div class="prize-rank">2위</div>
+            <div class="prize-body">메가커피 <b>아메리카노 1잔</b> 쿠폰</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tsec">
         <div class="tsec-h">■ 대회 경기 기록</div>
         <div class="tsec-sub">예선 순위는 여기 기록된 결과로 자동 계산됩니다</div>
 
@@ -3059,21 +3074,6 @@ if (/[?&]room=\d+/.test(location.search)) {
         </div>
 
         <div id="tMatchLog" style="margin-top:14px;"></div>
-      </div>
-
-      <div class="tsec">
-        <div class="tsec-h">■ 상금</div>
-        <div class="tsec-sub">팀원 각자 지급</div>
-        <div class="prize">
-          <div class="prize-card p1">
-            <div class="prize-rank">1위</div>
-            <div class="prize-body">각자 원하는 <b>치킨 1마리</b> + 콜라 쿠폰</div>
-          </div>
-          <div class="prize-card p2">
-            <div class="prize-rank">2위</div>
-            <div class="prize-body">메가커피 <b>아메리카노 1잔</b> 쿠폰</div>
-          </div>
-        </div>
       </div>
 
     </div>
@@ -3926,7 +3926,7 @@ let pingedAt = 0;
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 69;
+const APP_VERSION = 70;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
