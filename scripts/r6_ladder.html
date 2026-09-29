@@ -2669,12 +2669,15 @@ if (/[?&]room=\d+/.test(location.search)) {
         </div>
       </div>
       <div class="panel hud-corner">
-        <h2>Most Wins Top 5</h2>
+        <h2>Best Streak Top 5</h2>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Rank</th><th>ID</th><th>Clan</th><th>Game</th><th>Win</th><th>Loss</th><th>Ratio</th></tr></thead>
-            <tbody id="topWinBody"></tbody>
+            <thead><tr><th>Rank</th><th>ID</th><th>Clan</th><th>연승</th><th>Game</th><th>Win</th><th>Loss</th></tr></thead>
+            <tbody id="topStreakBody"></tbody>
           </table>
+        </div>
+        <div class="foot-note">
+          그 달에 가장 길게 이어간 연승입니다 · 지금 이어가는 중이 아니어도 기록으로 남습니다.
         </div>
       </div>
     </div>

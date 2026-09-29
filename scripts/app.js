@@ -281,7 +281,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 71;
+const APP_VERSION = 72;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -645,10 +645,47 @@ function renderStanding() {
   });
 }
 
+/**
+ * 그 달에 가장 길게 이어간 연승.
+ *
+ * 순위표의 Streak 칸은 '지금 이어가는 중'인 연승이라, 한 번 지면 0 으로
+ * 돌아간다. 여기서 보려는 것은 그 달 안에서 세운 최고 기록이므로 경기를
+ * 처음부터 되짚어 가장 길었던 구간을 찾는다.
+ *
+ * 세는 규칙은 서버(api/match.js)와 같다 — 이긴 경기는 이어 붙이고 진
+ * 경기에서 끊는다. 늦은 참석자는 전적에 들어가지 않으므로 연승을 끊지도
+ * 잇지도 않는다. 취소된 경기는 없던 일로 친다.
+ */
+function bestStreaks() {
+  const order = viewMatches()
+    .filter(m => !m.voidedAt)
+    .slice()
+    .sort((a, b) => (a.ts - b.ts) || ((a.id || 0) - (b.id || 0)));
+
+  const run = new Map();    // 지금 이어지고 있는 연승
+  const best = new Map();   // 그 달의 최고 기록
+  const mark = (handle, won) => {
+    const n = won ? (run.get(handle) || 0) + 1 : 0;
+    run.set(handle, n);
+    if (n > (best.get(handle) || 0)) best.set(handle, n);
+  };
+
+  for (const m of order) {
+    for (const w of (m.winners || [])) if (w && w.handle) mark(w.handle, true);
+    for (const h of (m.losers || [])) if (h) mark(h, false);
+  }
+
+  // 명단에서 빠진 사람(지워진 계정)은 빼고, 이겨본 적 없는 사람도 뺀다
+  return viewPlayers()
+    .map(p => ({ ...p, best: best.get(p.handle) || 0 }))
+    .filter(p => p.best > 0)
+    .sort((a, b) => b.best - a.best || b.wins - a.wins || a.handle.localeCompare(b.handle))
+    .slice(0, TOP_N);
+}
+
 function renderTop5() {
   const list = viewPlayers();
   const byPoint = [...list].sort((a, b) => b.point - a.point).slice(0, TOP_N);
-  const byWin = [...list].sort((a, b) => b.wins - a.wins).slice(0, TOP_N);
 
   document.getElementById('topPointBody').innerHTML = byPoint.map((p, i) => `
     <tr><td class="rank-cell ${medalClass(i + 1)}">${i + 1}</td><td>${whoName(p.handle)}</td>
@@ -656,11 +693,16 @@ function renderTop5() {
     <td>${p.wins + p.losses}</td>
     <td class="win-txt">${p.wins}</td><td class="loss-txt">${p.losses}</td></tr>`).join('');
 
-  document.getElementById('topWinBody').innerHTML = byWin.map((p, i) => `
-    <tr><td class="rank-cell ${medalClass(i + 1)}">${i + 1}</td><td>${whoName(p.handle)}</td>
-    <td class="clan-tag">${esc(p.clan)}</td>
-    <td>${p.wins + p.losses}</td>
-    <td class="win-txt">${p.wins}</td><td class="loss-txt">${p.losses}</td><td>${ratio(p)}%</td></tr>`).join('');
+  const streakBody = document.getElementById('topStreakBody');
+  if (streakBody) {
+    streakBody.innerHTML = bestStreaks().map((p, i) => `
+      <tr><td class="rank-cell ${medalClass(i + 1)}">${i + 1}</td><td>${whoName(p.handle)}</td>
+      <td class="clan-tag">${esc(p.clan)}</td>
+      <td><span class="streak-pos">${p.best}연승</span></td>
+      <td>${p.wins + p.losses}</td>
+      <td class="win-txt">${p.wins}</td><td class="loss-txt">${p.losses}</td></tr>`).join('')
+      || '<tr><td colspan="7" class="log-empty">아직 연승 기록이 없습니다.</td></tr>';
+  }
 
   // 승률은 경기를 치른 선수만 대상으로 한다. 0전 0승이 100%로 잡히거나
   // 0%로 목록을 채우는 것을 막기 위해서다.
