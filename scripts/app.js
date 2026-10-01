@@ -281,11 +281,14 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 76;
+const APP_VERSION = 77;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
 const LOSS_GAIN = 1;
+
+/** 한 팀의 최소 인원. 1:1 은 래더 경기로 치지 않는다. 서버도 같은 값으로 막는다. */
+const MIN_SIDE = 2;
 
 /**
  * 회선이 얼마나 빨리 닿는지를 잰다.
@@ -843,7 +846,7 @@ function renderChecklists() {
   showPickCount(nWin, nLose, latePicked.length);
 
   const submit = document.getElementById('submitMatch');
-  if (submit) submit.disabled = !(nWin > 0 && nLose > 0);
+  if (submit) submit.disabled = !(nWin >= MIN_SIDE && nLose >= MIN_SIDE);
 
   // 지울 게 있을 때만 켠다 — 빈 화면에서 눌러봐야 아무 일도 안 일어난다
   const reset = document.getElementById('resetPick');
@@ -961,7 +964,9 @@ function showPickCount(nWin, nLose, nLate = 0) {
   if (nWin === 0 && nLose === 0) msg = '';
   else if (nWin === 0) msg = '승리 팀을 체크해주세요.';
   else if (nLose === 0) msg = '패배 팀을 체크해주세요.';
-  else if (nWin !== nLose) msg = '양 팀 인원이 다릅니다 · 7:8 같은 경기도 그대로 기록할 수 있습니다.';
+  else if (nWin < MIN_SIDE || nLose < MIN_SIDE) {
+    msg = `${MIN_SIDE}:${MIN_SIDE} 경기부터 기록할 수 있습니다 · 각 팀에 ${MIN_SIDE}명 이상 골라주세요.`;
+  } else if (nWin !== nLose) msg = '양 팀 인원이 다릅니다 · 7:8 같은 경기도 그대로 기록할 수 있습니다.';
   note.textContent = msg;
 }
 
@@ -5750,7 +5755,7 @@ function initAdminEvents() {
   document.getElementById('submitMatch').addEventListener('click', async () => {
     const winners = getChecked('winList');
     const losers = getChecked('loseList');
-    if (!winners.length || !losers.length) return;
+    if (winners.length < MIN_SIDE || losers.length < MIN_SIDE) return;
     await recordTeamMatch(winners, losers, [...latePicked]);
   });
 

@@ -19,13 +19,22 @@ export default async function handler(req, res) {
 
 /* ---------- 기록 ---------- */
 
+/** 한 팀의 최소 인원. 1:1 은 래더 경기로 치지 않는다. */
+const MIN_SIDE = 2;
+
 async function record(req, res, b) {
   const me = await requireUser(req, res);
   if (!me) return;
 
   const { winners = [], losers = [], late = [] } = b;
-  if (!Array.isArray(winners) || !Array.isArray(losers) || !winners.length || !losers.length) {
-    return res.status(400).json({ error: '승리 팀과 패배 팀을 각각 1명 이상 선택해주세요.' });
+  if (!Array.isArray(winners) || !Array.isArray(losers)) {
+    return res.status(400).json({ error: '승리 팀과 패배 팀을 선택해주세요.' });
+  }
+  // 1:1 은 경기로 치지 않는다. 2:2 부터 기록한다.
+  if (winners.length < MIN_SIDE || losers.length < MIN_SIDE) {
+    return res.status(400).json({
+      error: `${MIN_SIDE}:${MIN_SIDE} 경기부터 기록할 수 있습니다 · 각 팀에 ${MIN_SIDE}명 이상 골라주세요.`,
+    });
   }
   if (!Array.isArray(late)) {
     return res.status(400).json({ error: '늦은 참석자 목록이 올바르지 않습니다.' });
