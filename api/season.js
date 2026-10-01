@@ -137,12 +137,18 @@ async function career(handle, current) {
   // 명단에서 빠진 사람도 세지 않는다 — 없는 사람과의 궁합은 쓸 데가 없다.
   const roster = new Set(totals.map(t => t.handle));
   const map = new Map();
+  // 이번 달 전적. 궁합과 같은 경기 목록을 쓰므로 DB 를 더 부르지 않는다.
+  // 늦은 참석자로만 낀 경기는 애초에 이 목록에 들어오지 않는다 — 전적에도
+  // 들어가지 않으므로 그래야 맞다.
+  let monthWins = 0;
+  let monthLosses = 0;
   for (const m of mate) {
     const win = (m.winners || []).map(w => w.handle);
     const lose = m.losers || [];
     const won = win.includes(handle);
     const side = won ? win : (lose.includes(handle) ? lose : null);
     if (!side) continue;
+    if (won) monthWins += 1; else monthLosses += 1;
     for (const h of side) {
       if (h === handle || !roster.has(h)) continue;
       const st = map.get(h) || { handle: h, games: 0, wins: 0 };
@@ -158,6 +164,8 @@ async function career(handle, current) {
     point: me.point,
     wins: me.wins,
     losses: me.losses,
+    monthWins,
+    monthLosses,
     rank,
     tied,
     of: totals.length,

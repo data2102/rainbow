@@ -2264,6 +2264,8 @@ button.room-n:hover{ color:var(--accent); text-decoration:underline; }
   width:3.6em; flex:none;
   font-size:var(--fs-footnote); color:var(--text-tertiary);
 }
+/* '전체 누적' 처럼 긴 이름이 들어가는 줄 */
+.pc-rank-t.wide{ width:4.8em; }
 .pc-rank-v{ flex:none; font-size:var(--fs-body); color:var(--text-secondary); }
 .pc-rank-v b{ font-size:var(--fs-heading); font-weight:var(--fw-bold); color:var(--text-primary); }
 .pc-rank-v b.none{ color:var(--text-tertiary); }
@@ -3964,7 +3966,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 77;
+const APP_VERSION = 78;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -4193,9 +4195,19 @@ async function showPlayerCard(handle) {
   openModal(pcShell(handle, d.clanText, pcBody(d)));
 }
 
+/** 'N전 N승 N패' 한 줄. 두 기간이 같은 모양으로 보여야 눈이 바로 견준다. */
+function recHtml(wins, losses) {
+  return `<b>${wins + losses}</b><span class="pc-u">전</span>`
+    + `<b class="w">${wins}</b><span class="pc-u">승</span>`
+    + `<b class="l">${losses}</b><span class="pc-u">패</span>`;
+}
+
 function pcBody(d) {
   const games = d.wins + d.losses;
   const pct = pcRatio(d.wins, d.losses);
+  // 지난 판에서 올린 서버가 아직 섞여 있을 수 있다. 값이 없으면 0 으로 둔다.
+  const mWins = d.monthWins || 0;
+  const mLosses = d.monthLosses || 0;
   const mates = bestMates(d.mates);
 
   const mateRows = mates.length
@@ -4234,15 +4246,21 @@ function pcBody(d) {
         <div class="pc-sub">전체 누적</div>
       </div>
       <div class="pc-cell">
-        <div class="pc-k">전적</div>
-        <div class="pc-v pc-rec"><b>${games}</b><span class="pc-u">전</span>
-          <b class="w">${d.wins}</b><span class="pc-u">승</span>
-          <b class="l">${d.losses}</b><span class="pc-u">패</span></div>
-      </div>
-      <div class="pc-cell pc-wide">
         <div class="pc-k">승률</div>
         <div class="pc-v"><b>${pct}</b><span class="pc-u">%</span></div>
         <div class="pc-bar"><div class="pc-bar-fill" style="width:${games ? pct : 0}%"></div></div>
+        <div class="pc-sub">전체 누적</div>
+      </div>
+      <div class="pc-cell pc-wide">
+        <div class="pc-k">전적</div>
+        <div class="pc-rank-row">
+          <span class="pc-rank-t wide">이번 달</span>
+          <span class="pc-rank-v pc-rec">${recHtml(mWins, mLosses)}</span>
+        </div>
+        <div class="pc-rank-row">
+          <span class="pc-rank-t wide">전체 누적</span>
+          <span class="pc-rank-v pc-rec">${recHtml(d.wins, d.losses)}</span>
+        </div>
       </div>
     </div>
 
@@ -4252,7 +4270,7 @@ function pcBody(d) {
       ${mateRows}
       ${thin ? `<div class="pc-foot">${MATE_MIN_GAMES}경기 미만은 표본이 적어 흐리게 두었습니다.</div>` : ''}
     </div>
-    <div class="pc-foot">포인트 · 전적 · 등수는 모든 달을 더한 값이고,
+    <div class="pc-foot">포인트 · 승률 · 등수는 모든 달을 더한 값이고,
       궁합은 이번 달 기록입니다 · 취소된 경기는 빠집니다.</div>`;
 }
 
