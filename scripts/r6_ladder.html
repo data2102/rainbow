@@ -2272,6 +2272,12 @@ button.room-n:hover{ color:var(--accent); text-decoration:underline; }
 /* 등수와 값을 한 줄에 둘 때 — 등수 칸 너비를 고정해야 아래윗줄이 맞는다 */
 .pc-rank-v.lead{ min-width:3.2em; }
 .pc-rank-d{ flex:none; color:var(--text-tertiary); }
+/* 한 칸에 묶음이 둘일 때 — 왼쪽에 묶음 이름, 묶음 사이에 줄 하나 */
+.pc-rank-g{
+  width:3.2em; flex:none;
+  font-size:var(--fs-footnote); font-weight:var(--fw-medium); color:var(--text-secondary);
+}
+.pc-grp + .pc-grp{ margin-top:3px; padding-top:3px; border-top:1px solid var(--border); }
 .pc-rank-x{
   margin-left:auto; text-align:right;
   font-size:var(--fs-footnote); color:var(--text-tertiary);

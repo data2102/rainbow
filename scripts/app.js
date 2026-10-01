@@ -281,7 +281,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 82;
+const APP_VERSION = 83;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -517,16 +517,21 @@ function recHtml(wins, losses) {
     + `<b class="l">${losses}</b><span class="pc-u">패</span>`;
 }
 
-/** 이번 달 한 줄 · 전체 누적 한 줄. 카드 안 모든 칸이 같은 모양을 쓴다. */
-function pcTwoRows(now, all) {
-  const row = (label, c) => `
+/**
+ * 이번 달 한 줄 · 전체 누적 한 줄. 카드 안 모든 칸이 같은 모양을 쓴다.
+ * name 을 주면 한 칸 안에 묶음이 둘 이상이라는 뜻이다 — 맨 왼쪽에 이름을 한 번 적는다.
+ */
+function pcTwoRows(now, all, name) {
+  const row = (first, label, c) => `
     <div class="pc-rank-row">
+      ${name ? `<span class="pc-rank-g">${first ? name : ''}</span>` : ''}
       <span class="pc-rank-t wide">${label}</span>
       <span class="pc-rank-v${c.v2 ? ' lead' : ''}">${c.v}</span>
       ${c.v2 ? `<span class="pc-rank-d">·</span><span class="pc-rank-v">${c.v2}</span>` : ''}
       ${c.x ? `<span class="pc-rank-x">${c.x}</span>` : ''}
     </div>`;
-  return row('이번 달', now) + row('전체 누적', all);
+  const rows = row(true, '이번 달', now) + row(false, '전체 누적', all);
+  return name ? `<div class="pc-grp">${rows}</div>` : rows;
 }
 
 /**
@@ -583,16 +588,15 @@ function pcBody(d) {
   return `
     <div class="pc-grid">
       <div class="pc-cell pc-wide">
-        <div class="pc-k">RANK · 포인트</div>
+        <div class="pc-k">RANK</div>
         ${pcTwoRows(
           pcPair(pcRankCell(M.rank, M.tied, M.of), `<b>${M.point}</b><span class="pc-u">점</span>`),
-          pcPair(pcRankCell(T.rank, T.tied, T.of), `<b>${T.point}</b><span class="pc-u">점</span>`))}
-      </div>
-      <div class="pc-cell pc-wide">
-        <div class="pc-k">RANK · 승률</div>
+          pcPair(pcRankCell(T.rank, T.tied, T.of), `<b>${T.point}</b><span class="pc-u">점</span>`),
+          '포인트')}
         ${pcTwoRows(
           pcPair(pcRankCell(M.ratioRank, M.ratioTied, M.ratioOf), pcPctCell(M.wins, M.losses).v),
-          pcPair(pcRankCell(T.ratioRank, T.ratioTied, T.ratioOf), pcPctCell(T.wins, T.losses).v))}
+          pcPair(pcRankCell(T.ratioRank, T.ratioTied, T.ratioOf), pcPctCell(T.wins, T.losses).v),
+          '승률')}
       </div>
       <div class="pc-cell pc-wide">
         <div class="pc-k">전적</div>
