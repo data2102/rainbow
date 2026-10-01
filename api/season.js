@@ -17,7 +17,7 @@ export default async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store');
     const who = (req.query && req.query.career) || null;
     if (who) {
-      const card = await career(String(who));
+      const card = await career(String(who), current);
       // 명단에도 지난 기록에도 없는 이름이다. 서버 잘못이 아니므로 404 로 알린다.
       if (!card) return res.status(404).json({ error: '기록이 없는 아이디입니다.' });
       return res.status(200).json(card);
@@ -76,7 +76,15 @@ async function detail(id, current) {
  * 그대로 남아 있고, 진행 중인 달은 players 에 있다 — 둘을 더하면 전체다.
  * (마감할 때 players 를 0 으로 되돌리므로 겹쳐 세지 않는다)
  */
-async function career(handle) {
+/**
+ * 선수 카드.
+ *
+ * 포인트·전적·등수는 모든 달을 더한 값이고, 궁합은 이번 달 것만 본다.
+ * 궁합은 "요즘 누구와 잘 맞는가"를 보려는 것이라 반 년 치가 섞이면
+ * 읽을 수가 없다. 달이 바뀌면 다시 0 부터 쌓인다.
+ */
+async function career(handle, current) {
+  const seasonId = current ? current.id : null;
   const [totals, mine, mate] = await Promise.all([
     // 모두의 누적 점수. 등수를 매기려면 남들 것도 있어야 한다.
     //
@@ -94,11 +102,14 @@ async function career(handle) {
                 SELECT handle, point, wins, losses FROM players ) t
         GROUP BY handle`),
     q(`SELECT handle, clan FROM players WHERE handle = $1`, [handle]),
-    // 이 사람이 낀 경기만 가져온다. 취소된 경기는 점수가 되돌려진 경기다.
+    // 이 사람이 낀 이번 달 경기만 가져온다. 취소된 경기는 점수가 되돌려진
+    // 경기다. 시즌 제도를 켜기 전 기록은 season 이 비어 있다.
     q(`SELECT winners, losers FROM matches
         WHERE voided_at IS NULL
+          AND season ${seasonId ? '= $2' : 'IS NULL'}
           AND (winners @> jsonb_build_array(jsonb_build_object('handle', $1::text))
-               OR losers @> to_jsonb($1::text))`, [handle]),
+               OR losers @> to_jsonb($1::text))`,
+      seasonId ? [handle, seasonId] : [handle]),
   ]);
 
   const me = totals.find(t => t.handle === handle);

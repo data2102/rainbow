@@ -3964,7 +3964,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 75;
+const APP_VERSION = 76;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -4124,7 +4124,7 @@ const MATE_TOP = 3;
 let careerCache = {};
 
 /**
- * 궁합 BEST 3.
+ * 궁합 BEST 3. 이번 달 경기만 본다 — 달이 바뀌면 다시 0 부터 쌓인다.
  *
  * 함께 세 판 이상 뛴 사람 가운데 승률이 높은 순이다. 그런 사람이 셋이
  * 안 되면 많이 함께 뛴 사람으로 채운다 — 자리를 비워두면 왜 비었는지
@@ -4202,7 +4202,7 @@ function pcBody(d) {
         <span class="pc-mate-rec">함께 ${x.games}전 <b class="w">${x.wins}승</b> <b class="l">${x.losses}패</b></span>
         <span class="pc-mate-pct${x.games >= MATE_MIN_GAMES ? '' : ' thin'}">${x.pct}%</span>
       </div>`).join('')
-    : '<div class="pc-empty">아직 같은 편으로 뛴 기록이 없습니다.</div>';
+    : '<div class="pc-empty">이번 달에는 아직 같은 편으로 뛴 기록이 없습니다.</div>';
 
   const thin = mates.some(x => x.games < MATE_MIN_GAMES);
 
@@ -4245,11 +4245,12 @@ function pcBody(d) {
 
     <div class="pc-sec">
       <div class="pc-sec-h">궁합 BEST ${MATE_TOP}
-        <span class="pc-sec-note">같은 편으로 뛰었을 때</span></div>
+        <span class="pc-sec-note">이번 달 · 같은 편으로 뛰었을 때</span></div>
       ${mateRows}
       ${thin ? `<div class="pc-foot">${MATE_MIN_GAMES}경기 미만은 표본이 적어 흐리게 두었습니다.</div>` : ''}
     </div>
-    <div class="pc-foot">모든 달의 기록을 더한 값입니다 · 취소된 경기는 빠집니다.</div>`;
+    <div class="pc-foot">포인트 · 전적 · 등수는 모든 달을 더한 값이고,
+      궁합은 이번 달 기록입니다 · 취소된 경기는 빠집니다.</div>`;
 }
 
 /** 이름을 누르는 길은 화면마다 따로 두지 않는다. 문서 한 곳에서 받는다. */
