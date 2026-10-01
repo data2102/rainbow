@@ -3966,7 +3966,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 78;
+const APP_VERSION = 79;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -4202,12 +4202,44 @@ function recHtml(wins, losses) {
     + `<b class="l">${losses}</b><span class="pc-u">패</span>`;
 }
 
+/** 이번 달 한 줄 · 전체 누적 한 줄. 카드 안 모든 칸이 같은 모양을 쓴다. */
+function pcTwoRows(now, all) {
+  const row = (label, v, x) => `
+    <div class="pc-rank-row">
+      <span class="pc-rank-t wide">${label}</span>
+      <span class="pc-rank-v">${v}</span>
+      ${x ? `<span class="pc-rank-x">${x}</span>` : ''}
+    </div>`;
+  return row('이번 달', now.v, now.x) + row('전체 누적', all.v, all.x);
+}
+
+/** 승률 한 칸. 한 판도 안 뛴 달은 0% 가 아니라 비워 둔다 — 다 졌다는 뜻으로 읽힌다. */
+function pcPctCell(wins, losses) {
+  return wins + losses
+    ? { v: `<b>${pcRatio(wins, losses)}</b><span class="pc-u">%</span>` }
+    : { v: '<b class="none">—</b>', x: '경기 기록 없음' };
+}
+
+/** 등수 한 칸 — 값과, 오른쪽에 붙는 '몇 명 중' */
+function pcRankCell(rank, tied, of) {
+  return {
+    v: rank ? `<b>${rank}</b><span class="pc-u">위</span>` : '<b class="none">—</b>',
+    x: rank ? `${of}명 중${tied ? ' · 동점' : ''}` : '경기 기록 없음',
+  };
+}
+
 function pcBody(d) {
-  const games = d.wins + d.losses;
-  const pct = pcRatio(d.wins, d.losses);
-  // 지난 판에서 올린 서버가 아직 섞여 있을 수 있다. 값이 없으면 0 으로 둔다.
-  const mWins = d.monthWins || 0;
-  const mLosses = d.monthLosses || 0;
+  // 지난 판에서 올린 서버가 아직 섞여 있을 수 있다. 없으면 누적만 채운다.
+  const T = d.total || {
+    point: d.point, wins: d.wins, losses: d.losses,
+    rank: d.rank, tied: d.tied, of: d.of,
+    ratioRank: d.ratioRank, ratioTied: d.ratioTied, ratioOf: d.ratioOf,
+  };
+  const M = d.month || {
+    point: 0, wins: 0, losses: 0,
+    rank: null, tied: false, of: 0,
+    ratioRank: null, ratioTied: false, ratioOf: 0,
+  };
   const mates = bestMates(d.mates);
 
   const mateRows = mates.length
@@ -4224,43 +4256,27 @@ function pcBody(d) {
   return `
     <div class="pc-grid">
       <div class="pc-cell pc-wide">
-        <div class="pc-k">RANK</div>
-        <div class="pc-rank-row">
-          <span class="pc-rank-t">포인트</span>
-          <span class="pc-rank-v"><b>${d.rank}</b><span class="pc-u">위</span></span>
-          <span class="pc-rank-x">${d.of}명 중${d.tied ? ' · 동점' : ''}</span>
-        </div>
-        <div class="pc-rank-row">
-          <span class="pc-rank-t">승률</span>
-          <span class="pc-rank-v">${d.ratioRank
-            ? `<b>${d.ratioRank}</b><span class="pc-u">위</span>`
-            : '<b class="none">—</b>'}</span>
-          <span class="pc-rank-x">${d.ratioRank
-            ? `${d.ratioOf}명 중${d.ratioTied ? ' · 동점' : ''}`
-            : '경기 기록 없음'}</span>
-        </div>
+        <div class="pc-k">RANK · 포인트</div>
+        ${pcTwoRows(pcRankCell(M.rank, M.tied, M.of), pcRankCell(T.rank, T.tied, T.of))}
+      </div>
+      <div class="pc-cell pc-wide">
+        <div class="pc-k">RANK · 승률</div>
+        ${pcTwoRows(pcRankCell(M.ratioRank, M.ratioTied, M.ratioOf),
+                    pcRankCell(T.ratioRank, T.ratioTied, T.ratioOf))}
       </div>
       <div class="pc-cell">
         <div class="pc-k">POINT</div>
-        <div class="pc-v"><b>${d.point}</b><span class="pc-u">점</span></div>
-        <div class="pc-sub">전체 누적</div>
+        ${pcTwoRows({ v: `<b>${M.point}</b><span class="pc-u">점</span>` },
+                    { v: `<b>${T.point}</b><span class="pc-u">점</span>` })}
       </div>
       <div class="pc-cell">
         <div class="pc-k">승률</div>
-        <div class="pc-v"><b>${pct}</b><span class="pc-u">%</span></div>
-        <div class="pc-bar"><div class="pc-bar-fill" style="width:${games ? pct : 0}%"></div></div>
-        <div class="pc-sub">전체 누적</div>
+        ${pcTwoRows(pcPctCell(M.wins, M.losses), pcPctCell(T.wins, T.losses))}
       </div>
       <div class="pc-cell pc-wide">
         <div class="pc-k">전적</div>
-        <div class="pc-rank-row">
-          <span class="pc-rank-t wide">이번 달</span>
-          <span class="pc-rank-v pc-rec">${recHtml(mWins, mLosses)}</span>
-        </div>
-        <div class="pc-rank-row">
-          <span class="pc-rank-t wide">전체 누적</span>
-          <span class="pc-rank-v pc-rec">${recHtml(d.wins, d.losses)}</span>
-        </div>
+        ${pcTwoRows({ v: `<span class="pc-rec">${recHtml(M.wins, M.losses)}</span>` },
+                    { v: `<span class="pc-rec">${recHtml(T.wins, T.losses)}</span>` })}
       </div>
     </div>
 
@@ -4270,8 +4286,7 @@ function pcBody(d) {
       ${mateRows}
       ${thin ? `<div class="pc-foot">${MATE_MIN_GAMES}경기 미만은 표본이 적어 흐리게 두었습니다.</div>` : ''}
     </div>
-    <div class="pc-foot">포인트 · 승률 · 등수는 모든 달을 더한 값이고,
-      궁합은 이번 달 기록입니다 · 취소된 경기는 빠집니다.</div>`;
+    <div class="pc-foot">궁합은 이번 달 기록입니다 · 취소된 경기는 빠집니다.</div>`;
 }
 
 /** 이름을 누르는 길은 화면마다 따로 두지 않는다. 문서 한 곳에서 받는다. */

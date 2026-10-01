@@ -85,7 +85,7 @@ async function detail(id, current) {
  */
 async function career(handle, current) {
   const seasonId = current ? current.id : null;
-  const [totals, mine, mate] = await Promise.all([
+  const [totals, month, mine, mate] = await Promise.all([
     // 모두의 누적 점수. 등수를 매기려면 남들 것도 있어야 한다.
     //
     // 지금 명단에 있는 사람만 센다. 경기 기록은 계정을 지워도 남으므로
@@ -101,6 +101,9 @@ async function career(handle, current) {
                 UNION ALL
                 SELECT handle, point, wins, losses FROM players ) t
         GROUP BY handle`),
+    // 이번 달 성적. players 표가 곧 이번 달이다 — 달을 닫을 때 지난 성적은
+    // season_standings 로 옮기고 여기를 0 으로 되돌린다.
+    q(`SELECT handle, point, wins, losses FROM players`),
     q(`SELECT handle, clan FROM players WHERE handle = $1`, [handle]),
     // 이 사람이 낀 이번 달 경기만 가져온다. 취소된 경기는 점수가 되돌려진
     // 경기다. 시즌 제도를 켜기 전 기록은 season 이 비어 있다.
@@ -115,10 +118,6 @@ async function career(handle, current) {
   const me = totals.find(t => t.handle === handle);
   if (!me) return null;
 
-  // 같은 점수는 같은 등수다
-  const rank = totals.filter(t => t.point > me.point).length + 1;
-  const tied = totals.filter(t => t.point === me.point).length > 1;
-
   // 승률 등수는 경기를 치른 사람끼리만 매긴다. 0전 0승을 100% 로 두거나
   // 0% 로 두면 둘 다 사실이 아니다.
   // 화면에 보이는 값(소수 첫째 자리)으로 견준다 — 같은 55.6% 인데 등수가
@@ -127,28 +126,42 @@ async function career(handle, current) {
     const g = t.wins + t.losses;
     return g ? Math.round((t.wins / g) * 1000) / 10 : null;
   };
-  const played = totals.filter(t => t.wins + t.losses > 0);
-  const myPct = pctOf(me);
-  const ratioRank = myPct == null ? null : played.filter(t => pctOf(t) > myPct).length + 1;
-  const ratioTied = myPct == null ? false : played.filter(t => pctOf(t) === myPct).length > 1;
+
+  /** 한 묶음(이번 달 또는 누적) 안에서 이 사람이 몇 등인가 */
+  const standOf = (rows) => {
+    const mineRow = rows.find(t => t.handle === handle)
+      || { handle, point: 0, wins: 0, losses: 0 };
+    const played = rows.filter(t => t.wins + t.losses > 0);
+    const myPct = pctOf(mineRow);
+    return {
+      point: mineRow.point,
+      wins: mineRow.wins,
+      losses: mineRow.losses,
+      // 같은 점수는 같은 등수다
+      rank: rows.filter(t => t.point > mineRow.point).length + 1,
+      tied: rows.filter(t => t.point === mineRow.point).length > 1,
+      of: rows.length,
+      ratioRank: myPct == null ? null : played.filter(t => pctOf(t) > myPct).length + 1,
+      ratioTied: myPct == null ? false : played.filter(t => pctOf(t) === myPct).length > 1,
+      ratioOf: played.length,
+    };
+  };
+
+  const all = standOf(totals);
+  const now = standOf(month);
+  const { rank, tied, ratioRank, ratioTied } = all;
 
   // 같은 편으로 몇 번 뛰었고 그중 몇 번 이겼는가.
   // 늦은 참석자는 어느 편도 아니어서 세지 않는다.
   // 명단에서 빠진 사람도 세지 않는다 — 없는 사람과의 궁합은 쓸 데가 없다.
   const roster = new Set(totals.map(t => t.handle));
   const map = new Map();
-  // 이번 달 전적. 궁합과 같은 경기 목록을 쓰므로 DB 를 더 부르지 않는다.
-  // 늦은 참석자로만 낀 경기는 애초에 이 목록에 들어오지 않는다 — 전적에도
-  // 들어가지 않으므로 그래야 맞다.
-  let monthWins = 0;
-  let monthLosses = 0;
   for (const m of mate) {
     const win = (m.winners || []).map(w => w.handle);
     const lose = m.losers || [];
     const won = win.includes(handle);
     const side = won ? win : (lose.includes(handle) ? lose : null);
     if (!side) continue;
-    if (won) monthWins += 1; else monthLosses += 1;
     for (const h of side) {
       if (h === handle || !roster.has(h)) continue;
       const st = map.get(h) || { handle: h, games: 0, wins: 0 };
@@ -158,20 +171,22 @@ async function career(handle, current) {
     }
   }
 
+  // 맨 위 칸들은 예전 화면도 읽을 수 있게 누적 값을 그대로 둔다.
+  // 두 기간을 함께 보여주는 화면은 total·month 를 본다.
   return {
     handle,
     clan: (mine[0] && mine[0].clan) || '',
-    point: me.point,
-    wins: me.wins,
-    losses: me.losses,
-    monthWins,
-    monthLosses,
+    point: all.point,
+    wins: all.wins,
+    losses: all.losses,
     rank,
     tied,
-    of: totals.length,
+    of: all.of,
     ratioRank,
     ratioTied,
-    ratioOf: played.length,
+    ratioOf: all.ratioOf,
+    total: all,
+    month: now,
     mates: [...map.values()],
   };
 }
