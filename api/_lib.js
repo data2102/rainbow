@@ -311,11 +311,15 @@ export function lossGain() {
   return 1;
 }
 
-/** 승리 시 획득 점수: 기본 +3, 3연승 +1, 5연승 +2 */
+/**
+ * 연승 고비마다 붙는 보너스. 그 수에 '닿는 순간' 한 번만 준다 —
+ * 4연승·6연승처럼 고비가 아닌 판은 기본 점수만 받는다.
+ */
+const STREAK_BONUS = { 3: 1, 5: 2, 7: 3, 10: 5 };
+
+/** 승리 시 획득 점수: 기본 +3 에 연승 보너스를 더한다 */
 export function winGain(newStreak) {
-  if (newStreak === 3) return 4;
-  if (newStreak === 5) return 5;
-  return 3;
+  return 3 + (STREAK_BONUS[newStreak] || 0);
 }
 
 export function rowToPlayer(r) {
