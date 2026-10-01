@@ -2269,6 +2269,9 @@ button.room-n:hover{ color:var(--accent); text-decoration:underline; }
 .pc-rank-v{ flex:none; font-size:var(--fs-caption); color:var(--text-secondary); }
 .pc-rank-v b{ font-size:var(--fs-body); font-weight:var(--fw-bold); color:var(--text-primary); }
 .pc-rank-v b.none{ color:var(--text-tertiary); }
+/* 등수와 값을 한 줄에 둘 때 — 등수 칸 너비를 고정해야 아래윗줄이 맞는다 */
+.pc-rank-v.lead{ min-width:3.2em; }
+.pc-rank-d{ flex:none; color:var(--text-tertiary); }
 .pc-rank-x{
   margin-left:auto; text-align:right;
   font-size:var(--fs-footnote); color:var(--text-tertiary);
@@ -3966,7 +3969,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 81;
+const APP_VERSION = 82;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -4204,13 +4207,24 @@ function recHtml(wins, losses) {
 
 /** 이번 달 한 줄 · 전체 누적 한 줄. 카드 안 모든 칸이 같은 모양을 쓴다. */
 function pcTwoRows(now, all) {
-  const row = (label, v, x) => `
+  const row = (label, c) => `
     <div class="pc-rank-row">
       <span class="pc-rank-t wide">${label}</span>
-      <span class="pc-rank-v">${v}</span>
-      ${x ? `<span class="pc-rank-x">${x}</span>` : ''}
+      <span class="pc-rank-v${c.v2 ? ' lead' : ''}">${c.v}</span>
+      ${c.v2 ? `<span class="pc-rank-d">·</span><span class="pc-rank-v">${c.v2}</span>` : ''}
+      ${c.x ? `<span class="pc-rank-x">${c.x}</span>` : ''}
     </div>`;
-  return row('이번 달', now.v, now.x) + row('전체 누적', all.v, all.x);
+  return row('이번 달', now) + row('전체 누적', all);
+}
+
+/**
+ * 등수와, 그 등수를 매긴 값을 한 줄에 붙인다.
+ * '1위' 와 '38점' 은 같은 것을 두 가지로 말한 것이라 칸을 따로 둘 까닭이 없다 —
+ * 칸을 반으로 줄이면 카드도 그만큼 짧아진다.
+ */
+function pcPair(cell, v2) {
+  // 등수가 없는 달은 값도 빈 줄이다. '— · —' 는 줄만 지저분해진다.
+  return { v: cell.v, v2: cell.ok === false ? '' : v2, x: cell.x };
 }
 
 /** 승률 한 칸. 한 판도 안 뛴 달은 0% 가 아니라 비워 둔다 — 다 졌다는 뜻으로 읽힌다. */
@@ -4225,6 +4239,7 @@ function pcRankCell(rank, tied, of) {
   return {
     v: rank ? `<b>${rank}</b><span class="pc-u">위</span>` : '<b class="none">—</b>',
     x: rank ? `${of}명 중${tied ? ' · 동점' : ''}` : '경기 기록 없음',
+    ok: !!rank,
   };
 }
 
@@ -4257,21 +4272,15 @@ function pcBody(d) {
     <div class="pc-grid">
       <div class="pc-cell pc-wide">
         <div class="pc-k">RANK · 포인트</div>
-        ${pcTwoRows(pcRankCell(M.rank, M.tied, M.of), pcRankCell(T.rank, T.tied, T.of))}
+        ${pcTwoRows(
+          pcPair(pcRankCell(M.rank, M.tied, M.of), `<b>${M.point}</b><span class="pc-u">점</span>`),
+          pcPair(pcRankCell(T.rank, T.tied, T.of), `<b>${T.point}</b><span class="pc-u">점</span>`))}
       </div>
       <div class="pc-cell pc-wide">
         <div class="pc-k">RANK · 승률</div>
-        ${pcTwoRows(pcRankCell(M.ratioRank, M.ratioTied, M.ratioOf),
-                    pcRankCell(T.ratioRank, T.ratioTied, T.ratioOf))}
-      </div>
-      <div class="pc-cell">
-        <div class="pc-k">POINT</div>
-        ${pcTwoRows({ v: `<b>${M.point}</b><span class="pc-u">점</span>` },
-                    { v: `<b>${T.point}</b><span class="pc-u">점</span>` })}
-      </div>
-      <div class="pc-cell">
-        <div class="pc-k">승률</div>
-        ${pcTwoRows(pcPctCell(M.wins, M.losses), pcPctCell(T.wins, T.losses))}
+        ${pcTwoRows(
+          pcPair(pcRankCell(M.ratioRank, M.ratioTied, M.ratioOf), pcPctCell(M.wins, M.losses).v),
+          pcPair(pcRankCell(T.ratioRank, T.ratioTied, T.ratioOf), pcPctCell(T.wins, T.losses).v))}
       </div>
       <div class="pc-cell pc-wide">
         <div class="pc-k">전적</div>
