@@ -281,7 +281,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 83;
+const APP_VERSION = 84;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -5682,6 +5682,290 @@ async function handleImportFile(e) {
   e.target.value = '';
 }
 
+/* ---------- 호스트 룰렛 ---------- */
+
+/**
+ * 이번 판에 들어온 사람 중에서 호스트 한 명을 제비뽑기로 정한다.
+ *
+ * 서버를 한 번도 부르지 않는다. 순위표를 그리며 이미 받아둔 명단을 그대로 쓰고
+ * 결과도 이 브라우저에만 남긴다 — 데이터베이스가 깨어날 일이 없다는 뜻이다.
+ * (2026-09 에 자동 갱신이 DB 를 못 재워 한도를 넘긴 일이 있었다. CLAUDE.md 참고)
+ */
+const RL_PICK_KEY = 'r6-host-pick';   // 체크해둔 사람
+const RL_LOG_KEY = 'r6-host-log';     // 최근 뽑기
+const RL_LOG_MAX = 5;
+/** 혼자 돌릴 까닭이 없다 */
+const RL_MIN = 2;
+/** 이보다 많으면 조각이 좁아 이름이 서로 겹친다 — 그때는 이름을 적지 않는다 */
+const RL_NAME_MAX = 16;
+const RL_SLICE_COLORS = 6;
+
+let rlPicked = new Set();
+let rlResult = null;
+let rlAngle = 0;
+let rlSpinning = false;
+let rlTimer = null;
+
+function rlReadJson(key) {
+  try {
+    const v = JSON.parse(readKey(key) || 'null');
+    return Array.isArray(v) ? v : [];
+  } catch { return []; }
+}
+
+/**
+ * 체크해둔 사람 중 지금도 명단에 있는 사람만.
+ * 탈퇴한 사람이 룰렛에 남아 호스트로 뽑히면 아무도 못 알아본다.
+ */
+function rlPlayers() {
+  return [...players]
+    .filter(p => rlPicked.has(p.handle))
+    .sort((a, b) => a.handle.localeCompare(b.handle, 'en', { sensitivity: 'base' }));
+}
+
+/**
+ * 0 이상 n 미만의 고른 난수.
+ *
+ * Math.random 을 쓰지 않는다. 브라우저 난수기에서 받은 값을 n 으로 나눈
+ * 나머지를 그냥 쓰면 앞쪽 번호가 아주 조금 더 자주 나온다 — 나눠떨어지지
+ * 않는 꼬리를 버려서 모두에게 똑같은 확률을 준다.
+ */
+function rlRandom(n) {
+  if (n <= 1) return 0;
+  const c = window.crypto;
+  if (!c || !c.getRandomValues) return Math.floor(Math.random() * n);
+  const limit = Math.floor(0x100000000 / n) * n;
+  const buf = new Uint32Array(1);
+  let v;
+  do { c.getRandomValues(buf); v = buf[0]; } while (v >= limit);
+  return v % n;
+}
+
+/** 지금 화면에 보여줄 명단 — 검색어가 있으면 거기 걸리는 사람만 */
+function rlShown() {
+  const el = document.getElementById('rlSearch');
+  const term = (el ? el.value : '').trim().toLowerCase();
+  const all = [...players].sort((a, b) =>
+    a.handle.localeCompare(b.handle, 'en', { sensitivity: 'base' }));
+  if (!term) return all;
+  return all.filter(p => p.handle.toLowerCase().includes(term)
+    || String(p.clan || '').toLowerCase().includes(term));
+}
+
+/** 체크 명단. 체크할 때마다 다시 그리면 스크롤이 튀므로 여기서만 그린다. */
+function renderRlList() {
+  const list = document.getElementById('rlList');
+  if (!list) return;
+  const shown = rlShown();
+  list.innerHTML = shown.length
+    ? shown.map(p => `<label class="check-item">
+        <input type="checkbox" value="${esc(p.handle)}" ${rlPicked.has(p.handle) ? 'checked' : ''}>
+        <span>${esc(p.handle)}</span> <span class="clan-mini">${esc(p.clan)}</span>
+      </label>`).join('')
+    : '<div class="rl-empty">찾는 아이디가 없습니다.</div>';
+}
+
+/** 숫자·버튼·판·결과 — 명단 말고 나머지 전부 */
+function renderRlState() {
+  const n = rlPlayers().length;
+
+  const cnt = document.getElementById('rlCount');
+  if (cnt) { cnt.textContent = n + '명'; cnt.classList.toggle('on', n > 0); }
+
+  const go = document.getElementById('rlGo');
+  if (go) {
+    go.disabled = rlSpinning || n < RL_MIN;
+    go.textContent = rlSpinning ? '돌리는 중…' : (rlResult ? '다시 돌리기' : '룰렛 돌리기');
+  }
+
+  rlDrawWheel();
+  renderRlOut();
+  renderRlLog();
+}
+
+function renderRoulette() {
+  renderRlList();
+  renderRlState();
+}
+
+/**
+ * 판을 그린다. 12시에서 시계 방향으로 한 조각씩, 모두 같은 크기다.
+ * 조각이 같아야 확률이 같다는 것이 눈으로 보인다.
+ */
+function rlDrawWheel() {
+  const g = document.getElementById('rlSpin');
+  if (!g) return;
+  const list = rlPlayers();
+  const n = list.length;
+  const C = 100, R = 92;
+  if (!n) {
+    g.innerHTML = `<circle cx="${C}" cy="${C}" r="${R}" fill="var(--surface-sunken)"/>`;
+    return;
+  }
+  const step = 360 / n;
+  // 12시를 0도로 두고 시계 방향으로 잰다 — 바늘이 12시에 박혀 있기 때문이다
+  const pt = (deg, r) => {
+    const a = (deg - 90) * Math.PI / 180;
+    return [(C + r * Math.cos(a)).toFixed(2), (C + r * Math.sin(a)).toFixed(2)];
+  };
+
+  const parts = list.map((p, i) => {
+    const color = `var(--rl-${(i % RL_SLICE_COLORS) + 1})`;
+    if (n === 1) {
+      return `<circle class="rl-slice" cx="${C}" cy="${C}" r="${R}" fill="${color}"/>`;
+    }
+    const [x1, y1] = pt(i * step, R);
+    const [x2, y2] = pt((i + 1) * step, R);
+    const big = step > 180 ? 1 : 0;
+    return `<path class="rl-slice" d="M ${C} ${C} L ${x1} ${y1} A ${R} ${R} 0 ${big} 1 ${x2} ${y2} Z" fill="${color}"/>`;
+  });
+
+  if (n <= RL_NAME_MAX) {
+    const size = Math.max(5.2, Math.min(10, 120 / n));
+    list.forEach((p, i) => {
+      const mid = i * step + step / 2;
+      // 아래쪽 절반은 그대로 두면 글자가 거꾸로 선다. 반 바퀴 돌려 바로 세운다.
+      const flip = mid > 180;
+      const rot = flip ? mid + 90 : mid - 90;
+      const x = flip ? -(R - 7) : (R - 7);
+      const name = p.handle.length > 11 ? p.handle.slice(0, 10) + '…' : p.handle;
+      parts.push(`<g transform="translate(${C},${C}) rotate(${rot.toFixed(2)})">`
+        + `<text class="rl-name" x="${x}" y="0" font-size="${size.toFixed(1)}"`
+        + ` text-anchor="${flip ? 'start' : 'end'}" dominant-baseline="central">${esc(name)}</text></g>`);
+    });
+  }
+  g.innerHTML = parts.join('');
+}
+
+function renderRlOut() {
+  const v = document.getElementById('rlWinner');
+  const sub = document.getElementById('rlSub');
+  if (!v || !sub) return;
+
+  if (rlSpinning) {
+    v.textContent = '…';
+    v.classList.remove('hit');
+    sub.textContent = '돌리는 중…';
+    return;
+  }
+  if (rlResult) {
+    v.textContent = rlResult.handle;
+    v.classList.remove('hit');
+    void v.offsetWidth;            // 같은 사람이 또 나와도 한 번 더 튀어오르도록
+    v.classList.add('hit');
+    sub.textContent = `${rlResult.n}명 중에서 뽑혔습니다 · ${formatDateTime(rlResult.at)}`;
+    return;
+  }
+  const n = rlPlayers().length;
+  v.textContent = '—';
+  v.classList.remove('hit');
+  sub.textContent = n < RL_MIN
+    ? `참가자를 ${RL_MIN}명 이상 체크해주세요.`
+    : `${n}명 중에서 한 명을 뽑습니다.`;
+}
+
+function renderRlLog() {
+  const box = document.getElementById('rlLog');
+  const panel = document.getElementById('rlLogPanel');
+  if (!box || !panel) return;
+  const log = rlReadJson(RL_LOG_KEY);
+  panel.hidden = !log.length;
+  box.innerHTML = log.map((r, i) => `<div class="rl-log-row">
+      <span class="rl-log-n">${i === 0 ? '최근' : i + 1}</span>
+      <b>${esc(r.handle)}</b>
+      <span class="rl-log-n">${Number(r.n) || 0}명 중</span>
+      <span class="rl-log-when">${esc(formatDateTime(r.at))}</span>
+    </div>`).join('');
+}
+
+/** 멈춘 뒤 — 당첨자를 적고 버튼을 돌려놓는다 */
+function rlFinish(handle, n) {
+  if (!rlSpinning) return;          // 타이머와 transitionend 중 먼저 온 쪽만
+  rlSpinning = false;
+  clearTimeout(rlTimer);
+  rlResult = { handle, n, at: Date.now() };
+  const log = [rlResult, ...rlReadJson(RL_LOG_KEY)].slice(0, RL_LOG_MAX);
+  writeKey(RL_LOG_KEY, JSON.stringify(log), true);
+  renderRlState();
+  showToast(`호스트는 ${handle} 님입니다`);
+}
+
+function rlSpin() {
+  if (rlSpinning) return;
+  const list = rlPlayers();
+  if (list.length < RL_MIN) return;
+  const g = document.getElementById('rlSpin');
+  if (!g) return;
+
+  // 먼저 뽑고, 판을 그 자리에 맞춰 세운다. 보이는 것과 뽑힌 사람이 어긋나지 않는다.
+  const n = list.length;
+  const i = rlRandom(n);
+  const step = 360 / n;
+  // 조각 한가운데에서 조금 비켜 세운다 — 매번 같은 자리에 서면 짜여 보인다
+  const mid = i * step + step / 2 + (rlRandom(61) - 30) / 100 * step;
+
+  rlSpinning = true;
+  rlResult = null;
+  renderRlState();
+
+  const slow = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const secs = slow ? 0.6 : 4.6;
+  const turns = slow ? 0 : 5 + rlRandom(3);
+  const need = (360 - ((rlAngle + mid) % 360) + 360) % 360;
+  rlAngle += turns * 360 + need;
+
+  g.style.transition = `transform ${secs}s cubic-bezier(.16,.68,.2,1)`;
+  g.style.transform = `rotate(${rlAngle}deg)`;
+
+  const done = () => rlFinish(list[i].handle, n);
+  g.addEventListener('transitionend', done, { once: true });
+  // transitionend 가 오지 않는 경우(화면이 가려졌다거나)에도 버튼이 잠긴 채
+  // 남지 않도록 한 박자 뒤에 같은 일을 한 번 더 시킨다. 둘 중 먼저 온 쪽만 먹는다.
+  clearTimeout(rlTimer);
+  rlTimer = setTimeout(done, secs * 1000 + 600);
+}
+
+function initRouletteEvents() {
+  rlPicked = new Set(rlReadJson(RL_PICK_KEY));
+
+  const list = document.getElementById('rlList');
+  if (list) list.addEventListener('change', (e) => {
+    const el = e.target;
+    if (!el || el.type !== 'checkbox') return;
+    if (el.checked) rlPicked.add(el.value); else rlPicked.delete(el.value);
+    writeKey(RL_PICK_KEY, JSON.stringify([...rlPicked]), true);
+    rlResult = null;
+    renderRlState();               // 명단은 그대로 둔다 — 스크롤이 튀지 않도록
+  });
+
+  const search = document.getElementById('rlSearch');
+  if (search) search.addEventListener('input', renderRlList);
+
+  // 전체 체크·해제는 지금 보이는 사람에게만 미친다. 검색해 걸러둔 뜻을 지키려고.
+  const bulk = (on) => {
+    rlShown().forEach(p => { if (on) rlPicked.add(p.handle); else rlPicked.delete(p.handle); });
+    writeKey(RL_PICK_KEY, JSON.stringify([...rlPicked]), true);
+    rlResult = null;
+    renderRoulette();
+  };
+  const all = document.getElementById('rlAll');
+  if (all) all.addEventListener('click', () => bulk(true));
+  const none = document.getElementById('rlNone');
+  if (none) none.addEventListener('click', () => bulk(false));
+
+  const go = document.getElementById('rlGo');
+  if (go) go.addEventListener('click', rlSpin);
+
+  const clear = document.getElementById('rlLogClear');
+  if (clear) clear.addEventListener('click', () => {
+    if (!confirm('최근 뽑기 기록을 지울까요?')) return;
+    writeKey(RL_LOG_KEY, '[]', true);
+    renderRlLog();
+    showToast('기록을 지웠습니다');
+  });
+}
+
 /* ---------- 초기화 ---------- */
 
 /** 탭만 켠다 — 받아오는 일 없이 화면만 바꾼다. */
@@ -5722,6 +6006,10 @@ function activateTab(name) {
   // 있으면 다시 들어왔을 때 어리둥절하므로, 언제나 목록부터 보여준다.
   if (name === 'photos') { showPhotoList(); loadPosts().then(renderPhotos); }
   if (name === 'launcher') { loadRooms().then(renderLauncher); }
+  // 뽑기는 이미 받아둔 명단으로 한다. 명단이 비었을 때만 한 번 받아온다.
+  if (name === 'roulette') {
+    (players.length ? Promise.resolve() : loadState()).then(renderRoulette);
+  }
 }
 
 function initTabs() {
@@ -5936,6 +6224,7 @@ async function boot() {
   initAdminPagers();
   initVoteStats();
   initWhoCard();
+  initRouletteEvents();
   initAwakeEvents();
   renderAuthBar();
   try {
