@@ -1078,12 +1078,22 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .check-item .clan-mini{ color:var(--text-tertiary); font-size:var(--fs-footnote); }
 
 /* ===== 호스트 룰렛 =====
-   뽑기는 서버를 한 번도 부르지 않는다. 이미 받아둔 명단으로 이 화면 안에서
-   끝내므로 데이터베이스가 깨어날 일이 없다. */
+   팀 나누기와 호스트 뽑기는 서버가 하고, 여기서는 그 결과를 보여주기만 한다. */
+.rl-sizes{ display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-bottom:var(--sp-2); }
+.rl-size{
+  font-family:inherit; font-size:var(--fs-caption); font-weight:var(--fw-bold);
+  font-variant-numeric:tabular-nums;
+  padding:var(--sp-2) var(--sp-4); border-radius:var(--radius-pill);
+  border:1px solid var(--border-strong); background:var(--surface);
+  color:var(--text-secondary); cursor:pointer;
+  transition:border-color var(--dur-fast) var(--ease-standard);
+}
+.rl-size:hover{ border-color:var(--accent); color:var(--accent); }
+.rl-size.on{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
+.rl-size:focus-visible{ outline:none; box-shadow:var(--shadow-focus); }
+
 .rl-tools{ display:flex; gap:var(--sp-2); align-items:center; margin-bottom:var(--sp-2); }
-/* 좁은 화면에서 '전체 체크' 가 두 줄로 접히지 않게 — 검색칸이 대신 줄어든다 */
-.rl-tools .pick-clear{ white-space:nowrap; }
-/* 전역 input 규칙이 min-width:200px 을 걸어 좁은 화면에서 버튼을 밀어낸다.
+/* 전역 input 규칙이 min-width:200px 을 걸어 좁은 화면에서 옆칸을 밀어낸다.
    선택자를 한 단계 깊게 해서 이 칸만 줄어들 수 있게 둔다. */
 .rl-tools .rl-search{
   flex:1 1 0; min-width:0;
@@ -1094,52 +1104,128 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .rl-tools .rl-search:focus{ outline:none; border-color:var(--accent); box-shadow:var(--shadow-focus); }
 .rl-list{ max-height:280px; }
 .rl-empty{ padding:var(--sp-5); text-align:center; color:var(--text-tertiary); font-size:var(--fs-caption); }
+/* .pick-note 는 리폿 화면의 대진 숫자 밑에 붙으라고 위쪽 여백이 음수다.
+   여기서는 바로 위가 체크 목록이라 그대로 두면 목록에 겹쳐 올라온다. */
+#rlNote{ margin-top:var(--sp-4); }
+/* 체크 칸에 이번 달 순위를 같이 적는다 — 누가 센지 보고 고르도록 */
+.check-item .rl-rk{
+  margin-left:auto; font-size:var(--fs-footnote); color:var(--text-tertiary);
+  font-variant-numeric:tabular-nums; white-space:nowrap;
+}
+/* 정원이 찼으면 더 못 고른다 */
+.check-item.full{ opacity:.45; }
 
-.rl-stage{ display:flex; flex-direction:column; align-items:center; margin-top:var(--sp-6); }
-.rl-wheel-wrap{ position:relative; width:min(320px, 82vw); aspect-ratio:1; }
+/* ---- 이번 판 ---- */
+.rl-when{ font-size:var(--fs-footnote); color:var(--text-tertiary); }
+.rl-teams{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:var(--sp-4); }
+.rl-team{
+  border:1px solid var(--border); border-radius:var(--radius-md);
+  background:var(--surface-sunken); padding:var(--sp-3);
+}
+.rl-team-h{ display:flex; align-items:center; gap:var(--sp-2); margin-bottom:var(--sp-2); }
+.rl-team-n{
+  font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+  letter-spacing:.1em; color:var(--text-secondary);
+}
+/* 어느 팀이 호스트를 먼저 잡는가 — 한눈에 보여야 해서 여기만 빨갛다 */
+.rl-first{
+  margin-left:auto; font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+  padding:2px var(--sp-2); border-radius:var(--radius-sm);
+  background:var(--danger-bg); color:var(--danger-strong);
+  border:1px solid var(--danger);
+}
+.rl-wheel-wrap{ position:relative; width:100%; max-width:260px; margin:0 auto; aspect-ratio:1; }
 .rl-wheel{ width:100%; height:100%; display:block; }
 /* 바늘은 돌지 않는다. 12시에 고정해두고 판만 돌린다. */
 .rl-pin{
   position:absolute; top:-2px; left:50%; transform:translateX(-50%);
   width:0; height:0; z-index:1;
-  border-left:11px solid transparent; border-right:11px solid transparent;
-  border-top:20px solid var(--danger);
+  border-left:9px solid transparent; border-right:9px solid transparent;
+  border-top:17px solid var(--danger);
   filter:drop-shadow(0 1px 2px rgba(0,0,0,.3));
 }
 /* 판은 뷰박스 한가운데를 축으로 돈다 */
-#rlSpin{ transform-box:view-box; transform-origin:100px 100px; }
+#rlSpinA, #rlSpinB{ transform-box:view-box; transform-origin:100px 100px; }
 .rl-slice{ stroke:var(--surface); stroke-width:.6; }
 .rl-name{
   font-family:var(--font-sans); font-weight:var(--fw-bold);
   fill:var(--rl-ink); pointer-events:none;
 }
-
-.rl-out{ text-align:center; margin:var(--sp-5) 0 var(--sp-4); }
-.rl-out-k{
-  font-size:var(--fs-footnote); font-weight:var(--fw-medium);
-  color:var(--text-tertiary); letter-spacing:.14em;
+.rl-host{
+  display:flex; align-items:baseline; justify-content:center; gap:var(--sp-2);
+  margin-top:var(--sp-3);
 }
-.rl-out-v{
-  margin-top:var(--sp-1); font-size:var(--fs-display); font-weight:var(--fw-bold);
-  color:var(--text-primary); line-height:1.2; word-break:break-all;
+.rl-host-k{ font-size:var(--fs-footnote); color:var(--text-tertiary); letter-spacing:.12em; }
+.rl-host b{
+  font-size:var(--fs-heading); font-weight:var(--fw-bold); color:var(--text-primary);
+  word-break:break-all;
 }
-.rl-out-v.hit{ color:var(--accent); animation:rl-pop .45s ease-out; }
+.rl-host b.hit{ color:var(--accent); animation:rl-pop .45s ease-out; }
 @keyframes rl-pop{ from{ transform:scale(.82); opacity:.4; } to{ transform:scale(1); opacity:1; } }
-.rl-out-sub{ margin-top:var(--sp-2); font-size:var(--fs-footnote); color:var(--text-tertiary); }
-#rlGo.btn, .rl-stage .btn{ width:auto; min-width:200px; }
-
-.rl-log{ display:flex; flex-direction:column; gap:var(--sp-1); }
-.rl-log-row{
-  display:flex; align-items:baseline; gap:var(--sp-3);
-  padding:var(--sp-2) var(--sp-3); border-radius:var(--radius-sm);
-  background:var(--surface-sunken); font-size:var(--fs-caption);
+.rl-roster{ margin-top:var(--sp-3); display:flex; flex-direction:column; gap:2px; }
+.rl-mem{
+  display:flex; align-items:baseline; gap:var(--sp-2);
+  padding:3px var(--sp-2); border-radius:var(--radius-sm);
+  font-size:var(--fs-caption); color:var(--text-secondary);
 }
-.rl-log-row b{ font-weight:var(--fw-bold); color:var(--text-primary); }
-.rl-log-when{ margin-left:auto; font-size:var(--fs-footnote); color:var(--text-tertiary); }
-.rl-log-n{ font-size:var(--fs-footnote); color:var(--text-tertiary); }
+.rl-mem.host{ background:var(--accent-bg); color:var(--text-primary); font-weight:var(--fw-bold); }
+.rl-mem .rl-rk{ margin-left:auto; font-size:var(--fs-footnote); color:var(--text-tertiary); }
 
+.rl-first-line{
+  margin-top:var(--sp-4); text-align:center;
+  font-size:var(--fs-caption); color:var(--text-secondary);
+}
+.rl-first-line b{ color:var(--danger-strong); font-weight:var(--fw-bold); }
+
+.rl-finish{ margin-top:var(--sp-5); border-top:1px solid var(--border); padding-top:var(--sp-4); }
+.rl-win-btns{ display:flex; gap:var(--sp-3); }
+.rl-win{
+  flex:1; font-size:var(--fs-caption); font-weight:var(--fw-bold);
+  padding:var(--sp-3); border-radius:var(--radius-md);
+  border:1px solid var(--border-strong); background:var(--surface);
+  color:var(--text-secondary); cursor:pointer; font-family:inherit;
+}
+.rl-win:hover:not(:disabled){ border-color:var(--success); color:var(--success-strong); background:var(--success-bg); }
+.rl-win:disabled{ color:var(--text-disabled); cursor:not-allowed; }
+.rl-win:focus-visible{ outline:none; box-shadow:var(--shadow-focus); }
+.rl-done{
+  margin-top:var(--sp-5); border-top:1px solid var(--border); padding-top:var(--sp-4);
+  text-align:center; font-size:var(--fs-caption); color:var(--text-secondary);
+}
+.rl-done b{ color:var(--success-strong); font-weight:var(--fw-bold); }
+
+/* ---- 기록 ---- */
+.rl-log{ display:flex; flex-direction:column; gap:var(--sp-2); }
+.rl-log-row{
+  padding:var(--sp-3); border-radius:var(--radius-sm);
+  background:var(--surface-sunken); border:1px solid var(--border);
+  font-size:var(--fs-caption);
+}
+.rl-log-top{ display:flex; align-items:baseline; gap:var(--sp-2); flex-wrap:wrap; }
+.rl-log-size{
+  font-weight:var(--fw-bold); font-variant-numeric:tabular-nums; color:var(--text-primary);
+}
+.rl-log-host{ color:var(--text-secondary); }
+.rl-log-host b{ color:var(--text-primary); font-weight:var(--fw-bold); }
+.rl-log-host .first{ color:var(--danger-strong); }
+.rl-log-when{ margin-left:auto; font-size:var(--fs-footnote); color:var(--text-tertiary); white-space:nowrap; }
+.rl-log-team{ margin-top:var(--sp-2); font-size:var(--fs-footnote); color:var(--text-tertiary); line-height:1.6; }
+.rl-log-team b{ color:var(--text-secondary); font-weight:var(--fw-medium); }
+.rl-log-res{
+  display:inline-block; margin-top:var(--sp-2);
+  font-size:var(--fs-footnote); font-weight:var(--fw-medium);
+  padding:2px var(--sp-2); border-radius:var(--radius-sm);
+  background:var(--success-bg); color:var(--success-strong);
+}
+.rl-log-res.wait{ background:var(--surface); color:var(--text-tertiary); border:1px solid var(--border); }
+
+@media (max-width:620px){
+  /* 좁으면 룰렛 두 개가 나란히 서지 못한다. 위아래로 쌓는다. */
+  .rl-teams{ grid-template-columns:1fr; }
+  .rl-win-btns{ flex-direction:column; }
+}
 @media (prefers-reduced-motion: reduce){
-  .rl-out-v.hit{ animation:none; }
+  .rl-host b.hit{ animation:none; }
 }
 
 /* 확정 버튼 위의 대진 표시 — 8 : 8 이 맞았는지 한눈에 */
@@ -3065,43 +3151,98 @@ if (/[?&]room=\d+/.test(location.search)) {
         <span class="pick-n" id="rlCount">0명</span>
       </div>
       <div class="foot-note" style="margin-top:0;margin-bottom:14px;">
-        이번 판에 들어온 사람을 체크하고 룰렛을 돌리면 <b>호스트 한 명</b>이 뽑힙니다 ·
-        체크한 사람은 이 브라우저에 남아 다음에 들어와도 그대로입니다 ·
-        <b>서버에 기록되지 않습니다</b> — 뽑기는 이 화면 안에서만 일어납니다.
+        경기 규모를 고르고 그만큼 체크하면 <b>A·B 팀으로 나누고 팀마다 호스트를 한 명씩</b> 뽑습니다 ·
+        팀은 <b>이번 달 포인트로 균형을 맞춰</b> 나눕니다 ·
+        팀도 호스트도 <b>서버가 정하고 아래 기록에 남습니다</b> — 돌린 사람이 짜 넣을 수 없습니다.
       </div>
 
+      <div class="side-label">경기 규모 · Match Size</div>
+      <div class="rl-sizes" id="rlSizes"></div>
+
+      <div class="side-label" style="margin-top:var(--sp-5);">
+        참가자 · Players<button type="button" class="pick-clear" id="rlNone" hidden>전체 해제</button>
+      </div>
       <div class="rl-tools">
         <input type="search" id="rlSearch" class="rl-search" placeholder="아이디 검색" aria-label="참가자 검색">
-        <button type="button" class="pick-clear" id="rlAll">전체 체크</button>
-        <button type="button" class="pick-clear" id="rlNone">전체 해제</button>
       </div>
       <div class="checklist rl-list" id="rlList"></div>
 
-      <div class="rl-stage">
-        <div class="rl-wheel-wrap">
-          <div class="rl-pin" aria-hidden="true"></div>
-          <svg class="rl-wheel" id="rlWheel" viewBox="0 0 200 200" role="img" aria-label="호스트 룰렛">
-            <g id="rlSpin"></g>
-            <circle cx="100" cy="100" r="95" fill="none" stroke="var(--border-strong)" stroke-width="2"/>
-            <circle cx="100" cy="100" r="15" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="2"/>
-          </svg>
-        </div>
-        <div class="rl-out" id="rlOut" aria-live="polite">
-          <div class="rl-out-k">HOST</div>
-          <div class="rl-out-v" id="rlWinner">—</div>
-          <div class="rl-out-sub" id="rlSub">참가자를 2명 이상 체크해주세요.</div>
-        </div>
-        <button class="btn" id="rlGo" disabled>룰렛 돌리기</button>
+      <div class="pick-note" id="rlNote" aria-live="polite"></div>
+      <div class="pick-actions">
+        <button class="btn" id="rlGo" disabled>팀 나누고 룰렛 돌리기</button>
       </div>
     </div>
 
-    <div class="panel hud-corner" id="rlLogPanel" hidden>
+    <!-- 뽑은 결과 — 돌리기 전에는 없는 칸이다 -->
+    <div class="panel hud-corner" id="rlStage" hidden>
       <div class="panel-head">
-        <h2>최근 뽑기</h2>
-        <button type="button" class="pick-clear" id="rlLogClear">기록 지우기</button>
+        <h2>이번 판 · This Round</h2>
+        <span class="rl-when" id="rlWhen"></span>
       </div>
-      <div class="foot-note" style="margin-top:0;margin-bottom:10px;">이 브라우저에만 남는 기록입니다 · 최근 5번까지 보여줍니다.</div>
+
+      <div class="rl-teams">
+        <div class="rl-team" data-team="A">
+          <div class="rl-team-h">
+            <span class="rl-team-n">A TEAM</span>
+            <span class="rl-first" id="rlFirstA" hidden>선호스트</span>
+          </div>
+          <div class="rl-wheel-wrap">
+            <div class="rl-pin" aria-hidden="true"></div>
+            <svg class="rl-wheel" viewBox="0 0 200 200" role="img" aria-label="A팀 호스트 룰렛">
+              <g id="rlSpinA"></g>
+              <circle cx="100" cy="100" r="95" fill="none" stroke="var(--border-strong)" stroke-width="2"/>
+              <circle cx="100" cy="100" r="15" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="2"/>
+            </svg>
+          </div>
+          <div class="rl-host"><span class="rl-host-k">HOST</span><b id="rlHostA">—</b></div>
+          <div class="rl-roster" id="rlRosterA"></div>
+        </div>
+
+        <div class="rl-team" data-team="B">
+          <div class="rl-team-h">
+            <span class="rl-team-n">B TEAM</span>
+            <span class="rl-first" id="rlFirstB" hidden>선호스트</span>
+          </div>
+          <div class="rl-wheel-wrap">
+            <div class="rl-pin" aria-hidden="true"></div>
+            <svg class="rl-wheel" viewBox="0 0 200 200" role="img" aria-label="B팀 호스트 룰렛">
+              <g id="rlSpinB"></g>
+              <circle cx="100" cy="100" r="95" fill="none" stroke="var(--border-strong)" stroke-width="2"/>
+              <circle cx="100" cy="100" r="15" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="2"/>
+            </svg>
+          </div>
+          <div class="rl-host"><span class="rl-host-k">HOST</span><b id="rlHostB">—</b></div>
+          <div class="rl-roster" id="rlRosterB"></div>
+        </div>
+      </div>
+
+      <div class="rl-first-line" id="rlFirstLine" hidden></div>
+
+      <div class="rl-finish" id="rlFinish" hidden>
+        <div class="side-label">경기 결과 · Report</div>
+        <div class="foot-note" style="margin-top:0;margin-bottom:10px;">
+          나눠준 팀 그대로 점수가 들어갑니다 · 리폿 탭에 쓰는 것과 같은 기록이라 <b>두 번 쓰지 마세요</b>.
+        </div>
+        <div class="rl-win-btns">
+          <button type="button" class="btn-mini rl-win" data-win="A">A Team 승리</button>
+          <button type="button" class="btn-mini rl-win" data-win="B">B Team 승리</button>
+        </div>
+      </div>
+      <div class="rl-done" id="rlDone" hidden></div>
+    </div>
+
+    <!-- 진행 기록 -->
+    <div class="panel hud-corner">
+      <div class="panel-head">
+        <h2>진행 기록 · Log</h2>
+        <button type="button" class="pick-clear" id="rlLogRefresh">↻ 새로고침</button>
+      </div>
+      <div class="foot-note" style="margin-top:0;margin-bottom:12px;">
+        누가 언제 어떻게 나눴는지 모두에게 남습니다 · 다시 돌리면 그것도 한 줄로 남습니다.
+      </div>
       <div class="rl-log" id="rlLog"></div>
+      <div id="rlLogEmpty" class="log-empty" hidden>아직 뽑은 기록이 없습니다.</div>
+      <div class="pager" id="rlPager" style="display:none;"></div>
     </div>
   </div>
 
@@ -4098,7 +4239,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 84;
+const APP_VERSION = 85;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -9502,26 +9643,29 @@ async function handleImportFile(e) {
 /* ---------- 호스트 룰렛 ---------- */
 
 /**
- * 이번 판에 들어온 사람 중에서 호스트 한 명을 제비뽑기로 정한다.
+ * 판을 짜고 팀마다 호스트를 뽑는다.
  *
- * 서버를 한 번도 부르지 않는다. 순위표를 그리며 이미 받아둔 명단을 그대로 쓰고
- * 결과도 이 브라우저에만 남긴다 — 데이터베이스가 깨어날 일이 없다는 뜻이다.
- * (2026-09 에 자동 갱신이 DB 를 못 재워 한도를 넘긴 일이 있었다. CLAUDE.md 참고)
+ * 팀 나누기도 호스트도 서버가 정한다. 화면에서 정해 올리게 두면 돌리는
+ * 사람이 원하는 대로 짤 수 있고, 그러면 기록을 남기는 뜻이 없어진다.
+ * 화면이 하는 일은 서버가 준 답에 판을 맞춰 세우는 것뿐이다.
  */
-const RL_PICK_KEY = 'r6-host-pick';   // 체크해둔 사람
-const RL_LOG_KEY = 'r6-host-log';     // 최근 뽑기
-const RL_LOG_MAX = 5;
-/** 혼자 돌릴 까닭이 없다 */
-const RL_MIN = 2;
-/** 이보다 많으면 조각이 좁아 이름이 서로 겹친다 — 그때는 이름을 적지 않는다 */
+const RL_SIZES = [2, 3, 4, 5, 6, 7, 8];
+const RL_PICK_KEY = 'r6-host-pick';
+const RL_SIZE_KEY = 'r6-host-size';
+/** 조각이 이보다 많으면 이름이 겹친다 — 그때는 적지 않는다 */
 const RL_NAME_MAX = 16;
 const RL_SLICE_COLORS = 6;
+const RL_SPIN_MS = 4600;
 
 let rlPicked = new Set();
-let rlResult = null;
-let rlAngle = 0;
+let rlSize = 4;
+let rlDraw = null;        // 지금 화면에 올라와 있는 판
 let rlSpinning = false;
+let rlBusy = false;       // 서버에 묻는 중
+let rlAngle = { A: 0, B: 0 };
 let rlTimer = null;
+let rlLogPage = 1;
+let rlLogData = null;
 
 function rlReadJson(key) {
   try {
@@ -9529,96 +9673,108 @@ function rlReadJson(key) {
     return Array.isArray(v) ? v : [];
   } catch { return []; }
 }
+function rlSavePicked() { writeKey(RL_PICK_KEY, JSON.stringify([...rlPicked]), true); }
 
-/**
- * 체크해둔 사람 중 지금도 명단에 있는 사람만.
- * 탈퇴한 사람이 룰렛에 남아 호스트로 뽑히면 아무도 못 알아본다.
- */
-function rlPlayers() {
-  return [...players]
-    .filter(p => rlPicked.has(p.handle))
-    .sort((a, b) => a.handle.localeCompare(b.handle, 'en', { sensitivity: 'base' }));
+/** 이번 달 포인트 높은 순. 같으면 승수, 그 다음 아이디 순. */
+function rlRanked() {
+  return [...players].sort((a, b) =>
+    (b.point - a.point) || (b.wins - a.wins)
+    || a.handle.localeCompare(b.handle, 'en', { sensitivity: 'base' }));
 }
 
-/**
- * 0 이상 n 미만의 고른 난수.
- *
- * Math.random 을 쓰지 않는다. 브라우저 난수기에서 받은 값을 n 으로 나눈
- * 나머지를 그냥 쓰면 앞쪽 번호가 아주 조금 더 자주 나온다 — 나눠떨어지지
- * 않는 꼬리를 버려서 모두에게 똑같은 확률을 준다.
- */
-function rlRandom(n) {
-  if (n <= 1) return 0;
-  const c = window.crypto;
-  if (!c || !c.getRandomValues) return Math.floor(Math.random() * n);
-  const limit = Math.floor(0x100000000 / n) * n;
-  const buf = new Uint32Array(1);
-  let v;
-  do { c.getRandomValues(buf); v = buf[0]; } while (v >= limit);
-  return v % n;
+/** 체크해둔 사람 중 지금도 명단에 있는 사람만 — 탈퇴한 사람은 빠진다 */
+function rlEntries() {
+  return rlRanked().filter(p => rlPicked.has(p.handle)).map(p => p.handle);
 }
 
-/** 지금 화면에 보여줄 명단 — 검색어가 있으면 거기 걸리는 사람만 */
+/** 화면에 보여줄 사람 — 검색어가 있으면 거기 걸리는 사람만 */
 function rlShown() {
   const el = document.getElementById('rlSearch');
   const term = (el ? el.value : '').trim().toLowerCase();
-  const all = [...players].sort((a, b) =>
-    a.handle.localeCompare(b.handle, 'en', { sensitivity: 'base' }));
+  const all = rlRanked();
   if (!term) return all;
   return all.filter(p => p.handle.toLowerCase().includes(term)
     || String(p.clan || '').toLowerCase().includes(term));
 }
 
-/** 체크 명단. 체크할 때마다 다시 그리면 스크롤이 튀므로 여기서만 그린다. */
+function rlNeed() { return rlSize * 2; }
+
+/* ---- 판 짜기 화면 ---- */
+
+function renderRlSizes() {
+  const box = document.getElementById('rlSizes');
+  if (!box) return;
+  box.innerHTML = RL_SIZES.map(n =>
+    `<button type="button" class="rl-size${n === rlSize ? ' on' : ''}" data-size="${n}"
+       ${n === rlSize ? 'aria-pressed="true"' : 'aria-pressed="false"'}>${n}:${n}</button>`
+  ).join('');
+}
+
 function renderRlList() {
   const list = document.getElementById('rlList');
   if (!list) return;
   const shown = rlShown();
+  const rank = new Map(rlRanked().map((p, i) => [p.handle, i + 1]));
+  const n = rlEntries().length;
+  const full = n >= rlNeed();
   list.innerHTML = shown.length
-    ? shown.map(p => `<label class="check-item">
-        <input type="checkbox" value="${esc(p.handle)}" ${rlPicked.has(p.handle) ? 'checked' : ''}>
-        <span>${esc(p.handle)}</span> <span class="clan-mini">${esc(p.clan)}</span>
-      </label>`).join('')
+    ? shown.map(p => {
+        const on = rlPicked.has(p.handle);
+        // 정원이 찼으면 더 고르지 못하게 막는다 — 눌러본 뒤 거절당하지 않도록
+        const off = !on && full;
+        return `<label class="check-item${off ? ' full' : ''}">
+          <input type="checkbox" value="${esc(p.handle)}" ${on ? 'checked' : ''} ${off ? 'disabled' : ''}>
+          <span>${esc(p.handle)}</span> <span class="clan-mini">${esc(p.clan)}</span>
+          <span class="rl-rk">${rank.get(p.handle)}위 · ${p.point}점</span>
+        </label>`;
+      }).join('')
     : '<div class="rl-empty">찾는 아이디가 없습니다.</div>';
 }
 
-/** 숫자·버튼·판·결과 — 명단 말고 나머지 전부 */
-function renderRlState() {
-  const n = rlPlayers().length;
+function renderRlPick() {
+  const n = rlEntries().length;
+  const need = rlNeed();
 
   const cnt = document.getElementById('rlCount');
-  if (cnt) { cnt.textContent = n + '명'; cnt.classList.toggle('on', n > 0); }
+  if (cnt) { cnt.textContent = `${n} / ${need}명`; cnt.classList.toggle('on', n > 0); }
+
+  const clear = document.getElementById('rlNone');
+  if (clear) clear.hidden = !n;
+
+  const note = document.getElementById('rlNote');
+  if (note) {
+    if (!me) note.textContent = '로그인하면 룰렛을 돌릴 수 있습니다.';
+    else if (n < need) note.textContent = `${rlSize}:${rlSize} 경기는 ${need}명이 필요합니다 · ${need - n}명 더 체크해주세요.`;
+    else note.textContent = `${need}명이 모였습니다 · 돌리면 A·B 팀과 팀별 호스트가 한 번에 정해집니다.`;
+    note.classList.toggle('warn', !!me && n > need);
+  }
 
   const go = document.getElementById('rlGo');
   if (go) {
-    go.disabled = rlSpinning || n < RL_MIN;
-    go.textContent = rlSpinning ? '돌리는 중…' : (rlResult ? '다시 돌리기' : '룰렛 돌리기');
+    go.disabled = !me || rlBusy || rlSpinning || n !== need;
+    go.textContent = rlBusy ? '나누는 중…' : (rlSpinning ? '돌리는 중…' : '팀 나누고 룰렛 돌리기');
   }
-
-  rlDrawWheel();
-  renderRlOut();
-  renderRlLog();
 }
 
 function renderRoulette() {
+  renderRlSizes();
   renderRlList();
-  renderRlState();
+  renderRlPick();
 }
 
+/* ---- 룰렛 ---- */
+
 /**
- * 판을 그린다. 12시에서 시계 방향으로 한 조각씩, 모두 같은 크기다.
+ * 한 팀의 판을 그린다. 12시에서 시계 방향으로 한 조각씩, 모두 같은 크기다.
  * 조각이 같아야 확률이 같다는 것이 눈으로 보인다.
  */
-function rlDrawWheel() {
-  const g = document.getElementById('rlSpin');
+function rlDrawWheel(side, list) {
+  const g = document.getElementById('rlSpin' + side);
   if (!g) return;
-  const list = rlPlayers();
   const n = list.length;
   const C = 100, R = 92;
-  if (!n) {
-    g.innerHTML = `<circle cx="${C}" cy="${C}" r="${R}" fill="var(--surface-sunken)"/>`;
-    return;
-  }
+  if (!n) { g.innerHTML = `<circle cx="${C}" cy="${C}" r="${R}" fill="var(--surface-sunken)"/>`; return; }
+
   const step = 360 / n;
   // 12시를 0도로 두고 시계 방향으로 잰다 — 바늘이 12시에 박혀 있기 때문이다
   const pt = (deg, r) => {
@@ -9626,11 +9782,9 @@ function rlDrawWheel() {
     return [(C + r * Math.cos(a)).toFixed(2), (C + r * Math.sin(a)).toFixed(2)];
   };
 
-  const parts = list.map((p, i) => {
+  const parts = list.map((h, i) => {
     const color = `var(--rl-${(i % RL_SLICE_COLORS) + 1})`;
-    if (n === 1) {
-      return `<circle class="rl-slice" cx="${C}" cy="${C}" r="${R}" fill="${color}"/>`;
-    }
+    if (n === 1) return `<circle class="rl-slice" cx="${C}" cy="${C}" r="${R}" fill="${color}"/>`;
     const [x1, y1] = pt(i * step, R);
     const [x2, y2] = pt((i + 1) * step, R);
     const big = step > 180 ? 1 : 0;
@@ -9638,14 +9792,14 @@ function rlDrawWheel() {
   });
 
   if (n <= RL_NAME_MAX) {
-    const size = Math.max(5.2, Math.min(10, 120 / n));
-    list.forEach((p, i) => {
+    const size = Math.max(5.2, Math.min(10, 110 / n));
+    list.forEach((h, i) => {
       const mid = i * step + step / 2;
       // 아래쪽 절반은 그대로 두면 글자가 거꾸로 선다. 반 바퀴 돌려 바로 세운다.
       const flip = mid > 180;
       const rot = flip ? mid + 90 : mid - 90;
       const x = flip ? -(R - 7) : (R - 7);
-      const name = p.handle.length > 11 ? p.handle.slice(0, 10) + '…' : p.handle;
+      const name = h.length > 11 ? h.slice(0, 10) + '…' : h;
       parts.push(`<g transform="translate(${C},${C}) rotate(${rot.toFixed(2)})">`
         + `<text class="rl-name" x="${x}" y="0" font-size="${size.toFixed(1)}"`
         + ` text-anchor="${flip ? 'start' : 'end'}" dominant-baseline="central">${esc(name)}</text></g>`);
@@ -9654,132 +9808,273 @@ function rlDrawWheel() {
   g.innerHTML = parts.join('');
 }
 
-function renderRlOut() {
-  const v = document.getElementById('rlWinner');
-  const sub = document.getElementById('rlSub');
-  if (!v || !sub) return;
+/** 그 사람이 바늘 아래 서도록 판을 돌린다 */
+function rlSpinTo(side, list, winner, slow) {
+  const g = document.getElementById('rlSpin' + side);
+  if (!g) return;
+  const n = list.length;
+  const i = Math.max(0, list.indexOf(winner));
+  const step = 360 / n;
+  // 조각 한가운데에서 조금 비켜 세운다 — 매번 같은 자리에 서면 짜여 보인다
+  const mid = i * step + step / 2 + (Math.random() - 0.5) * step * 0.6;
+  const turns = slow ? 0 : 5 + Math.floor(Math.random() * 3);
+  const need = (360 - ((rlAngle[side] + mid) % 360) + 360) % 360;
+  rlAngle[side] += turns * 360 + need;
 
-  if (rlSpinning) {
-    v.textContent = '…';
-    v.classList.remove('hit');
-    sub.textContent = '돌리는 중…';
+  g.style.transition = `transform ${(slow ? 600 : RL_SPIN_MS) / 1000}s cubic-bezier(.16,.68,.2,1)`;
+  g.style.transform = `rotate(${rlAngle[side]}deg)`;
+}
+
+/** 돌리기 전 — 이름칸을 비우고 판만 보여준다 */
+function rlStagePre(draw) {
+  const stage = document.getElementById('rlStage');
+  if (stage) stage.hidden = false;
+  const when = document.getElementById('rlWhen');
+  if (when) when.textContent = `${formatDateTime(draw.ts)} · ${draw.by} 님이 돌림`;
+
+  for (const side of ['A', 'B']) {
+    const list = side === 'A' ? draw.teamA : draw.teamB;
+    rlDrawWheel(side, list);
+    const host = document.getElementById('rlHost' + side);
+    if (host) { host.textContent = '…'; host.classList.remove('hit'); }
+    // 호스트가 정해지기 전에는 명단만, 강조 없이
+    renderRlRoster(side, list, null);
+    const badge = document.getElementById('rlFirst' + side);
+    if (badge) badge.hidden = true;
+  }
+  const line = document.getElementById('rlFirstLine');
+  if (line) line.hidden = true;
+  const fin = document.getElementById('rlFinish');
+  if (fin) fin.hidden = true;
+  const done = document.getElementById('rlDone');
+  if (done) done.hidden = true;
+}
+
+function renderRlRoster(side, list, host) {
+  const box = document.getElementById('rlRoster' + side);
+  if (!box) return;
+  const rank = new Map(rlRanked().map((p, i) => [p.handle, i + 1]));
+  const pt = new Map(players.map(p => [p.handle, p.point]));
+  box.innerHTML = list.map(h => `<div class="rl-mem${h === host ? ' host' : ''}">
+      <span>${esc(h)}</span>
+      <span class="rl-rk">${rank.get(h) || '-'}위 · ${pt.get(h) || 0}점</span>
+    </div>`).join('');
+}
+
+/** 멈춘 뒤 — 호스트와 선호스트를 적고 결과 버튼을 연다 */
+function rlStagePost() {
+  if (!rlSpinning) return;
+  rlSpinning = false;
+  clearTimeout(rlTimer);
+  const d = rlDraw;
+  if (!d) { renderRlPick(); return; }
+
+  for (const side of ['A', 'B']) {
+    const host = side === 'A' ? d.hostA : d.hostB;
+    const el = document.getElementById('rlHost' + side);
+    if (el) {
+      el.textContent = host;
+      el.classList.remove('hit');
+      void el.offsetWidth;
+      el.classList.add('hit');
+    }
+    renderRlRoster(side, side === 'A' ? d.teamA : d.teamB, host);
+    const badge = document.getElementById('rlFirst' + side);
+    if (badge) badge.hidden = d.first !== side;
+  }
+
+  const line = document.getElementById('rlFirstLine');
+  if (line) {
+    const host = d.first === 'A' ? d.hostA : d.hostB;
+    line.innerHTML = `호스트는 <b>${esc(d.first)} Team · ${esc(host)}</b> 님이 먼저 잡습니다.`;
+    line.hidden = false;
+  }
+
+  rlShowResult(d);
+  renderRlPick();
+  showToast(`${d.first} Team 이 먼저 · A ${d.hostA} / B ${d.hostB}`);
+}
+
+/** 결과 등록 칸 — 아직이면 버튼, 끝났으면 적어둔 결과 */
+function rlShowResult(d) {
+  const fin = document.getElementById('rlFinish');
+  const done = document.getElementById('rlDone');
+  if (!fin || !done) return;
+  if (d.result) {
+    fin.hidden = true;
+    done.hidden = false;
+    done.innerHTML = `경기 결과: <b>${esc(d.result)} Team 승리</b>`
+      + ` · ${esc(d.resultBy || '')} 님이 등록`
+      + (d.resultTs ? ` · ${esc(formatDateTime(d.resultTs))}` : '');
     return;
   }
-  if (rlResult) {
-    v.textContent = rlResult.handle;
-    v.classList.remove('hit');
-    void v.offsetWidth;            // 같은 사람이 또 나와도 한 번 더 튀어오르도록
-    v.classList.add('hit');
-    sub.textContent = `${rlResult.n}명 중에서 뽑혔습니다 · ${formatDateTime(rlResult.at)}`;
-    return;
+  done.hidden = true;
+  fin.hidden = false;
+  fin.querySelectorAll('.rl-win').forEach(b => { b.disabled = !me || rlBusy; });
+}
+
+/* ---- 서버에 묻기 ---- */
+
+async function rlGo() {
+  if (rlBusy || rlSpinning) return;
+  const entries = rlEntries();
+  if (entries.length !== rlNeed()) return;
+
+  rlBusy = true;
+  renderRlPick();
+  try {
+    const r = await apiPost('/api/match', { action: 'host', size: rlSize, entries });
+    rlDraw = r.draw;
+    rlBusy = false;
+    rlSpinning = true;
+    renderRlPick();
+    rlStagePre(rlDraw);
+    document.getElementById('rlStage').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    const slow = window.matchMedia
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // 두 판을 동시에 돌린다 — 팀이 나뉘는 것과 호스트가 정해지는 것이 한 장면이다
+    rlSpinTo('A', rlDraw.teamA, rlDraw.hostA, slow);
+    rlSpinTo('B', rlDraw.teamB, rlDraw.hostB, slow);
+    // 애니메이션 끝 신호가 오지 않아도(화면이 가려졌다거나) 멈춘 채 남지 않도록
+    clearTimeout(rlTimer);
+    rlTimer = setTimeout(rlStagePost, (slow ? 600 : RL_SPIN_MS) + 400);
+
+    loadRlLog(1);
+  } catch (e) {
+    rlBusy = false;
+    renderRlPick();
+    showToast('뽑기 실패: ' + e.message);
   }
-  const n = rlPlayers().length;
-  v.textContent = '—';
-  v.classList.remove('hit');
-  sub.textContent = n < RL_MIN
-    ? `참가자를 ${RL_MIN}명 이상 체크해주세요.`
-    : `${n}명 중에서 한 명을 뽑습니다.`;
+}
+
+async function rlReport(winner) {
+  if (!rlDraw || rlDraw.result || rlBusy) return;
+  const n = rlDraw.size;
+  if (!confirm(`${winner} Team 승리로 기록합니다.\n${n}:${n} · 점수가 바로 반영되고 되돌리려면 관리자가 취소해야 합니다.\n계속할까요?`)) return;
+
+  rlBusy = true;
+  rlShowResult(rlDraw);
+  try {
+    await apiPost('/api/match', { action: 'hostResult', id: rlDraw.id, winner });
+    rlDraw = { ...rlDraw, result: winner, resultBy: me.handle, resultTs: Date.now() };
+    rlBusy = false;
+    rlShowResult(rlDraw);
+    showToast(`${winner} Team 승리로 기록했습니다`);
+    await Promise.all([
+      loadState().then(() => { renderStanding(); renderTop5(); }),
+      loadRlLog(1),
+    ]);
+    renderRoulette();
+  } catch (e) {
+    rlBusy = false;
+    rlShowResult(rlDraw);
+    showToast('기록 실패: ' + e.message);
+  }
+}
+
+/* ---- 기록 ---- */
+
+async function loadRlLog(page) {
+  if (page) rlLogPage = page;
+  try {
+    rlLogData = await apiGet(`/api/match?host=1&page=${rlLogPage}`);
+  } catch {
+    rlLogData = null;
+  }
+  renderRlLog();
 }
 
 function renderRlLog() {
   const box = document.getElementById('rlLog');
-  const panel = document.getElementById('rlLogPanel');
-  if (!box || !panel) return;
-  const log = rlReadJson(RL_LOG_KEY);
-  panel.hidden = !log.length;
-  box.innerHTML = log.map((r, i) => `<div class="rl-log-row">
-      <span class="rl-log-n">${i === 0 ? '최근' : i + 1}</span>
-      <b>${esc(r.handle)}</b>
-      <span class="rl-log-n">${Number(r.n) || 0}명 중</span>
-      <span class="rl-log-when">${esc(formatDateTime(r.at))}</span>
+  const empty = document.getElementById('rlLogEmpty');
+  if (!box || !empty) return;
+  const d = rlLogData;
+  const rows = (d && d.draws) || [];
+  empty.hidden = rows.length > 0;
+  if (d && d.total === 0) empty.textContent = '아직 뽑은 기록이 없습니다.';
+
+  const team = (name, list, host, first) =>
+    `<div><b>${name} Team</b> ${esc(list.join(', '))}`
+    + ` · 호스트 <b>${esc(host)}</b>${first ? ' <span class="first">(선)</span>' : ''}</div>`;
+
+  box.innerHTML = rows.map(r => `<div class="rl-log-row">
+      <div class="rl-log-top">
+        <span class="rl-log-size">${r.size}:${r.size}</span>
+        <span class="rl-log-host">A <b>${esc(r.hostA)}</b>${r.first === 'A' ? ' <span class="first">(선)</span>' : ''}
+          · B <b>${esc(r.hostB)}</b>${r.first === 'B' ? ' <span class="first">(선)</span>' : ''}</span>
+        <span class="rl-log-when">${esc(formatDateTime(r.ts))} · ${esc(r.by)}</span>
+      </div>
+      <div class="rl-log-team">
+        ${team('A', r.teamA, r.hostA, r.first === 'A')}
+        ${team('B', r.teamB, r.hostB, r.first === 'B')}
+      </div>
+      <span class="rl-log-res${r.result ? '' : ' wait'}">${r.result
+        ? `${esc(r.result)} Team 승리 · ${esc(r.resultBy || '')}`
+        : '결과 미등록'}</span>
     </div>`).join('');
+
+  const pages = (d && d.pages) || 1;
+  const total = (d && d.total) || 0;
+  const per = (d && d.per) || 10;
+  renderPager('rlPager', 'rlpage', total, pages, rlLogPage, (rlLogPage - 1) * per, rows.length, '건');
 }
 
-/** 멈춘 뒤 — 당첨자를 적고 버튼을 돌려놓는다 */
-function rlFinish(handle, n) {
-  if (!rlSpinning) return;          // 타이머와 transitionend 중 먼저 온 쪽만
-  rlSpinning = false;
-  clearTimeout(rlTimer);
-  rlResult = { handle, n, at: Date.now() };
-  const log = [rlResult, ...rlReadJson(RL_LOG_KEY)].slice(0, RL_LOG_MAX);
-  writeKey(RL_LOG_KEY, JSON.stringify(log), true);
-  renderRlState();
-  showToast(`호스트는 ${handle} 님입니다`);
-}
-
-function rlSpin() {
-  if (rlSpinning) return;
-  const list = rlPlayers();
-  if (list.length < RL_MIN) return;
-  const g = document.getElementById('rlSpin');
-  if (!g) return;
-
-  // 먼저 뽑고, 판을 그 자리에 맞춰 세운다. 보이는 것과 뽑힌 사람이 어긋나지 않는다.
-  const n = list.length;
-  const i = rlRandom(n);
-  const step = 360 / n;
-  // 조각 한가운데에서 조금 비켜 세운다 — 매번 같은 자리에 서면 짜여 보인다
-  const mid = i * step + step / 2 + (rlRandom(61) - 30) / 100 * step;
-
-  rlSpinning = true;
-  rlResult = null;
-  renderRlState();
-
-  const slow = window.matchMedia
-    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const secs = slow ? 0.6 : 4.6;
-  const turns = slow ? 0 : 5 + rlRandom(3);
-  const need = (360 - ((rlAngle + mid) % 360) + 360) % 360;
-  rlAngle += turns * 360 + need;
-
-  g.style.transition = `transform ${secs}s cubic-bezier(.16,.68,.2,1)`;
-  g.style.transform = `rotate(${rlAngle}deg)`;
-
-  const done = () => rlFinish(list[i].handle, n);
-  g.addEventListener('transitionend', done, { once: true });
-  // transitionend 가 오지 않는 경우(화면이 가려졌다거나)에도 버튼이 잠긴 채
-  // 남지 않도록 한 박자 뒤에 같은 일을 한 번 더 시킨다. 둘 중 먼저 온 쪽만 먹는다.
-  clearTimeout(rlTimer);
-  rlTimer = setTimeout(done, secs * 1000 + 600);
-}
+/* ---- 묶기 ---- */
 
 function initRouletteEvents() {
   rlPicked = new Set(rlReadJson(RL_PICK_KEY));
+  const saved = Number(readKey(RL_SIZE_KEY));
+  if (RL_SIZES.includes(saved)) rlSize = saved;
+
+  const sizes = document.getElementById('rlSizes');
+  if (sizes) sizes.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-size]');
+    if (!btn || rlSpinning || rlBusy) return;
+    rlSize = Number(btn.dataset.size);
+    writeKey(RL_SIZE_KEY, String(rlSize), true);
+    renderRoulette();
+  });
 
   const list = document.getElementById('rlList');
   if (list) list.addEventListener('change', (e) => {
     const el = e.target;
     if (!el || el.type !== 'checkbox') return;
     if (el.checked) rlPicked.add(el.value); else rlPicked.delete(el.value);
-    writeKey(RL_PICK_KEY, JSON.stringify([...rlPicked]), true);
-    rlResult = null;
-    renderRlState();               // 명단은 그대로 둔다 — 스크롤이 튀지 않도록
+    rlSavePicked();
+    // 정원이 찼는지에 따라 남은 칸이 잠기므로 명단도 다시 그린다
+    renderRoulette();
   });
 
   const search = document.getElementById('rlSearch');
   if (search) search.addEventListener('input', renderRlList);
 
-  // 전체 체크·해제는 지금 보이는 사람에게만 미친다. 검색해 걸러둔 뜻을 지키려고.
-  const bulk = (on) => {
-    rlShown().forEach(p => { if (on) rlPicked.add(p.handle); else rlPicked.delete(p.handle); });
-    writeKey(RL_PICK_KEY, JSON.stringify([...rlPicked]), true);
-    rlResult = null;
-    renderRoulette();
-  };
-  const all = document.getElementById('rlAll');
-  if (all) all.addEventListener('click', () => bulk(true));
   const none = document.getElementById('rlNone');
-  if (none) none.addEventListener('click', () => bulk(false));
+  if (none) none.addEventListener('click', () => {
+    rlPicked.clear();
+    rlSavePicked();
+    renderRoulette();
+  });
 
   const go = document.getElementById('rlGo');
-  if (go) go.addEventListener('click', rlSpin);
+  if (go) go.addEventListener('click', rlGo);
 
-  const clear = document.getElementById('rlLogClear');
-  if (clear) clear.addEventListener('click', () => {
-    if (!confirm('최근 뽑기 기록을 지울까요?')) return;
-    writeKey(RL_LOG_KEY, '[]', true);
-    renderRlLog();
-    showToast('기록을 지웠습니다');
+  const fin = document.getElementById('rlFinish');
+  if (fin) fin.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-win]');
+    if (!btn || btn.disabled) return;
+    rlReport(btn.dataset.win);
+  });
+
+  const refresh = document.getElementById('rlLogRefresh');
+  if (refresh) refresh.addEventListener('click', () => loadRlLog(1));
+
+  bindPager('rlPager', 'rlpage', n => { rlLogPage = n; }, () => loadRlLog());
+
+  // 판이 멈추면 이름을 적는다. 두 판 중 늦게 끝나는 쪽은 없다 — 같이 출발했다.
+  ['A', 'B'].forEach(side => {
+    const g = document.getElementById('rlSpin' + side);
+    if (g) g.addEventListener('transitionend', () => { if (side === 'A') rlStagePost(); });
   });
 }
 
@@ -9823,9 +10118,10 @@ function activateTab(name) {
   // 있으면 다시 들어왔을 때 어리둥절하므로, 언제나 목록부터 보여준다.
   if (name === 'photos') { showPhotoList(); loadPosts().then(renderPhotos); }
   if (name === 'launcher') { loadRooms().then(renderLauncher); }
-  // 뽑기는 이미 받아둔 명단으로 한다. 명단이 비었을 때만 한 번 받아온다.
+  // 명단은 순위표에서 이미 받아둔 것을 쓴다. 비었을 때만 한 번 더 받아온다.
   if (name === 'roulette') {
     (players.length ? Promise.resolve() : loadState()).then(renderRoulette);
+    loadRlLog(1);
   }
 }
 

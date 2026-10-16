@@ -1078,12 +1078,22 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .check-item .clan-mini{ color:var(--text-tertiary); font-size:var(--fs-footnote); }
 
 /* ===== 호스트 룰렛 =====
-   뽑기는 서버를 한 번도 부르지 않는다. 이미 받아둔 명단으로 이 화면 안에서
-   끝내므로 데이터베이스가 깨어날 일이 없다. */
+   팀 나누기와 호스트 뽑기는 서버가 하고, 여기서는 그 결과를 보여주기만 한다. */
+.rl-sizes{ display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-bottom:var(--sp-2); }
+.rl-size{
+  font-family:inherit; font-size:var(--fs-caption); font-weight:var(--fw-bold);
+  font-variant-numeric:tabular-nums;
+  padding:var(--sp-2) var(--sp-4); border-radius:var(--radius-pill);
+  border:1px solid var(--border-strong); background:var(--surface);
+  color:var(--text-secondary); cursor:pointer;
+  transition:border-color var(--dur-fast) var(--ease-standard);
+}
+.rl-size:hover{ border-color:var(--accent); color:var(--accent); }
+.rl-size.on{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
+.rl-size:focus-visible{ outline:none; box-shadow:var(--shadow-focus); }
+
 .rl-tools{ display:flex; gap:var(--sp-2); align-items:center; margin-bottom:var(--sp-2); }
-/* 좁은 화면에서 '전체 체크' 가 두 줄로 접히지 않게 — 검색칸이 대신 줄어든다 */
-.rl-tools .pick-clear{ white-space:nowrap; }
-/* 전역 input 규칙이 min-width:200px 을 걸어 좁은 화면에서 버튼을 밀어낸다.
+/* 전역 input 규칙이 min-width:200px 을 걸어 좁은 화면에서 옆칸을 밀어낸다.
    선택자를 한 단계 깊게 해서 이 칸만 줄어들 수 있게 둔다. */
 .rl-tools .rl-search{
   flex:1 1 0; min-width:0;
@@ -1094,52 +1104,128 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .rl-tools .rl-search:focus{ outline:none; border-color:var(--accent); box-shadow:var(--shadow-focus); }
 .rl-list{ max-height:280px; }
 .rl-empty{ padding:var(--sp-5); text-align:center; color:var(--text-tertiary); font-size:var(--fs-caption); }
+/* .pick-note 는 리폿 화면의 대진 숫자 밑에 붙으라고 위쪽 여백이 음수다.
+   여기서는 바로 위가 체크 목록이라 그대로 두면 목록에 겹쳐 올라온다. */
+#rlNote{ margin-top:var(--sp-4); }
+/* 체크 칸에 이번 달 순위를 같이 적는다 — 누가 센지 보고 고르도록 */
+.check-item .rl-rk{
+  margin-left:auto; font-size:var(--fs-footnote); color:var(--text-tertiary);
+  font-variant-numeric:tabular-nums; white-space:nowrap;
+}
+/* 정원이 찼으면 더 못 고른다 */
+.check-item.full{ opacity:.45; }
 
-.rl-stage{ display:flex; flex-direction:column; align-items:center; margin-top:var(--sp-6); }
-.rl-wheel-wrap{ position:relative; width:min(320px, 82vw); aspect-ratio:1; }
+/* ---- 이번 판 ---- */
+.rl-when{ font-size:var(--fs-footnote); color:var(--text-tertiary); }
+.rl-teams{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:var(--sp-4); }
+.rl-team{
+  border:1px solid var(--border); border-radius:var(--radius-md);
+  background:var(--surface-sunken); padding:var(--sp-3);
+}
+.rl-team-h{ display:flex; align-items:center; gap:var(--sp-2); margin-bottom:var(--sp-2); }
+.rl-team-n{
+  font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+  letter-spacing:.1em; color:var(--text-secondary);
+}
+/* 어느 팀이 호스트를 먼저 잡는가 — 한눈에 보여야 해서 여기만 빨갛다 */
+.rl-first{
+  margin-left:auto; font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+  padding:2px var(--sp-2); border-radius:var(--radius-sm);
+  background:var(--danger-bg); color:var(--danger-strong);
+  border:1px solid var(--danger);
+}
+.rl-wheel-wrap{ position:relative; width:100%; max-width:260px; margin:0 auto; aspect-ratio:1; }
 .rl-wheel{ width:100%; height:100%; display:block; }
 /* 바늘은 돌지 않는다. 12시에 고정해두고 판만 돌린다. */
 .rl-pin{
   position:absolute; top:-2px; left:50%; transform:translateX(-50%);
   width:0; height:0; z-index:1;
-  border-left:11px solid transparent; border-right:11px solid transparent;
-  border-top:20px solid var(--danger);
+  border-left:9px solid transparent; border-right:9px solid transparent;
+  border-top:17px solid var(--danger);
   filter:drop-shadow(0 1px 2px rgba(0,0,0,.3));
 }
 /* 판은 뷰박스 한가운데를 축으로 돈다 */
-#rlSpin{ transform-box:view-box; transform-origin:100px 100px; }
+#rlSpinA, #rlSpinB{ transform-box:view-box; transform-origin:100px 100px; }
 .rl-slice{ stroke:var(--surface); stroke-width:.6; }
 .rl-name{
   font-family:var(--font-sans); font-weight:var(--fw-bold);
   fill:var(--rl-ink); pointer-events:none;
 }
-
-.rl-out{ text-align:center; margin:var(--sp-5) 0 var(--sp-4); }
-.rl-out-k{
-  font-size:var(--fs-footnote); font-weight:var(--fw-medium);
-  color:var(--text-tertiary); letter-spacing:.14em;
+.rl-host{
+  display:flex; align-items:baseline; justify-content:center; gap:var(--sp-2);
+  margin-top:var(--sp-3);
 }
-.rl-out-v{
-  margin-top:var(--sp-1); font-size:var(--fs-display); font-weight:var(--fw-bold);
-  color:var(--text-primary); line-height:1.2; word-break:break-all;
+.rl-host-k{ font-size:var(--fs-footnote); color:var(--text-tertiary); letter-spacing:.12em; }
+.rl-host b{
+  font-size:var(--fs-heading); font-weight:var(--fw-bold); color:var(--text-primary);
+  word-break:break-all;
 }
-.rl-out-v.hit{ color:var(--accent); animation:rl-pop .45s ease-out; }
+.rl-host b.hit{ color:var(--accent); animation:rl-pop .45s ease-out; }
 @keyframes rl-pop{ from{ transform:scale(.82); opacity:.4; } to{ transform:scale(1); opacity:1; } }
-.rl-out-sub{ margin-top:var(--sp-2); font-size:var(--fs-footnote); color:var(--text-tertiary); }
-#rlGo.btn, .rl-stage .btn{ width:auto; min-width:200px; }
-
-.rl-log{ display:flex; flex-direction:column; gap:var(--sp-1); }
-.rl-log-row{
-  display:flex; align-items:baseline; gap:var(--sp-3);
-  padding:var(--sp-2) var(--sp-3); border-radius:var(--radius-sm);
-  background:var(--surface-sunken); font-size:var(--fs-caption);
+.rl-roster{ margin-top:var(--sp-3); display:flex; flex-direction:column; gap:2px; }
+.rl-mem{
+  display:flex; align-items:baseline; gap:var(--sp-2);
+  padding:3px var(--sp-2); border-radius:var(--radius-sm);
+  font-size:var(--fs-caption); color:var(--text-secondary);
 }
-.rl-log-row b{ font-weight:var(--fw-bold); color:var(--text-primary); }
-.rl-log-when{ margin-left:auto; font-size:var(--fs-footnote); color:var(--text-tertiary); }
-.rl-log-n{ font-size:var(--fs-footnote); color:var(--text-tertiary); }
+.rl-mem.host{ background:var(--accent-bg); color:var(--text-primary); font-weight:var(--fw-bold); }
+.rl-mem .rl-rk{ margin-left:auto; font-size:var(--fs-footnote); color:var(--text-tertiary); }
 
+.rl-first-line{
+  margin-top:var(--sp-4); text-align:center;
+  font-size:var(--fs-caption); color:var(--text-secondary);
+}
+.rl-first-line b{ color:var(--danger-strong); font-weight:var(--fw-bold); }
+
+.rl-finish{ margin-top:var(--sp-5); border-top:1px solid var(--border); padding-top:var(--sp-4); }
+.rl-win-btns{ display:flex; gap:var(--sp-3); }
+.rl-win{
+  flex:1; font-size:var(--fs-caption); font-weight:var(--fw-bold);
+  padding:var(--sp-3); border-radius:var(--radius-md);
+  border:1px solid var(--border-strong); background:var(--surface);
+  color:var(--text-secondary); cursor:pointer; font-family:inherit;
+}
+.rl-win:hover:not(:disabled){ border-color:var(--success); color:var(--success-strong); background:var(--success-bg); }
+.rl-win:disabled{ color:var(--text-disabled); cursor:not-allowed; }
+.rl-win:focus-visible{ outline:none; box-shadow:var(--shadow-focus); }
+.rl-done{
+  margin-top:var(--sp-5); border-top:1px solid var(--border); padding-top:var(--sp-4);
+  text-align:center; font-size:var(--fs-caption); color:var(--text-secondary);
+}
+.rl-done b{ color:var(--success-strong); font-weight:var(--fw-bold); }
+
+/* ---- 기록 ---- */
+.rl-log{ display:flex; flex-direction:column; gap:var(--sp-2); }
+.rl-log-row{
+  padding:var(--sp-3); border-radius:var(--radius-sm);
+  background:var(--surface-sunken); border:1px solid var(--border);
+  font-size:var(--fs-caption);
+}
+.rl-log-top{ display:flex; align-items:baseline; gap:var(--sp-2); flex-wrap:wrap; }
+.rl-log-size{
+  font-weight:var(--fw-bold); font-variant-numeric:tabular-nums; color:var(--text-primary);
+}
+.rl-log-host{ color:var(--text-secondary); }
+.rl-log-host b{ color:var(--text-primary); font-weight:var(--fw-bold); }
+.rl-log-host .first{ color:var(--danger-strong); }
+.rl-log-when{ margin-left:auto; font-size:var(--fs-footnote); color:var(--text-tertiary); white-space:nowrap; }
+.rl-log-team{ margin-top:var(--sp-2); font-size:var(--fs-footnote); color:var(--text-tertiary); line-height:1.6; }
+.rl-log-team b{ color:var(--text-secondary); font-weight:var(--fw-medium); }
+.rl-log-res{
+  display:inline-block; margin-top:var(--sp-2);
+  font-size:var(--fs-footnote); font-weight:var(--fw-medium);
+  padding:2px var(--sp-2); border-radius:var(--radius-sm);
+  background:var(--success-bg); color:var(--success-strong);
+}
+.rl-log-res.wait{ background:var(--surface); color:var(--text-tertiary); border:1px solid var(--border); }
+
+@media (max-width:620px){
+  /* 좁으면 룰렛 두 개가 나란히 서지 못한다. 위아래로 쌓는다. */
+  .rl-teams{ grid-template-columns:1fr; }
+  .rl-win-btns{ flex-direction:column; }
+}
 @media (prefers-reduced-motion: reduce){
-  .rl-out-v.hit{ animation:none; }
+  .rl-host b.hit{ animation:none; }
 }
 
 /* 확정 버튼 위의 대진 표시 — 8 : 8 이 맞았는지 한눈에 */
@@ -3065,43 +3151,98 @@ if (/[?&]room=\d+/.test(location.search)) {
         <span class="pick-n" id="rlCount">0명</span>
       </div>
       <div class="foot-note" style="margin-top:0;margin-bottom:14px;">
-        이번 판에 들어온 사람을 체크하고 룰렛을 돌리면 <b>호스트 한 명</b>이 뽑힙니다 ·
-        체크한 사람은 이 브라우저에 남아 다음에 들어와도 그대로입니다 ·
-        <b>서버에 기록되지 않습니다</b> — 뽑기는 이 화면 안에서만 일어납니다.
+        경기 규모를 고르고 그만큼 체크하면 <b>A·B 팀으로 나누고 팀마다 호스트를 한 명씩</b> 뽑습니다 ·
+        팀은 <b>이번 달 포인트로 균형을 맞춰</b> 나눕니다 ·
+        팀도 호스트도 <b>서버가 정하고 아래 기록에 남습니다</b> — 돌린 사람이 짜 넣을 수 없습니다.
       </div>
 
+      <div class="side-label">경기 규모 · Match Size</div>
+      <div class="rl-sizes" id="rlSizes"></div>
+
+      <div class="side-label" style="margin-top:var(--sp-5);">
+        참가자 · Players<button type="button" class="pick-clear" id="rlNone" hidden>전체 해제</button>
+      </div>
       <div class="rl-tools">
         <input type="search" id="rlSearch" class="rl-search" placeholder="아이디 검색" aria-label="참가자 검색">
-        <button type="button" class="pick-clear" id="rlAll">전체 체크</button>
-        <button type="button" class="pick-clear" id="rlNone">전체 해제</button>
       </div>
       <div class="checklist rl-list" id="rlList"></div>
 
-      <div class="rl-stage">
-        <div class="rl-wheel-wrap">
-          <div class="rl-pin" aria-hidden="true"></div>
-          <svg class="rl-wheel" id="rlWheel" viewBox="0 0 200 200" role="img" aria-label="호스트 룰렛">
-            <g id="rlSpin"></g>
-            <circle cx="100" cy="100" r="95" fill="none" stroke="var(--border-strong)" stroke-width="2"/>
-            <circle cx="100" cy="100" r="15" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="2"/>
-          </svg>
-        </div>
-        <div class="rl-out" id="rlOut" aria-live="polite">
-          <div class="rl-out-k">HOST</div>
-          <div class="rl-out-v" id="rlWinner">—</div>
-          <div class="rl-out-sub" id="rlSub">참가자를 2명 이상 체크해주세요.</div>
-        </div>
-        <button class="btn" id="rlGo" disabled>룰렛 돌리기</button>
+      <div class="pick-note" id="rlNote" aria-live="polite"></div>
+      <div class="pick-actions">
+        <button class="btn" id="rlGo" disabled>팀 나누고 룰렛 돌리기</button>
       </div>
     </div>
 
-    <div class="panel hud-corner" id="rlLogPanel" hidden>
+    <!-- 뽑은 결과 — 돌리기 전에는 없는 칸이다 -->
+    <div class="panel hud-corner" id="rlStage" hidden>
       <div class="panel-head">
-        <h2>최근 뽑기</h2>
-        <button type="button" class="pick-clear" id="rlLogClear">기록 지우기</button>
+        <h2>이번 판 · This Round</h2>
+        <span class="rl-when" id="rlWhen"></span>
       </div>
-      <div class="foot-note" style="margin-top:0;margin-bottom:10px;">이 브라우저에만 남는 기록입니다 · 최근 5번까지 보여줍니다.</div>
+
+      <div class="rl-teams">
+        <div class="rl-team" data-team="A">
+          <div class="rl-team-h">
+            <span class="rl-team-n">A TEAM</span>
+            <span class="rl-first" id="rlFirstA" hidden>선호스트</span>
+          </div>
+          <div class="rl-wheel-wrap">
+            <div class="rl-pin" aria-hidden="true"></div>
+            <svg class="rl-wheel" viewBox="0 0 200 200" role="img" aria-label="A팀 호스트 룰렛">
+              <g id="rlSpinA"></g>
+              <circle cx="100" cy="100" r="95" fill="none" stroke="var(--border-strong)" stroke-width="2"/>
+              <circle cx="100" cy="100" r="15" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="2"/>
+            </svg>
+          </div>
+          <div class="rl-host"><span class="rl-host-k">HOST</span><b id="rlHostA">—</b></div>
+          <div class="rl-roster" id="rlRosterA"></div>
+        </div>
+
+        <div class="rl-team" data-team="B">
+          <div class="rl-team-h">
+            <span class="rl-team-n">B TEAM</span>
+            <span class="rl-first" id="rlFirstB" hidden>선호스트</span>
+          </div>
+          <div class="rl-wheel-wrap">
+            <div class="rl-pin" aria-hidden="true"></div>
+            <svg class="rl-wheel" viewBox="0 0 200 200" role="img" aria-label="B팀 호스트 룰렛">
+              <g id="rlSpinB"></g>
+              <circle cx="100" cy="100" r="95" fill="none" stroke="var(--border-strong)" stroke-width="2"/>
+              <circle cx="100" cy="100" r="15" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="2"/>
+            </svg>
+          </div>
+          <div class="rl-host"><span class="rl-host-k">HOST</span><b id="rlHostB">—</b></div>
+          <div class="rl-roster" id="rlRosterB"></div>
+        </div>
+      </div>
+
+      <div class="rl-first-line" id="rlFirstLine" hidden></div>
+
+      <div class="rl-finish" id="rlFinish" hidden>
+        <div class="side-label">경기 결과 · Report</div>
+        <div class="foot-note" style="margin-top:0;margin-bottom:10px;">
+          나눠준 팀 그대로 점수가 들어갑니다 · 리폿 탭에 쓰는 것과 같은 기록이라 <b>두 번 쓰지 마세요</b>.
+        </div>
+        <div class="rl-win-btns">
+          <button type="button" class="btn-mini rl-win" data-win="A">A Team 승리</button>
+          <button type="button" class="btn-mini rl-win" data-win="B">B Team 승리</button>
+        </div>
+      </div>
+      <div class="rl-done" id="rlDone" hidden></div>
+    </div>
+
+    <!-- 진행 기록 -->
+    <div class="panel hud-corner">
+      <div class="panel-head">
+        <h2>진행 기록 · Log</h2>
+        <button type="button" class="pick-clear" id="rlLogRefresh">↻ 새로고침</button>
+      </div>
+      <div class="foot-note" style="margin-top:0;margin-bottom:12px;">
+        누가 언제 어떻게 나눴는지 모두에게 남습니다 · 다시 돌리면 그것도 한 줄로 남습니다.
+      </div>
       <div class="rl-log" id="rlLog"></div>
+      <div id="rlLogEmpty" class="log-empty" hidden>아직 뽑은 기록이 없습니다.</div>
+      <div class="pager" id="rlPager" style="display:none;"></div>
     </div>
   </div>
 

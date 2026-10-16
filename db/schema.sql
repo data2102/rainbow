@@ -185,3 +185,26 @@ CREATE TABLE IF NOT EXISTS room_messages (
   ts     BIGINT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_room_msg ON room_messages (room, id);
+
+-- 호스트 뽑기 한 판. 팀 나누기 · 팀별 호스트 · 선호스트까지 한 줄에 담는다.
+--
+-- 한 사람이 혼자 돌리므로 누가 언제 어떻게 나눴는지 모두가 볼 수 있어야 한다.
+-- 그래서 팀도 호스트도 서버가 정한다 — 보내는 쪽에서 짜서 올릴 수 없게.
+CREATE TABLE IF NOT EXISTS host_draws (
+  id         BIGSERIAL PRIMARY KEY,
+  ts         BIGINT NOT NULL,
+  size       INTEGER NOT NULL,              -- 한 팀 인원 (2~8)
+  team_a     JSONB NOT NULL,
+  team_b     JSONB NOT NULL,
+  host_a     TEXT NOT NULL,
+  host_b     TEXT NOT NULL,
+  first_team TEXT NOT NULL CHECK (first_team IN ('A','B')),  -- 선호스트
+  drawn_by   TEXT NOT NULL,
+  season     TEXT,
+  -- 경기까지 끝났으면 그 결과. 아직이면 비어 있다.
+  result     TEXT CHECK (result IN ('A','B')),
+  match_id   BIGINT,
+  result_by  TEXT,
+  result_ts  BIGINT
+);
+CREATE INDEX IF NOT EXISTS idx_host_draws_ts ON host_draws (ts DESC);

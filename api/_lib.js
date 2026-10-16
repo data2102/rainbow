@@ -396,6 +396,53 @@ export async function ensureMatchVoid() {
   voidReady = true;
 }
 
+/**
+ * 호스트 뽑기 표가 아직 없는 데이터베이스일 수 있다.
+ * 배포만 하면 쓸 수 있도록 처음 불릴 때 한 번 만든다.
+ */
+let drawsReady = false;
+export async function ensureHostDraws() {
+  if (drawsReady) return;
+  await q(`
+    CREATE TABLE IF NOT EXISTS host_draws (
+      id         BIGSERIAL PRIMARY KEY,
+      ts         BIGINT NOT NULL,
+      size       INTEGER NOT NULL,
+      team_a     JSONB NOT NULL,
+      team_b     JSONB NOT NULL,
+      host_a     TEXT NOT NULL,
+      host_b     TEXT NOT NULL,
+      first_team TEXT NOT NULL,
+      drawn_by   TEXT NOT NULL,
+      season     TEXT,
+      result     TEXT,
+      match_id   BIGINT,
+      result_by  TEXT,
+      result_ts  BIGINT
+    );
+    CREATE INDEX IF NOT EXISTS idx_host_draws_ts ON host_draws (ts DESC);
+  `);
+  drawsReady = true;
+}
+
+export function rowToDraw(r) {
+  return {
+    id: Number(r.id),
+    ts: Number(r.ts),
+    size: r.size,
+    teamA: r.team_a || [],
+    teamB: r.team_b || [],
+    hostA: r.host_a,
+    hostB: r.host_b,
+    first: r.first_team,
+    by: r.drawn_by,
+    result: r.result || null,
+    matchId: r.match_id == null ? null : Number(r.match_id),
+    resultBy: r.result_by || null,
+    resultTs: r.result_ts == null ? null : Number(r.result_ts),
+  };
+}
+
 export function rowToRequest(r) {
   return {
     id: r.id,

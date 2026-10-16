@@ -90,7 +90,7 @@ function idleAway()    { return Date.now() - lastTouchAt > IDLE_STOP_MS; }
 | **궁합**(선수 카드) | 3개, 그중 하나가 `matches` **전체 스캔**(JSONB `@>`, 인덱스 없음) | 누를 때마다 |
 | **사진첩** | 목록 2개 + **썸네일 1장당 1개**(한 쪽 20장) | 첫 방문만 (하루 캐시) |
 | **자료실** | 게시판 요청에 얹혀 옴 + 내려받기 1건당 1개 | 거의 없음 |
-| **호스트뽑기** | **0개** — 이미 받아둔 명단으로 브라우저 안에서 끝낸다 | 없음 |
+| **호스트뽑기** | 기록 목록 1개 · 한 판 뽑을 때 3~4개(트랜잭션) · 결과 등록 1건 | 폴링 없음 |
 
 **단, 요금은 횟수가 아니라 깨어 있던 시간으로 매겨진다.** 메뉴를 없애는 것은 대부분 헛수고다.
 런쳐도 **탭을 선택하지 않으면 한 번도 부르지 않는다**(`panel.classList.contains('active')` 검사).
@@ -124,6 +124,11 @@ function idleAway()    { return Date.now() - lastTouchAt > IDLE_STOP_MS; }
 - `scripts/app.js` 와 `api/room.js` 의 `APP_VERSION` 은 **항상 같은 값**이어야 하고, 배포마다 올린다.
 - **Vercel Hobby 는 서버리스 함수 12개가 상한**이다. 지금 11개이므로 새 API 는
   기존 파일(예: `api/post.js`)에 합쳐야 한다.
+  호스트 뽑기가 `api/match.js` 에 얹혀 있는 것도 이 때문이다 (GET 은 기록 조회,
+  POST `action:'host'`/`'hostResult'`).
+- **호스트 뽑기는 팀도 호스트도 서버가 정한다**(`splitTeams`, `pickOne`).
+  화면에서 정해 올리게 두면 돌리는 사람이 짤 수 있어 기록을 남기는 뜻이 없어진다.
+  점수 계산은 리폿과 같은 `recordCore()` 를 쓰므로 어느 쪽으로 넣든 결과가 같다.
 - 되돌릴 일에 대비한 백업 브랜치가 있다: `backup/font-before-logo`, `backup/garo-menu`,
   `backup/radmin-launcher`. **지우지 말 것.**
 
