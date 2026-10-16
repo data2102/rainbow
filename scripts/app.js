@@ -281,7 +281,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 89;
+const APP_VERSION = 90;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -6077,10 +6077,43 @@ function renderRlLog() {
         : '결과 미등록'}</span>
     </div>`).join('');
 
+  const wipe = document.getElementById('rlLogWipe');
+  if (wipe) wipe.hidden = !isAdmin() || !(d && d.total > 0);
+
   const pages = (d && d.pages) || 1;
   const total = (d && d.total) || 0;
   const per = (d && d.per) || 10;
   renderPager('rlPager', 'rlpage', total, pages, rlLogPage, (rlLogPage - 1) * per, rows.length, '건');
+}
+
+/**
+ * 뽑기 기록을 통째로 비운다 (관리자).
+ *
+ * 되돌릴 수 없고, 결과까지 올린 판이 있으면 그 경기는 리폿에 그대로 남는다 —
+ * 점수를 되돌리는 것은 리폿에서 따로 취소해야 하는 일이라 여기서 하지 않는다.
+ * 모르고 지우면 순위가 왜 그런지 설명할 길이 없어지므로 미리 알린다.
+ */
+async function rlWipeLog() {
+  const d = rlLogData;
+  if (!d || !d.total) return;
+  const done = (d.draws || []).filter(r => r.result).length;
+
+  let ask = `뽑기 기록 ${d.total}건을 모두 지웁니다. 되돌릴 수 없습니다.\n계속할까요?`;
+  if (done) {
+    ask = `뽑기 기록 ${d.total}건을 모두 지웁니다. 되돌릴 수 없습니다.\n\n`
+      + `※ 결과까지 올린 판이 섞여 있습니다. 그 경기와 점수는 리폿에 그대로 남습니다 —\n`
+      + `   점수를 되돌리려면 리폿(경기결과)에서 해당 경기를 따로 취소해야 합니다.\n\n계속할까요?`;
+  }
+  if (!confirm(ask)) return;
+
+  try {
+    const r = await apiPost('/api/match', { action: 'hostClear', expect: d.total });
+    await loadRlLog(1);
+    showToast(`뽑기 기록 ${r.removed}건을 지웠습니다`
+      + (r.withResult ? ` · 그중 ${r.withResult}건은 경기 기록이 리폿에 남아 있습니다` : ''));
+  } catch (e) {
+    showToast('삭제 실패: ' + e.message);
+  }
 }
 
 /* ---- 묶기 ---- */
@@ -6131,6 +6164,9 @@ function initRouletteEvents() {
 
   const refresh = document.getElementById('rlLogRefresh');
   if (refresh) refresh.addEventListener('click', () => loadRlLog(1));
+
+  const wipe = document.getElementById('rlLogWipe');
+  if (wipe) wipe.addEventListener('click', rlWipeLog);
 
   bindPager('rlPager', 'rlpage', n => { rlLogPage = n; }, () => loadRlLog());
 

@@ -13,6 +13,7 @@ import { ensureSeason } from './_season.js';
  * POST /api/match {action:'restore'}   취소 되돌리기 (관리자 이상)
  * POST /api/match {action:'host'}      팀 나누기 + 팀별 호스트 뽑기
  * POST /api/match {action:'hostResult'} 그 판의 승패 등록
+ * POST /api/match {action:'hostClear'}  뽑기 기록 비우기 (관리자 이상)
  *
  * 호스트 뽑기가 여기 얹혀 있는 까닭: Vercel Hobby 는 서버리스 함수가 12개까지다.
  * 지금 11개라 새 파일을 만들 수 없다. 경기와 한 몸인 기능이라 여기에 둔다.
@@ -25,6 +26,7 @@ export default async function handler(req, res) {
   if (b.action === 'restore') return restoreMatch(req, res, b);
   if (b.action === 'host') return hostDraw(req, res, b);
   if (b.action === 'hostResult') return hostResult(req, res, b);
+  if (b.action === 'hostClear') return hostClear(req, res, b);
   return record(req, res, b);
 }
 
@@ -496,5 +498,41 @@ async function hostLog(req, res) {
     });
   } catch (e) {
     res.status(500).json({ error: '기록을 불러오지 못했습니다: ' + e.message });
+  }
+}
+
+/**
+ * POST {action:'hostClear'} — 뽑기 기록을 통째로 비운다.
+ *
+ * 시험 삼아 돌려본 것들을 치우려고 둔 길이다. 되돌릴 수 없다.
+ *
+ * 경기 기록(matches)과 점수는 건드리지 않는다. 결과까지 올린 판이 있으면
+ * 그 경기는 리폿에 그대로 남아 있다 — 점수를 되돌리려면 리폿에서 따로
+ * 취소해야 한다. 여기서 같이 지우면 지운 줄 모르고 순위가 틀어진다.
+ */
+async function hostClear(req, res, b) {
+  const me = await requireAdmin(req, res);
+  if (!me) return;
+
+  try {
+    await ensureHostDraws();
+    const before = await q(`SELECT count(*)::int AS n FROM host_draws`);
+    const n = before[0].n;
+
+    // 결과까지 올린 판이 섞여 있으면 한 번 더 확인받는다. 화면에서 보여준
+    // 숫자와 지금 숫자가 다르면(그 사이 누가 돌렸으면) 멈춘다.
+    const expect = b.expect == null ? null : Number(b.expect);
+    if (expect != null && expect !== n) {
+      return res.status(409).json({
+        error: `그 사이 기록이 바뀌었습니다 (${expect}건 → ${n}건) · 새로고침한 뒤 다시 눌러주세요.`,
+      });
+    }
+
+    const withResult = await q(`SELECT count(*)::int AS n FROM host_draws WHERE result IS NOT NULL`);
+    await q(`DELETE FROM host_draws`);
+    await audit(me, 'host_clear', { removed: n, withResult: withResult[0].n });
+    res.status(200).json({ ok: true, removed: n, withResult: withResult[0].n });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
   }
 }

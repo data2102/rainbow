@@ -1266,6 +1266,9 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   background:var(--success-bg); color:var(--success-strong);
 }
 .rl-log-res.wait{ background:var(--surface); color:var(--text-tertiary); border:1px solid var(--border); }
+/* 시험 삼아 돌려본 기록을 치우는 길. 관리자에게만 보인다. */
+.rl-log-wipe{ border-color:var(--danger); color:var(--danger-strong); }
+.rl-log-wipe:hover{ background:var(--danger); border-color:var(--danger); color:#fff; }
 
 @media (max-width:620px){
   /* 좁으면 룰렛 두 개가 나란히 서지 못한다. 위아래로 쌓는다. */
@@ -3285,6 +3288,7 @@ if (/[?&]room=\d+/.test(location.search)) {
       <div class="panel-head">
         <h2>진행 기록 · Log</h2>
         <button type="button" class="pick-clear" id="rlLogRefresh">↻ 새로고침</button>
+        <button type="button" class="pick-clear rl-log-wipe" id="rlLogWipe" hidden>기록 전체 삭제</button>
       </div>
       <div class="foot-note" style="margin-top:0;margin-bottom:12px;">
         누가 언제 어떻게 나눴는지 모두에게 남습니다 · 다시 돌리면 그것도 한 줄로 남습니다.
