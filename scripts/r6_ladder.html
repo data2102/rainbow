@@ -1169,13 +1169,22 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   font-size:var(--fs-caption); color:var(--text-secondary);
 }
 .rl-mem.host{ background:var(--accent-bg); color:var(--text-primary); font-weight:var(--fw-bold); }
-.rl-mem .rl-rk{ margin-left:auto; font-size:var(--fs-footnote); color:var(--text-tertiary); }
+/* 호스트 순번. 1번이 못 잡으면 2번이 맡는다 — 번호가 곧 차례다. */
+.rl-ord{
+  flex:none; width:18px; height:18px; border-radius:var(--radius-pill);
+  display:inline-flex; align-items:center; justify-content:center;
+  font-size:10px; font-weight:var(--fw-bold);
+  background:var(--border); color:var(--text-secondary);
+}
+.rl-mem.host .rl-ord{ background:var(--accent); color:var(--on-accent); }
+.rl-ord.off{ background:transparent; color:var(--text-disabled); }
 
 .rl-first-line{
   margin-top:var(--sp-4); text-align:center;
   font-size:var(--fs-caption); color:var(--text-secondary);
 }
 .rl-first-line b{ color:var(--danger-strong); font-weight:var(--fw-bold); }
+.rl-first-sub{ margin-top:var(--sp-2); font-size:var(--fs-footnote); color:var(--text-tertiary); }
 
 .rl-finish{ margin-top:var(--sp-5); border-top:1px solid var(--border); padding-top:var(--sp-4); }
 .rl-win-btns{ display:flex; gap:var(--sp-3); }
@@ -1211,6 +1220,11 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .rl-log-when{ margin-left:auto; font-size:var(--fs-footnote); color:var(--text-tertiary); white-space:nowrap; }
 .rl-log-team{ margin-top:var(--sp-2); font-size:var(--fs-footnote); color:var(--text-tertiary); line-height:1.6; }
 .rl-log-team b{ color:var(--text-secondary); font-weight:var(--fw-medium); }
+.rl-log-ord{
+  display:inline-block; min-width:13px; margin-right:2px;
+  text-align:center; font-size:10px; font-weight:var(--fw-bold);
+  color:var(--text-disabled);
+}
 .rl-log-res{
   display:inline-block; margin-top:var(--sp-2);
   font-size:var(--fs-footnote); font-weight:var(--fw-medium);

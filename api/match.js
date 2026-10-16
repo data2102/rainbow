@@ -360,12 +360,11 @@ function splitTeams(rows) {
   return randomInt(2) ? [ha, hb] : [hb, ha];
 }
 
-/** 한 사람을 뽑는다 */
-function pickOne(list) { return list[randomInt(list.length)]; }
 
 /**
  * POST {action:'host', size, entries}
- * 팀을 나누고 팀마다 호스트를 하나씩 뽑는다. 선호스트도 여기서 정한다.
+ * 팀을 나누고 팀마다 호스트 순번을 매긴다. 선호스트도 여기서 정한다.
+ * team_a·team_b 에 담긴 차례가 곧 호스트 순번이고, 맨 앞이 host_a·host_b 다.
  *
  * 팀도 호스트도 서버가 고른다. 화면에서 정해 올리게 두면 돌리는 사람이
  * 원하는 대로 짤 수 있고, 그러면 기록을 남기는 뜻이 없어진다.
@@ -401,9 +400,14 @@ async function hostDraw(req, res, b) {
       const missing = entries.filter(h => !found.has(h));
       if (missing.length) throw new Error('명단에 없는 선수입니다: ' + missing.join(', '));
 
-      const [teamA, teamB] = splitTeams(rows);
-      const hostA = pickOne(teamA);
-      const hostB = pickOne(teamB);
+      // 팀 안의 차례를 섞는다. 이 순서가 곧 호스트 순번이다 —
+      // 1번이 호스트를 못 잡으면 2번, 그래도 안 되면 3번이 맡는다.
+      // 다시 뽑지 않아도 되도록 처음부터 끝까지 정해 둔다.
+      const [splitA, splitB] = splitTeams(rows);
+      const teamA = shuffle(splitA);
+      const teamB = shuffle(splitB);
+      const hostA = teamA[0];
+      const hostB = teamB[0];
       const first = randomInt(2) ? 'A' : 'B';
       const ts = Date.now();
 

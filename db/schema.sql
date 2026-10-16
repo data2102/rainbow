@@ -194,10 +194,11 @@ CREATE TABLE IF NOT EXISTS host_draws (
   id         BIGSERIAL PRIMARY KEY,
   ts         BIGINT NOT NULL,
   size       INTEGER NOT NULL,              -- 한 팀 인원 (2~8)
+  -- 담긴 차례가 곧 호스트 순번이다. 1번이 못 잡으면 2번, 그 다음 3번.
   team_a     JSONB NOT NULL,
   team_b     JSONB NOT NULL,
-  host_a     TEXT NOT NULL,
-  host_b     TEXT NOT NULL,
+  host_a     TEXT NOT NULL,                 -- team_a 의 맨 앞 (1번)
+  host_b     TEXT NOT NULL,                 -- team_b 의 맨 앞 (1번)
   first_team TEXT NOT NULL CHECK (first_team IN ('A','B')),  -- 선호스트
   drawn_by   TEXT NOT NULL,
   season     TEXT,

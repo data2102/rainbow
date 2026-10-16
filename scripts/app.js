@@ -281,7 +281,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 85;
+const APP_VERSION = 86;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -5705,6 +5705,11 @@ let rlDraw = null;        // 지금 화면에 올라와 있는 판
 let rlSpinning = false;
 let rlBusy = false;       // 서버에 묻는 중
 let rlAngle = { A: 0, B: 0 };
+/**
+ * 판에 그려 둔 차례. 서버가 준 순번 그대로 그리면 호스트가 늘 첫 조각이라
+ * 돌리기도 전에 어디 설지 보인다. 보여줄 때만 차례를 한 번 굴려 둔다.
+ */
+let rlWheel = { A: [], B: [] };
 let rlTimer = null;
 let rlLogPage = 1;
 let rlLogData = null;
@@ -5876,11 +5881,13 @@ function rlStagePre(draw) {
 
   for (const side of ['A', 'B']) {
     const list = side === 'A' ? draw.teamA : draw.teamB;
-    rlDrawWheel(side, list);
+    const cut = Math.floor(Math.random() * list.length);
+    rlWheel[side] = [...list.slice(cut), ...list.slice(0, cut)];
+    rlDrawWheel(side, rlWheel[side]);
     const host = document.getElementById('rlHost' + side);
     if (host) { host.textContent = '…'; host.classList.remove('hit'); }
-    // 호스트가 정해지기 전에는 명단만, 강조 없이
-    renderRlRoster(side, list, null);
+    // 순번은 판이 멈춘 뒤에 밝힌다 — 미리 보이면 돌릴 까닭이 없다
+    renderRlRoster(side, list, false);
     const badge = document.getElementById('rlFirst' + side);
     if (badge) badge.hidden = true;
   }
@@ -5892,14 +5899,21 @@ function rlStagePre(draw) {
   if (done) done.hidden = true;
 }
 
-function renderRlRoster(side, list, host) {
+/**
+ * 팀 명단. 적힌 차례가 곧 호스트 순번이다.
+ *
+ * 1번이 호스트를 못 잡는 일이 있어서 끝까지 번호를 매겨 둔다 —
+ * 그때마다 다시 돌리지 않고 다음 번호가 맡으면 된다.
+ * show 가 거짓이면 아직 돌리는 중이라 번호를 감춘다.
+ */
+function renderRlRoster(side, list, show) {
   const box = document.getElementById('rlRoster' + side);
   if (!box) return;
-  const rank = new Map(rlRanked().map((p, i) => [p.handle, i + 1]));
-  const pt = new Map(players.map(p => [p.handle, p.point]));
-  box.innerHTML = list.map(h => `<div class="rl-mem${h === host ? ' host' : ''}">
+  // 등수·점수는 적지 않는다. 팀은 이미 나뉘었고 여기서 볼 것은 호스트 차례뿐이다 —
+  // 숫자를 같이 두면 누가 센 팀인지 따지게 된다. (고를 때는 참가자 칸에 나온다)
+  box.innerHTML = list.map((h, i) => `<div class="rl-mem${show && i === 0 ? ' host' : ''}">
+      <span class="rl-ord${show ? '' : ' off'}">${show ? i + 1 : '·'}</span>
       <span>${esc(h)}</span>
-      <span class="rl-rk">${rank.get(h) || '-'}위 · ${pt.get(h) || 0}점</span>
     </div>`).join('');
 }
 
@@ -5920,7 +5934,7 @@ function rlStagePost() {
       void el.offsetWidth;
       el.classList.add('hit');
     }
-    renderRlRoster(side, side === 'A' ? d.teamA : d.teamB, host);
+    renderRlRoster(side, side === 'A' ? d.teamA : d.teamB, true);
     const badge = document.getElementById('rlFirst' + side);
     if (badge) badge.hidden = d.first !== side;
   }
@@ -5928,7 +5942,9 @@ function rlStagePost() {
   const line = document.getElementById('rlFirstLine');
   if (line) {
     const host = d.first === 'A' ? d.hostA : d.hostB;
-    line.innerHTML = `호스트는 <b>${esc(d.first)} Team · ${esc(host)}</b> 님이 먼저 잡습니다.`;
+    line.innerHTML = `호스트는 <b>${esc(d.first)} Team · ${esc(host)}</b> 님이 먼저 잡습니다.`
+      + `<div class="rl-first-sub">1번이 호스트를 못 잡으면 2번, 그래도 안 되면 3번 순서로 맡습니다 ·`
+      + ` 다시 돌릴 것 없습니다.</div>`;
     line.hidden = false;
   }
 
@@ -5976,8 +5992,8 @@ async function rlGo() {
     const slow = window.matchMedia
       && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     // 두 판을 동시에 돌린다 — 팀이 나뉘는 것과 호스트가 정해지는 것이 한 장면이다
-    rlSpinTo('A', rlDraw.teamA, rlDraw.hostA, slow);
-    rlSpinTo('B', rlDraw.teamB, rlDraw.hostB, slow);
+    rlSpinTo('A', rlWheel.A, rlDraw.hostA, slow);
+    rlSpinTo('B', rlWheel.B, rlDraw.hostB, slow);
     // 애니메이션 끝 신호가 오지 않아도(화면이 가려졌다거나) 멈춘 채 남지 않도록
     clearTimeout(rlTimer);
     rlTimer = setTimeout(rlStagePost, (slow ? 600 : RL_SPIN_MS) + 400);
@@ -6036,9 +6052,11 @@ function renderRlLog() {
   empty.hidden = rows.length > 0;
   if (d && d.total === 0) empty.textContent = '아직 뽑은 기록이 없습니다.';
 
-  const team = (name, list, host, first) =>
-    `<div><b>${name} Team</b> ${esc(list.join(', '))}`
-    + ` · 호스트 <b>${esc(host)}</b>${first ? ' <span class="first">(선)</span>' : ''}</div>`;
+  // 적힌 차례가 곧 호스트 순번이다. 1번이 못 잡았을 때 누가 맡았는지 보려면 이게 있어야 한다.
+  const team = (name, list, first) =>
+    `<div><b>${name} Team</b> `
+    + list.map((h, i) => `<span class="rl-log-ord">${i + 1}</span>${esc(h)}`).join(' ')
+    + `${first ? ' <span class="first">(선호스트)</span>' : ''}</div>`;
 
   box.innerHTML = rows.map(r => `<div class="rl-log-row">
       <div class="rl-log-top">
@@ -6048,8 +6066,8 @@ function renderRlLog() {
         <span class="rl-log-when">${esc(formatDateTime(r.ts))} · ${esc(r.by)}</span>
       </div>
       <div class="rl-log-team">
-        ${team('A', r.teamA, r.hostA, r.first === 'A')}
-        ${team('B', r.teamB, r.hostB, r.first === 'B')}
+        ${team('A', r.teamA, r.first === 'A')}
+        ${team('B', r.teamB, r.first === 'B')}
       </div>
       <span class="rl-log-res${r.result ? '' : ' wait'}">${r.result
         ? `${esc(r.result)} Team 승리 · ${esc(r.resultBy || '')}`
