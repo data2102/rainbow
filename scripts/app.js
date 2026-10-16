@@ -281,7 +281,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 86;
+const APP_VERSION = 87;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -5912,7 +5912,7 @@ function renderRlRoster(side, list, show) {
   // 등수·점수는 적지 않는다. 팀은 이미 나뉘었고 여기서 볼 것은 호스트 차례뿐이다 —
   // 숫자를 같이 두면 누가 센 팀인지 따지게 된다. (고를 때는 참가자 칸에 나온다)
   box.innerHTML = list.map((h, i) => `<div class="rl-mem${show && i === 0 ? ' host' : ''}">
-      <span class="rl-ord${show ? '' : ' off'}">${show ? i + 1 : '·'}</span>
+      <span class="rl-ord${show ? '' : ' off'}">${show ? (i + 1) + '순위' : '·'}</span>
       <span>${esc(h)}</span>
     </div>`).join('');
 }
@@ -5943,7 +5943,7 @@ function rlStagePost() {
   if (line) {
     const host = d.first === 'A' ? d.hostA : d.hostB;
     line.innerHTML = `호스트는 <b>${esc(d.first)} Team · ${esc(host)}</b> 님이 먼저 잡습니다.`
-      + `<div class="rl-first-sub">1번이 호스트를 못 잡으면 2번, 그래도 안 되면 3번 순서로 맡습니다 ·`
+      + `<div class="rl-first-sub">1순위가 호스트를 못 잡으면 2순위, 그래도 안 되면 3순위가 맡습니다 ·`
       + ` 다시 돌릴 것 없습니다.</div>`;
     line.hidden = false;
   }
@@ -6055,7 +6055,7 @@ function renderRlLog() {
   // 적힌 차례가 곧 호스트 순번이다. 1번이 못 잡았을 때 누가 맡았는지 보려면 이게 있어야 한다.
   const team = (name, list, first) =>
     `<div><b>${name} Team</b> `
-    + list.map((h, i) => `<span class="rl-log-ord">${i + 1}</span>${esc(h)}`).join(' ')
+    + list.map((h, i) => `<span class="rl-log-ord">${i + 1}.</span>${esc(h)}`).join(' ')
     + `${first ? ' <span class="first">(선호스트)</span>' : ''}</div>`;
 
   box.innerHTML = rows.map(r => `<div class="rl-log-row">

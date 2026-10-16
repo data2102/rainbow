@@ -1171,12 +1171,14 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .rl-mem.host{ background:var(--accent-bg); color:var(--text-primary); font-weight:var(--fw-bold); }
 /* 호스트 순번. 1번이 못 잡으면 2번이 맡는다 — 번호가 곧 차례다. */
 .rl-ord{
-  flex:none; width:18px; height:18px; border-radius:var(--radius-pill);
+  flex:none; min-width:42px; padding:1px var(--sp-2);
+  border-radius:var(--radius-pill);
   display:inline-flex; align-items:center; justify-content:center;
-  font-size:10px; font-weight:var(--fw-bold);
+  font-size:var(--fs-footnote); font-weight:var(--fw-bold);
   background:var(--border); color:var(--text-secondary);
 }
 .rl-mem.host .rl-ord{ background:var(--accent); color:var(--on-accent); }
+/* 아직 안 밝힌 차례 — 자리만 잡아둔다 */
 .rl-ord.off{ background:transparent; color:var(--text-disabled); }
 
 .rl-first-line{
@@ -1220,9 +1222,11 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .rl-log-when{ margin-left:auto; font-size:var(--fs-footnote); color:var(--text-tertiary); white-space:nowrap; }
 .rl-log-team{ margin-top:var(--sp-2); font-size:var(--fs-footnote); color:var(--text-tertiary); line-height:1.6; }
 .rl-log-team b{ color:var(--text-secondary); font-weight:var(--fw-medium); }
+/* 기록 줄의 호스트 순번. 여덟 명까지 들어가므로 '1순위' 를 다 적지 않고
+   번호만 점과 함께 둔다 — 이름에 붙어 읽히지 않을 만큼만. */
 .rl-log-ord{
-  display:inline-block; min-width:13px; margin-right:2px;
-  text-align:center; font-size:10px; font-weight:var(--fw-bold);
+  display:inline-block; margin-right:1px;
+  font-size:var(--fs-footnote); font-weight:var(--fw-bold);
   color:var(--text-disabled);
 }
 .rl-log-res{
@@ -4253,7 +4257,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 86;
+const APP_VERSION = 87;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -9884,7 +9888,7 @@ function renderRlRoster(side, list, show) {
   // 등수·점수는 적지 않는다. 팀은 이미 나뉘었고 여기서 볼 것은 호스트 차례뿐이다 —
   // 숫자를 같이 두면 누가 센 팀인지 따지게 된다. (고를 때는 참가자 칸에 나온다)
   box.innerHTML = list.map((h, i) => `<div class="rl-mem${show && i === 0 ? ' host' : ''}">
-      <span class="rl-ord${show ? '' : ' off'}">${show ? i + 1 : '·'}</span>
+      <span class="rl-ord${show ? '' : ' off'}">${show ? (i + 1) + '순위' : '·'}</span>
       <span>${esc(h)}</span>
     </div>`).join('');
 }
@@ -9915,7 +9919,7 @@ function rlStagePost() {
   if (line) {
     const host = d.first === 'A' ? d.hostA : d.hostB;
     line.innerHTML = `호스트는 <b>${esc(d.first)} Team · ${esc(host)}</b> 님이 먼저 잡습니다.`
-      + `<div class="rl-first-sub">1번이 호스트를 못 잡으면 2번, 그래도 안 되면 3번 순서로 맡습니다 ·`
+      + `<div class="rl-first-sub">1순위가 호스트를 못 잡으면 2순위, 그래도 안 되면 3순위가 맡습니다 ·`
       + ` 다시 돌릴 것 없습니다.</div>`;
     line.hidden = false;
   }
@@ -10027,7 +10031,7 @@ function renderRlLog() {
   // 적힌 차례가 곧 호스트 순번이다. 1번이 못 잡았을 때 누가 맡았는지 보려면 이게 있어야 한다.
   const team = (name, list, first) =>
     `<div><b>${name} Team</b> `
-    + list.map((h, i) => `<span class="rl-log-ord">${i + 1}</span>${esc(h)}`).join(' ')
+    + list.map((h, i) => `<span class="rl-log-ord">${i + 1}.</span>${esc(h)}`).join(' ')
     + `${first ? ' <span class="first">(선호스트)</span>' : ''}</div>`;
 
   box.innerHTML = rows.map(r => `<div class="rl-log-row">
