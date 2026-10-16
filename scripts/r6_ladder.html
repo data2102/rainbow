@@ -194,10 +194,17 @@
   /* 로고 빨강 — 원본 로고의 빨강. 상태색(--danger)과는 쓰임이 다르다. */
   --r6-red:            #e21b1b;
 
-  /* 룰렛 조각 — 여섯 색을 돌려 쓴다. 옆 조각과 붙어 보이지 않을 만큼만 다르게. */
-  --rl-1: #dbeafe;  --rl-2: #fde8ef;  --rl-3: #dcfce7;
-  --rl-4: #fef3c7;  --rl-5: #e9e3fb;  --rl-6: #d9f3f7;
-  --rl-ink: #1f2937;
+  /* 룰렛 조각 — 한 팀이 여덟 명까지이므로 여덟 색을 둔다. 같은 판에 같은 색이
+     두 번 나오지 않는다. 색마다 글자색을 따로 두는 까닭은, 밝은 색 위의 흰 글씨와
+     어두운 색 위의 검은 글씨가 둘 다 안 읽히기 때문이다. */
+  --rl-1: #e63946;  --rl-1-ink: #ffffff;   /* 빨강 */
+  --rl-2: #f77f00;  --rl-2-ink: #ffffff;   /* 주황 */
+  --rl-3: #fcbf49;  --rl-3-ink: #3d2b00;   /* 노랑 */
+  --rl-4: #2ec4b6;  --rl-4-ink: #06302c;   /* 민트 */
+  --rl-5: #118ab2;  --rl-5-ink: #ffffff;   /* 파랑 */
+  --rl-6: #7c5cff;  --rl-6-ink: #ffffff;   /* 보라 */
+  --rl-7: #ff6fb5;  --rl-7-ink: #4a0f2e;   /* 분홍 */
+  --rl-8: #8ac926;  --rl-8-ink: #1c2e05;   /* 연두 */
 }
 
 /* ============================================================
@@ -254,9 +261,15 @@
   /* 어두운 바탕에서는 같은 빨강이 가라앉아 한 단계 밝힌다 */
   --r6-red:            #ff2b2b;
 
-  --rl-1: #1e3a5f;  --rl-2: #4a2740;  --rl-3: #1d4038;
-  --rl-4: #4a3a12;  --rl-5: #332a52;  --rl-6: #123c44;
-  --rl-ink: #edeff4;
+  /* 어두운 바탕에서는 같은 색이 가라앉는다. 한 단계씩 밝혀 또렷하게. */
+  --rl-1: #ff5c69;  --rl-1-ink: #3d0007;
+  --rl-2: #ff9f2e;  --rl-2-ink: #3d2300;
+  --rl-3: #ffd166;  --rl-3-ink: #3d2b00;
+  --rl-4: #3ddbc9;  --rl-4-ink: #052e29;
+  --rl-5: #38b6e0;  --rl-5-ink: #042836;
+  --rl-6: #9b85ff;  --rl-6-ink: #19083f;
+  --rl-7: #ff8ac6;  --rl-7-ink: #4a0f2e;
+  --rl-8: #a8e034;  --rl-8-ink: #1c2e05;
 }
 
 /* ============================================================
@@ -1102,6 +1115,18 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   border-radius:var(--radius-sm); background:var(--surface);
 }
 .rl-tools .rl-search:focus{ outline:none; border-color:var(--accent); box-shadow:var(--shadow-focus); }
+/* 잘못 고른 뒤 전부 지우는 길. 작은 회색 글씨로 두었더니 아무도 못 찾아서
+   체크한 사람이 있을 때만 나타나는 또렷한 단추로 바꿨다. */
+.rl-clear{
+  flex:none; white-space:nowrap; font-family:inherit;
+  font-size:var(--fs-caption); font-weight:var(--fw-bold);
+  padding:var(--sp-2) var(--sp-4); border-radius:var(--radius-sm);
+  border:1px solid var(--danger); background:var(--danger-bg);
+  color:var(--danger-strong); cursor:pointer;
+  transition:background var(--dur-fast) var(--ease-standard);
+}
+.rl-clear:hover{ background:var(--danger); color:#fff; }
+.rl-clear:focus-visible{ outline:none; box-shadow:var(--shadow-focus-danger); }
 .rl-list{ max-height:280px; }
 .rl-empty{ padding:var(--sp-5); text-align:center; color:var(--text-tertiary); font-size:var(--fs-caption); }
 /* .pick-note 는 리폿 화면의 대진 숫자 밑에 붙으라고 위쪽 여백이 음수다.
@@ -1146,11 +1171,9 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 }
 /* 판은 뷰박스 한가운데를 축으로 돈다 */
 #rlSpinA, #rlSpinB{ transform-box:view-box; transform-origin:100px 100px; }
-.rl-slice{ stroke:var(--surface); stroke-width:.6; }
-.rl-name{
-  font-family:var(--font-sans); font-weight:var(--fw-bold);
-  fill:var(--rl-ink); pointer-events:none;
-}
+.rl-slice{ stroke:var(--surface); stroke-width:1.2; }
+/* 글자색은 조각 색에 맞춰 그릴 때 하나씩 넣는다 */
+.rl-name{ font-family:var(--font-sans); font-weight:var(--fw-bold); pointer-events:none; }
 .rl-host{
   display:flex; align-items:baseline; justify-content:center; gap:var(--sp-2);
   margin-top:var(--sp-3);
@@ -3177,11 +3200,10 @@ if (/[?&]room=\d+/.test(location.search)) {
       <div class="side-label">경기 규모 · Match Size</div>
       <div class="rl-sizes" id="rlSizes"></div>
 
-      <div class="side-label" style="margin-top:var(--sp-5);">
-        참가자 · Players<button type="button" class="pick-clear" id="rlNone" hidden>전체 해제</button>
-      </div>
+      <div class="side-label" style="margin-top:var(--sp-5);">참가자 · Players</div>
       <div class="rl-tools">
         <input type="search" id="rlSearch" class="rl-search" placeholder="아이디 검색" aria-label="참가자 검색">
+        <button type="button" class="rl-clear" id="rlNone" hidden>✕ 전체 해제</button>
       </div>
       <div class="checklist rl-list" id="rlList"></div>
 

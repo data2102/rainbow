@@ -281,7 +281,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 87;
+const APP_VERSION = 88;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -5696,7 +5696,7 @@ const RL_PICK_KEY = 'r6-host-pick';
 const RL_SIZE_KEY = 'r6-host-size';
 /** 조각이 이보다 많으면 이름이 겹친다 — 그때는 적지 않는다 */
 const RL_NAME_MAX = 16;
-const RL_SLICE_COLORS = 6;
+const RL_SLICE_COLORS = 8;   // 한 팀이 여덟 명까지라 같은 색이 겹치지 않는다
 const RL_SPIN_MS = 4600;
 
 let rlPicked = new Set();
@@ -5786,7 +5786,7 @@ function renderRlPick() {
   if (cnt) { cnt.textContent = `${n} / ${need}명`; cnt.classList.toggle('on', n > 0); }
 
   const clear = document.getElementById('rlNone');
-  if (clear) clear.hidden = !n;
+  if (clear) { clear.hidden = !n; clear.textContent = `✕ 전체 해제 ${n}명`; }
 
   const note = document.getElementById('rlNote');
   if (note) {
@@ -5829,8 +5829,9 @@ function rlDrawWheel(side, list) {
     return [(C + r * Math.cos(a)).toFixed(2), (C + r * Math.sin(a)).toFixed(2)];
   };
 
+  const hue = (i) => (i % RL_SLICE_COLORS) + 1;
   const parts = list.map((h, i) => {
-    const color = `var(--rl-${(i % RL_SLICE_COLORS) + 1})`;
+    const color = `var(--rl-${hue(i)})`;
     if (n === 1) return `<circle class="rl-slice" cx="${C}" cy="${C}" r="${R}" fill="${color}"/>`;
     const [x1, y1] = pt(i * step, R);
     const [x2, y2] = pt((i + 1) * step, R);
@@ -5849,6 +5850,7 @@ function rlDrawWheel(side, list) {
       const name = h.length > 11 ? h.slice(0, 10) + '…' : h;
       parts.push(`<g transform="translate(${C},${C}) rotate(${rot.toFixed(2)})">`
         + `<text class="rl-name" x="${x}" y="0" font-size="${size.toFixed(1)}"`
+        + ` fill="var(--rl-${hue(i)}-ink)"`
         + ` text-anchor="${flip ? 'start' : 'end'}" dominant-baseline="central">${esc(name)}</text></g>`);
     });
   }
