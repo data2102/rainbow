@@ -1147,18 +1147,25 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   border:1px solid var(--border); border-radius:var(--radius-md);
   background:var(--surface-sunken); padding:var(--sp-3);
 }
-.rl-team-h{ display:flex; align-items:center; gap:var(--sp-2); margin-bottom:var(--sp-2); }
+.rl-team-h{ margin-bottom:var(--sp-3); }
 .rl-team-n{
-  font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+  display:block; font-size:var(--fs-footnote); font-weight:var(--fw-bold);
   letter-spacing:.1em; color:var(--text-secondary);
 }
-/* 어느 팀이 호스트를 먼저 잡는가 — 한눈에 보여야 해서 여기만 빨갛다 */
+/* 어느 팀이 호스트를 먼저 잡는가.
+   팀 이름 옆에 작게 붙여뒀더니 눈에 안 들어온다고 해서 아랫줄로 내리고
+   채운 빨강으로 바꿨다. 한 팀에만 붙지만 두 칸의 높이는 같아야 룰렛이
+   나란히 서므로, 아닌 쪽은 자리만 비워둔다(.off). */
 .rl-first{
-  margin-left:auto; font-size:var(--fs-footnote); font-weight:var(--fw-bold);
-  padding:2px var(--sp-2); border-radius:var(--radius-sm);
-  background:var(--danger-bg); color:var(--danger-strong);
-  border:1px solid var(--danger);
+  display:block; margin-top:var(--sp-2);
+  text-align:center; font-size:var(--fs-caption); font-weight:var(--fw-bold);
+  padding:var(--sp-2) var(--sp-3); border-radius:var(--radius-sm);
+  background:var(--danger); color:#fff;
+  letter-spacing:.02em;
 }
+.rl-first.off{ visibility:hidden; }
+/* 다크에서 --danger 는 밝은 빨강이라 흰 글씨가 묻는다. 글씨를 어둡게 둔다. */
+:root[data-theme="dark"] .rl-first{ color:#3d0007; }
 .rl-wheel-wrap{ position:relative; width:100%; max-width:260px; margin:0 auto; aspect-ratio:1; }
 .rl-wheel{ width:100%; height:100%; display:block; }
 /* 바늘은 돌지 않는다. 12시에 고정해두고 판만 돌린다. */
@@ -1263,6 +1270,8 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 @media (max-width:620px){
   /* 좁으면 룰렛 두 개가 나란히 서지 못한다. 위아래로 쌓는다. */
   .rl-teams{ grid-template-columns:1fr; }
+  /* 위아래로 쌓이면 높이를 맞출 까닭이 없다. 빈 자리는 아예 접는다. */
+  .rl-first.off{ display:none; }
   .rl-win-btns{ flex-direction:column; }
 }
 @media (prefers-reduced-motion: reduce){
@@ -3202,8 +3211,8 @@ if (/[?&]room=\d+/.test(location.search)) {
 
       <div class="side-label" style="margin-top:var(--sp-5);">참가자 · Players</div>
       <div class="rl-tools">
-        <input type="search" id="rlSearch" class="rl-search" placeholder="아이디 검색" aria-label="참가자 검색">
         <button type="button" class="rl-clear" id="rlNone" hidden>✕ 전체 해제</button>
+        <input type="search" id="rlSearch" class="rl-search" placeholder="아이디 검색" aria-label="참가자 검색">
       </div>
       <div class="checklist rl-list" id="rlList"></div>
 
@@ -3224,7 +3233,7 @@ if (/[?&]room=\d+/.test(location.search)) {
         <div class="rl-team" data-team="A">
           <div class="rl-team-h">
             <span class="rl-team-n">A TEAM</span>
-            <span class="rl-first" id="rlFirstA" hidden>선호스트</span>
+            <span class="rl-first off" id="rlFirstA">선호스트 · 먼저 잡습니다</span>
           </div>
           <div class="rl-wheel-wrap">
             <div class="rl-pin" aria-hidden="true"></div>
@@ -3241,7 +3250,7 @@ if (/[?&]room=\d+/.test(location.search)) {
         <div class="rl-team" data-team="B">
           <div class="rl-team-h">
             <span class="rl-team-n">B TEAM</span>
-            <span class="rl-first" id="rlFirstB" hidden>선호스트</span>
+            <span class="rl-first off" id="rlFirstB">선호스트 · 먼저 잡습니다</span>
           </div>
           <div class="rl-wheel-wrap">
             <div class="rl-pin" aria-hidden="true"></div>

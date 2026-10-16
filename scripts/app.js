@@ -281,7 +281,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 88;
+const APP_VERSION = 89;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -5890,8 +5890,9 @@ function rlStagePre(draw) {
     if (host) { host.textContent = '…'; host.classList.remove('hit'); }
     // 순번은 판이 멈춘 뒤에 밝힌다 — 미리 보이면 돌릴 까닭이 없다
     renderRlRoster(side, list, false);
+    // 아직 모르니 둘 다 자리만 비워둔다 — 숨기면 두 칸 높이가 어긋난다
     const badge = document.getElementById('rlFirst' + side);
-    if (badge) badge.hidden = true;
+    if (badge) badge.classList.add('off');
   }
   const line = document.getElementById('rlFirstLine');
   if (line) line.hidden = true;
@@ -5938,7 +5939,7 @@ function rlStagePost() {
     }
     renderRlRoster(side, side === 'A' ? d.teamA : d.teamB, true);
     const badge = document.getElementById('rlFirst' + side);
-    if (badge) badge.hidden = d.first !== side;
+    if (badge) badge.classList.toggle('off', d.first !== side);
   }
 
   const line = document.getElementById('rlFirstLine');
