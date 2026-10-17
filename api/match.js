@@ -2,7 +2,7 @@ import { randomInt } from 'node:crypto';
 import {
   q, tx, body, methodGuard, requireUser, requireAdmin, audit,
   winGain, lossGain, lateGain, cleanReason, ensureMatchVoid,
-  ensureHostDraws, rowToDraw,
+  ensureHostDraws, rowToDraw, TEAM_NAMES,
 } from './_lib.js';
 import { ensureSeason } from './_season.js';
 
@@ -313,9 +313,15 @@ function winnerHandles(row) {
 
 /* ---------- 호스트 뽑기 ---------- */
 
-/** 한 팀 인원. 1:1 은 래더 경기가 아니고, 9:9 는 방이 안 찬다. */
+/**
+ * 한 팀 인원. 1:1 은 래더 경기가 아니다.
+ *
+ * 두 팀으로 나눌 때는 8:8 까지. 네 팀으로 나눌 때는 두 경기를 동시에 하므로
+ * 5:5 까지만 둔다 — 그 위는 스무 명이 넘어 한 자리에 모이지 않는다.
+ * (8:8 한 경기는 오래 걸려서 네 명씩 나눠 두 경기를 돌리고 싶다는 말에서 나왔다)
+ */
 const HOST_MIN = 2;
-const HOST_MAX = 8;
+const HOST_MAX = { 2: 8, 4: 5 };
 /** 한 쪽에 보여줄 기록 수 */
 const LOG_PER = 10;
 
@@ -355,55 +361,65 @@ const SPLIT_SLACK = 0.15;
  * '충분히 고른' 것들을 모아 그중에서 제비를 뽑는다. 몇 점 차이는 어차피
  * 경기에서 느껴지지 않고, 매번 다른 사람과 한 편이 되는 쪽이 낫다.
  */
-function splitTeams(rows) {
-  const half = rows.length / 2;
+function splitTeams(rows, groups) {
+  const per = rows.length / groups;
   const total = rows.reduce((n, p) => n + p.point, 0);
   // 점수가 전부 0인 달(새 시즌 첫날)에도 멈추지 않도록 바닥을 둔다
-  const slack = Math.max(2, Math.round((total / 2) * SPLIT_SLACK));
+  const slack = Math.max(2, Math.round((total / groups) * SPLIT_SLACK));
 
   let best = Infinity;
   const tries = [];
   for (let t = 0; t < SPLIT_TRIES; t++) {
-    const a = shuffle([...rows]).slice(0, half);
-    const sum = a.reduce((n, p) => n + p.point, 0);
-    const gap = Math.abs(sum - (total - sum));
-    if (gap < best) best = gap;
-    tries.push({ a, gap });
+    const mix = shuffle([...rows]);
+    const parts = [];
+    for (let g = 0; g < groups; g++) parts.push(mix.slice(g * per, (g + 1) * per));
+    const sums = parts.map(part => part.reduce((n, p) => n + p.point, 0));
+    // 팀이 셋 이상이면 '차이' 는 가장 센 팀과 가장 약한 팀의 사이다
+    const spread = Math.max(...sums) - Math.min(...sums);
+    if (spread < best) best = spread;
+    tries.push({ parts, spread });
   }
 
-  const fair = tries.filter(t => t.gap <= best + slack);
+  const fair = tries.filter(t => t.spread <= best + slack);
   const pick = fair[randomInt(fair.length)];
-  const aSet = new Set(pick.a.map(p => p.handle));
-  const ha = pick.a.map(p => p.handle);
-  const hb = rows.filter(p => !aSet.has(p.handle)).map(p => p.handle);
-  // A 가 늘 센 팀이면 이름이 뜻을 가져버린다. 라벨도 동전을 던져 바꾼다.
-  return randomInt(2) ? [ha, hb] : [hb, ha];
+  // 이름표도 섞어 붙인다. A 가 늘 센 팀이면 이름이 뜻을 가져버리고,
+  // 네 팀일 때는 A-B / C-D 로 붙으므로 대진까지 한쪽으로 쏠린다.
+  return shuffle(pick.parts).map(part => part.map(p => p.handle));
 }
 
 /**
- * POST {action:'host', size, entries}
- * 팀을 나누고 팀마다 호스트 순번을 매긴다. 선호스트도 여기서 정한다.
- * team_a·team_b 에 담긴 차례가 곧 호스트 순번이고, 맨 앞이 host_a·host_b 다.
+ * POST {action:'host', size, entries, teams}
  *
- * 팀도 호스트도 서버가 고른다. 화면에서 정해 올리게 두면 돌리는 사람이
- * 원하는 대로 짤 수 있고, 그러면 기록을 남기는 뜻이 없어진다.
+ * 팀을 나누고 팀마다 호스트 순번을 매긴다. 대진과 선호스트도 여기서 정한다.
+ * teams 가 2 면 A·B 한 경기, 4 면 A·B / C·D 두 경기를 동시에 한다.
+ *
+ * 팀도 순번도 서버가 고른다. 화면에서 짜 올리게 두면 돌리는 사람이 원하는
+ * 대로 만들 수 있고, 그러면 기록을 남기는 뜻이 없어진다.
  */
 async function hostDraw(req, res, b) {
   const me = await requireUser(req, res);
   if (!me) return;
 
+  const teams = b.teams == null ? 2 : Number(b.teams);
+  if (teams !== 2 && teams !== 4) {
+    return res.status(400).json({ error: '두 팀 또는 네 팀으로만 나눌 수 있습니다.' });
+  }
+  const max = HOST_MAX[teams];
   const size = Number(b.size);
-  if (!Number.isInteger(size) || size < HOST_MIN || size > HOST_MAX) {
-    return res.status(400).json({ error: `${HOST_MIN}:${HOST_MIN} 부터 ${HOST_MAX}:${HOST_MAX} 까지 고를 수 있습니다.` });
+  if (!Number.isInteger(size) || size < HOST_MIN || size > max) {
+    return res.status(400).json({
+      error: `${teams}팀으로 나눌 때는 ${HOST_MIN}:${HOST_MIN} 부터 ${max}:${max} 까지 고를 수 있습니다.`,
+    });
   }
   const entries = Array.isArray(b.entries) ? b.entries.map(String) : null;
   if (!entries) return res.status(400).json({ error: '참가자 목록이 올바르지 않습니다.' });
   if (new Set(entries).size !== entries.length) {
     return res.status(400).json({ error: '같은 사람이 두 번 들어 있습니다.' });
   }
-  if (entries.length !== size * 2) {
+  const need = size * teams;
+  if (entries.length !== need) {
     return res.status(400).json({
-      error: `${size}:${size} 경기는 ${size * 2}명을 골라야 합니다 · 지금 ${entries.length}명입니다.`,
+      error: `${size}:${size} ${teams}팀은 ${need}명을 골라야 합니다 · 지금 ${entries.length}명입니다.`,
     });
   }
 
@@ -420,28 +436,39 @@ async function hostDraw(req, res, b) {
       if (missing.length) throw new Error('명단에 없는 선수입니다: ' + missing.join(', '));
 
       // 팀 안의 차례를 섞는다. 이 순서가 곧 호스트 순번이다 —
-      // 1번이 호스트를 못 잡으면 2번, 그래도 안 되면 3번이 맡는다.
-      // 다시 뽑지 않아도 되도록 처음부터 끝까지 정해 둔다.
-      const [splitA, splitB] = splitTeams(rows);
-      const teamA = shuffle(splitA);
-      const teamB = shuffle(splitB);
-      const hostA = teamA[0];
-      const hostB = teamB[0];
-      const first = randomInt(2) ? 'A' : 'B';
-      const ts = Date.now();
+      // 1순위가 호스트를 못 잡으면 2순위, 그래도 안 되면 3순위가 맡는다.
+      const parts = splitTeams(rows, teams);
+      const names = TEAM_NAMES.slice(0, teams);
+      const teamRows = parts.map((handles, i) => ({ name: names[i], order: shuffle([...handles]) }));
 
+      // 앞에서부터 둘씩 붙여 대진을 만든다. 이름표를 이미 섞었으므로 어느 팀이
+      // 어느 팀과 붙을지도 여기서 갈린다.
+      const pairs = [];
+      for (let i = 0; i < teams; i += 2) {
+        pairs.push({
+          a: names[i], b: names[i + 1],
+          first: randomInt(2) ? names[i] : names[i + 1],
+          result: null, matchId: null, by: null, at: null,
+        });
+      }
+
+      const ts = Date.now();
       const ins = await c.query(
         `INSERT INTO host_draws
-           (ts, size, team_a, team_b, host_a, host_b, first_team, drawn_by, season)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-        [ts, size, JSON.stringify(teamA), JSON.stringify(teamB),
-         hostA, hostB, first, me, season.current ? season.current.id : null]
+           (ts, size, team_a, team_b, host_a, host_b, first_team, drawn_by, season, teams, pairs)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+        [ts, size,
+         // 옛 칸은 비워둘 수 없다. 앞의 두 팀을 그대로 적어 둔다.
+         JSON.stringify(teamRows[0].order), JSON.stringify(teamRows[1].order),
+         teamRows[0].order[0], teamRows[1].order[0], pairs[0].first,
+         me, season.current ? season.current.id : null,
+         JSON.stringify(teamRows), JSON.stringify(pairs)]
       );
       return rowToDraw(ins.rows[0]);
     });
 
-    await audit(me, 'host_draw', { id: out.id, size, teamA: out.teamA, teamB: out.teamB,
-      hostA: out.hostA, hostB: out.hostB, first: out.first });
+    await audit(me, 'host_draw', { id: out.id, size, teams, pairs: out.pairs,
+      order: out.teams.map(t => `${t.name}:${t.order.join('>')}`) });
     res.status(200).json({ ok: true, draw: out });
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -449,8 +476,10 @@ async function hostDraw(req, res, b) {
 }
 
 /**
- * POST {action:'hostResult', id, winner:'A'|'B'}
+ * POST {action:'hostResult', id, pair, winner}
+ *
  * 나눠준 팀 그대로 승패를 매긴다. 점수 계산은 리폿과 같은 길을 쓴다.
+ * 네 팀이면 경기가 둘이므로 pair 로 어느 경기인지 가린다.
  */
 async function hostResult(req, res, b) {
   const me = await requireUser(req, res);
@@ -461,9 +490,7 @@ async function hostResult(req, res, b) {
     return res.status(400).json({ error: '어떤 판인지 알 수 없습니다.' });
   }
   const winner = String(b.winner || '').toUpperCase();
-  if (winner !== 'A' && winner !== 'B') {
-    return res.status(400).json({ error: '이긴 팀을 골라주세요.' });
-  }
+  const at = b.pair == null ? 0 : Number(b.pair);
 
   try {
     await ensureHostDraws();
@@ -472,22 +499,35 @@ async function hostResult(req, res, b) {
       const { rows } = await c.query(`SELECT * FROM host_draws WHERE id = $1 FOR UPDATE`, [id]);
       if (!rows.length) throw new Error('없는 판입니다.');
       const d = rowToDraw(rows[0]);
-      if (d.result) throw new Error('이미 결과를 올린 판입니다.');
 
-      const winners = winner === 'A' ? d.teamA : d.teamB;
-      const losers = winner === 'A' ? d.teamB : d.teamA;
+      const pair = d.pairs[at];
+      if (!pair) throw new Error('없는 경기입니다.');
+      if (pair.result) throw new Error('이미 결과를 올린 경기입니다.');
+      if (winner !== pair.a && winner !== pair.b) {
+        throw new Error('이긴 팀을 골라주세요.');
+      }
+
+      const order = (name) => (d.teams.find(t => t.name === name) || { order: [] }).order;
+      const winners = order(winner);
+      const losers = order(winner === pair.a ? pair.b : pair.a);
       const r = await recordCore(c, me, winners, losers, []);
 
-      await c.query(
-        `UPDATE host_draws SET result = $1, match_id = $2, result_by = $3, result_ts = $4
-          WHERE id = $5`,
-        [winner, r.matchId, me, r.ts, id]
-      );
-      return { ...r, winners, losers };
+      const next = d.pairs.map((p, i) => i !== at ? p
+        : { ...p, result: winner, matchId: r.matchId, by: me, at: r.ts });
+      await c.query(`UPDATE host_draws SET pairs = $1 WHERE id = $2`, [JSON.stringify(next), id]);
+      // 두 팀짜리는 옛 칸도 맞춰 둔다 — 그 칸만 보는 자리가 아직 있을 수 있다
+      if (d.teams.length === 2) {
+        await c.query(
+          `UPDATE host_draws SET result = $1, match_id = $2, result_by = $3, result_ts = $4
+            WHERE id = $5`,
+          [winner, r.matchId, me, r.ts, id]
+        );
+      }
+      return { ...r, winners, losers, pairs: next };
     });
 
-    await audit(me, 'host_result', { id, winner, winners: out.winners, losers: out.losers });
-    res.status(200).json({ ok: true, winnerResults: out.winnerResults, ts: out.ts });
+    await audit(me, 'host_result', { id, pair: at, winner, winners: out.winners, losers: out.losers });
+    res.status(200).json({ ok: true, winnerResults: out.winnerResults, ts: out.ts, pairs: out.pairs });
   } catch (e) {
     res.status(400).json({ error: e.message });
   }
@@ -545,7 +585,13 @@ async function hostClear(req, res, b) {
       });
     }
 
-    const withResult = await q(`SELECT count(*)::int AS n FROM host_draws WHERE result IS NOT NULL`);
+    // 네 팀짜리는 결과가 pairs 안에 들어 있다. 옛 칸만 보면 세지 못한다.
+    const withResult = await q(
+      `SELECT count(*)::int AS n FROM host_draws
+        WHERE result IS NOT NULL
+           OR EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(pairs, '[]'::jsonb)) e
+                       WHERE e->>'result' IS NOT NULL)`
+    );
     await q(`DELETE FROM host_draws`);
     await audit(me, 'host_clear', { removed: n, withResult: withResult[0].n });
     res.status(200).json({ ok: true, removed: n, withResult: withResult[0].n });

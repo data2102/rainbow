@@ -281,7 +281,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 91;
+const APP_VERSION = 92;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -5685,31 +5685,35 @@ async function handleImportFile(e) {
 /* ---------- 호스트 룰렛 ---------- */
 
 /**
- * 판을 짜고 팀마다 호스트를 뽑는다.
+ * 판을 짜고 팀마다 호스트 순번을 매긴다.
  *
- * 팀 나누기도 호스트도 서버가 정한다. 화면에서 정해 올리게 두면 돌리는
- * 사람이 원하는 대로 짤 수 있고, 그러면 기록을 남기는 뜻이 없어진다.
- * 화면이 하는 일은 서버가 준 답에 판을 맞춰 세우는 것뿐이다.
+ * 두 팀(A·B)으로 한 경기를 하거나, 네 팀(A·B / C·D)으로 두 경기를 동시에 한다.
+ * 8:8 한 경기는 사람이 많아 오래 걸려서, 열여섯이 모이면 네 명씩 나눠
+ * 두 경기를 돌리고 싶다는 말에서 나온 길이다.
+ *
+ * 팀도 순번도 서버가 정한다. 화면이 하는 일은 서버가 준 답에 판을 맞춰
+ * 세우는 것뿐이다 — 그래야 돌린 사람이 짜 넣을 수 없다.
  */
-const RL_SIZES = [2, 3, 4, 5, 6, 7, 8];
+const RL_TEAM_OPTIONS = [2, 4];
+/** 팀 수마다 고를 수 있는 한 팀 인원 */
+const RL_SIZES = { 2: [2, 3, 4, 5, 6, 7, 8], 4: [2, 3, 4, 5] };
 const RL_PICK_KEY = 'r6-host-pick';
 const RL_SIZE_KEY = 'r6-host-size';
+const RL_TEAMS_KEY = 'r6-host-teams';
 /** 조각이 이보다 많으면 이름이 겹친다 — 그때는 적지 않는다 */
 const RL_NAME_MAX = 16;
 const RL_SLICE_COLORS = 8;   // 한 팀이 여덟 명까지라 같은 색이 겹치지 않는다
 const RL_SPIN_MS = 4600;
 
 let rlPicked = new Set();
+let rlTeamCount = 2;
 let rlSize = 4;
 let rlDraw = null;        // 지금 화면에 올라와 있는 판
 let rlSpinning = false;
 let rlBusy = false;       // 서버에 묻는 중
-let rlAngle = { A: 0, B: 0 };
-/**
- * 판에 그려 둔 차례. 서버가 준 순번 그대로 그리면 호스트가 늘 첫 조각이라
- * 돌리기도 전에 어디 설지 보인다. 보여줄 때만 차례를 한 번 굴려 둔다.
- */
-let rlWheel = { A: [], B: [] };
+/** 판에 그려 둔 차례와 돌린 각도. 팀 이름을 열쇠로 쓴다. */
+let rlWheel = {};
+let rlAngle = {};
 let rlTimer = null;
 let rlLogPage = 1;
 let rlLogData = null;
@@ -5744,16 +5748,26 @@ function rlShown() {
     || String(p.clan || '').toLowerCase().includes(term));
 }
 
-function rlNeed() { return rlSize * 2; }
+/** 지금 고른 짜임에 필요한 인원 */
+function rlNeed() { return rlSize * rlTeamCount; }
 
 /* ---- 판 짜기 화면 ---- */
+
+function renderRlTeams() {
+  const box = document.getElementById('rlTeams');
+  if (!box) return;
+  const label = { 2: '2팀 · A·B 한 경기', 4: '4팀 · A·B / C·D 두 경기' };
+  box.innerHTML = RL_TEAM_OPTIONS.map(n =>
+    `<button type="button" class="rl-size rl-wide${n === rlTeamCount ? ' on' : ''}" data-teams="${n}"
+       aria-pressed="${n === rlTeamCount}">${label[n]}</button>`).join('');
+}
 
 function renderRlSizes() {
   const box = document.getElementById('rlSizes');
   if (!box) return;
-  box.innerHTML = RL_SIZES.map(n =>
+  box.innerHTML = RL_SIZES[rlTeamCount].map(n =>
     `<button type="button" class="rl-size${n === rlSize ? ' on' : ''}" data-size="${n}"
-       ${n === rlSize ? 'aria-pressed="true"' : 'aria-pressed="false"'}>${n}:${n}</button>`
+       aria-pressed="${n === rlSize}">${n}:${n}<span class="rl-size-n">${n * rlTeamCount}명</span></button>`
   ).join('');
 }
 
@@ -5790,20 +5804,22 @@ function renderRlPick() {
 
   const note = document.getElementById('rlNote');
   if (note) {
+    const how = rlTeamCount === 2 ? 'A·B 두 팀' : 'A·B·C·D 네 팀';
     if (!me) note.textContent = '로그인하면 룰렛을 돌릴 수 있습니다.';
-    else if (n < need) note.textContent = `${rlSize}:${rlSize} 경기는 ${need}명이 필요합니다 · ${need - n}명 더 체크해주세요.`;
-    else note.textContent = `${need}명이 모였습니다 · 돌리면 A·B 팀과 팀별 호스트가 한 번에 정해집니다.`;
-    note.classList.toggle('warn', !!me && n > need);
+    else if (n < need) note.textContent = `${rlSize}:${rlSize} ${rlTeamCount}팀은 ${need}명이 필요합니다 · ${need - n}명 더 체크해주세요.`;
+    else note.textContent = `${need}명이 모였습니다 · 돌리면 ${how}과 팀별 호스트가 한 번에 정해집니다.`;
   }
 
   const go = document.getElementById('rlGo');
   if (go) {
     go.disabled = !me || rlBusy || rlSpinning || n !== need;
-    go.textContent = rlBusy ? '나누는 중…' : (rlSpinning ? '돌리는 중…' : '팀 나누고 룰렛 돌리기');
+    go.textContent = rlBusy ? '나누는 중…'
+      : (rlSpinning ? '돌리는 중…' : `${rlTeamCount}팀으로 나누고 룰렛 돌리기`);
   }
 }
 
 function renderRoulette() {
+  renderRlTeams();
   renderRlSizes();
   renderRlList();
   renderRlPick();
@@ -5815,8 +5831,8 @@ function renderRoulette() {
  * 한 팀의 판을 그린다. 12시에서 시계 방향으로 한 조각씩, 모두 같은 크기다.
  * 조각이 같아야 확률이 같다는 것이 눈으로 보인다.
  */
-function rlDrawWheel(side, list) {
-  const g = document.getElementById('rlSpin' + side);
+function rlDrawWheel(name, list) {
+  const g = document.getElementById('rlSpin' + name);
   if (!g) return;
   const n = list.length;
   const C = 100, R = 92;
@@ -5828,8 +5844,8 @@ function rlDrawWheel(side, list) {
     const a = (deg - 90) * Math.PI / 180;
     return [(C + r * Math.cos(a)).toFixed(2), (C + r * Math.sin(a)).toFixed(2)];
   };
-
   const hue = (i) => (i % RL_SLICE_COLORS) + 1;
+
   const parts = list.map((h, i) => {
     const color = `var(--rl-${hue(i)})`;
     if (n === 1) return `<circle class="rl-slice" cx="${C}" cy="${C}" r="${R}" fill="${color}"/>`;
@@ -5847,19 +5863,19 @@ function rlDrawWheel(side, list) {
       const flip = mid > 180;
       const rot = flip ? mid + 90 : mid - 90;
       const x = flip ? -(R - 7) : (R - 7);
-      const name = h.length > 11 ? h.slice(0, 10) + '…' : h;
+      const nm = h.length > 11 ? h.slice(0, 10) + '…' : h;
       parts.push(`<g transform="translate(${C},${C}) rotate(${rot.toFixed(2)})">`
         + `<text class="rl-name" x="${x}" y="0" font-size="${size.toFixed(1)}"`
         + ` fill="var(--rl-${hue(i)}-ink)"`
-        + ` text-anchor="${flip ? 'start' : 'end'}" dominant-baseline="central">${esc(name)}</text></g>`);
+        + ` text-anchor="${flip ? 'start' : 'end'}" dominant-baseline="central">${esc(nm)}</text></g>`);
     });
   }
   g.innerHTML = parts.join('');
 }
 
 /** 그 사람이 바늘 아래 서도록 판을 돌린다 */
-function rlSpinTo(side, list, winner, slow) {
-  const g = document.getElementById('rlSpin' + side);
+function rlSpinTo(name, list, winner, slow) {
+  const g = document.getElementById('rlSpin' + name);
   if (!g) return;
   const n = list.length;
   const i = Math.max(0, list.indexOf(winner));
@@ -5867,50 +5883,83 @@ function rlSpinTo(side, list, winner, slow) {
   // 조각 한가운데에서 조금 비켜 세운다 — 매번 같은 자리에 서면 짜여 보인다
   const mid = i * step + step / 2 + (Math.random() - 0.5) * step * 0.6;
   const turns = slow ? 0 : 5 + Math.floor(Math.random() * 3);
-  const need = (360 - ((rlAngle[side] + mid) % 360) + 360) % 360;
-  rlAngle[side] += turns * 360 + need;
+  const cur = rlAngle[name] || 0;
+  const need = (360 - ((cur + mid) % 360) + 360) % 360;
+  rlAngle[name] = cur + turns * 360 + need;
 
   g.style.transition = `transform ${(slow ? 600 : RL_SPIN_MS) / 1000}s cubic-bezier(.16,.68,.2,1)`;
-  g.style.transform = `rotate(${rlAngle[side]}deg)`;
+  g.style.transform = `rotate(${rlAngle[name]}deg)`;
 }
 
-/** 돌리기 전 — 이름칸을 비우고 판만 보여준다 */
+/** 팀 한 칸 */
+function rlTeamHtml(name) {
+  return `<div class="rl-team" data-team="${name}">
+    <div class="rl-team-h">
+      <span class="rl-team-n">${name} TEAM</span>
+      <span class="rl-first off" id="rlFirst${name}">선호스트 · 먼저 잡습니다</span>
+    </div>
+    <div class="rl-wheel-wrap">
+      <div class="rl-pin" aria-hidden="true"></div>
+      <svg class="rl-wheel" viewBox="0 0 200 200" role="img" aria-label="${name}팀 호스트 룰렛">
+        <g class="rl-spin" id="rlSpin${name}"></g>
+        <circle cx="100" cy="100" r="95" fill="none" stroke="var(--border-strong)" stroke-width="2"/>
+        <circle cx="100" cy="100" r="15" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="2"/>
+      </svg>
+    </div>
+    <div class="rl-host"><span class="rl-host-k">HOST</span><b id="rlHost${name}">…</b></div>
+    <div class="rl-roster" id="rlRoster${name}"></div>
+  </div>`;
+}
+
+/** 돌리기 전 — 자리를 짓고 이름칸을 비운 채 판만 보여준다 */
 function rlStagePre(draw) {
   const stage = document.getElementById('rlStage');
-  if (stage) stage.hidden = false;
+  const box = document.getElementById('rlMatches');
+  if (!stage || !box) return;
+  stage.hidden = false;
   const when = document.getElementById('rlWhen');
   if (when) when.textContent = `${formatDateTime(draw.ts)} · ${draw.by} 님이 돌림`;
 
-  for (const side of ['A', 'B']) {
-    const list = side === 'A' ? draw.teamA : draw.teamB;
-    const cut = Math.floor(Math.random() * list.length);
-    rlWheel[side] = [...list.slice(cut), ...list.slice(0, cut)];
-    rlDrawWheel(side, rlWheel[side]);
-    const host = document.getElementById('rlHost' + side);
-    if (host) { host.textContent = '…'; host.classList.remove('hit'); }
+  const many = draw.pairs.length > 1;
+  box.innerHTML = draw.pairs.map((p, i) => `<div class="rl-match">
+      ${many ? `<div class="rl-match-h">${i + 1}경기 · ${p.a} vs ${p.b}</div>` : ''}
+      <div class="rl-teams">${rlTeamHtml(p.a)}${rlTeamHtml(p.b)}</div>
+      <div class="rl-first-line" id="rlFirstLine${i}" hidden></div>
+      <div class="rl-finish" data-pair="${i}" hidden>
+        <div class="side-label">경기 결과 · Report</div>
+        <div class="foot-note" style="margin-top:0;margin-bottom:10px;">
+          나눠준 팀 그대로 점수가 들어갑니다 · 리폿 탭에 쓰는 것과 같은 기록이라 <b>두 번 쓰지 마세요</b>.
+        </div>
+        <div class="rl-win-btns">
+          <button type="button" class="btn-mini rl-win" data-win="${p.a}">${p.a} Team 승리</button>
+          <button type="button" class="btn-mini rl-win" data-win="${p.b}">${p.b} Team 승리</button>
+        </div>
+      </div>
+      <div class="rl-done" id="rlDone${i}" hidden></div>
+    </div>`).join('');
+
+  rlAngle = {};
+  rlWheel = {};
+  for (const t of draw.teams) {
+    // 판에 그리는 차례는 한 번 굴려 둔다. 순번 그대로 그리면 호스트가 늘
+    // 첫 조각이라 돌리기도 전에 어디 설지 보인다.
+    const cut = Math.floor(Math.random() * t.order.length);
+    rlWheel[t.name] = [...t.order.slice(cut), ...t.order.slice(0, cut)];
+    rlDrawWheel(t.name, rlWheel[t.name]);
     // 순번은 판이 멈춘 뒤에 밝힌다 — 미리 보이면 돌릴 까닭이 없다
-    renderRlRoster(side, list, false);
-    // 아직 모르니 둘 다 자리만 비워둔다 — 숨기면 두 칸 높이가 어긋난다
-    const badge = document.getElementById('rlFirst' + side);
-    if (badge) badge.classList.add('off');
+    renderRlRoster(t.name, t.order, false);
   }
-  const line = document.getElementById('rlFirstLine');
-  if (line) line.hidden = true;
-  const fin = document.getElementById('rlFinish');
-  if (fin) fin.hidden = true;
-  const done = document.getElementById('rlDone');
-  if (done) done.hidden = true;
 }
 
 /**
  * 팀 명단. 적힌 차례가 곧 호스트 순번이다.
  *
- * 1번이 호스트를 못 잡는 일이 있어서 끝까지 번호를 매겨 둔다 —
- * 그때마다 다시 돌리지 않고 다음 번호가 맡으면 된다.
- * show 가 거짓이면 아직 돌리는 중이라 번호를 감춘다.
+ * 1순위가 호스트를 못 잡는 일이 있어서 끝까지 번호를 매겨 둔다 —
+ * 그때마다 다시 돌리지 않고 다음 순위가 맡으면 된다.
+ * show 가 거짓이면 아직 돌리는 중이라 순번을 감춘다.
  */
-function renderRlRoster(side, list, show) {
-  const box = document.getElementById('rlRoster' + side);
+function renderRlRoster(name, list, show) {
+  const box = document.getElementById('rlRoster' + name);
   if (!box) return;
   // 등수·점수는 적지 않는다. 팀은 이미 나뉘었고 여기서 볼 것은 호스트 차례뿐이다 —
   // 숫자를 같이 두면 누가 센 팀인지 따지게 된다. (고를 때는 참가자 칸에 나온다)
@@ -5928,45 +5977,59 @@ function rlStagePost() {
   const d = rlDraw;
   if (!d) { renderRlPick(); return; }
 
-  for (const side of ['A', 'B']) {
-    const host = side === 'A' ? d.hostA : d.hostB;
-    const el = document.getElementById('rlHost' + side);
+  for (const t of d.teams) {
+    const el = document.getElementById('rlHost' + t.name);
     if (el) {
-      el.textContent = host;
+      el.textContent = t.order[0];
       el.classList.remove('hit');
       void el.offsetWidth;
       el.classList.add('hit');
     }
-    renderRlRoster(side, side === 'A' ? d.teamA : d.teamB, true);
-    const badge = document.getElementById('rlFirst' + side);
-    if (badge) badge.classList.toggle('off', d.first !== side);
+    renderRlRoster(t.name, t.order, true);
   }
 
-  const line = document.getElementById('rlFirstLine');
-  if (line) {
-    const host = d.first === 'A' ? d.hostA : d.hostB;
-    line.innerHTML = `호스트는 <b>${esc(d.first)} Team · ${esc(host)}</b> 님이 먼저 잡습니다.`
-      + `<div class="rl-first-sub">1순위가 호스트를 못 잡으면 2순위, 그래도 안 되면 3순위가 맡습니다 ·`
-      + ` 다시 돌릴 것 없습니다.</div>`;
-    line.hidden = false;
-  }
+  d.pairs.forEach((p, i) => {
+    for (const name of [p.a, p.b]) {
+      const badge = document.getElementById('rlFirst' + name);
+      if (badge) badge.classList.toggle('off', p.first !== name);
+    }
+    const line = document.getElementById('rlFirstLine' + i);
+    if (line) {
+      const host = rlHostOf(d, p.first);
+      line.innerHTML = `호스트는 <b>${esc(p.first)} Team · ${esc(host)}</b> 님이 먼저 잡습니다.`
+        + `<div class="rl-first-sub">1순위가 호스트를 못 잡으면 2순위, 그래도 안 되면 3순위가 맡습니다 ·`
+        + ` 다시 돌릴 것 없습니다.</div>`;
+      line.hidden = false;
+    }
+    rlShowResult(i);
+  });
 
-  rlShowResult(d);
   renderRlPick();
-  showToast(`${d.first} Team 이 먼저 · A ${d.hostA} / B ${d.hostB}`);
+  const tell = d.pairs.map(p => `${p.first} 먼저`).join(' · ');
+  showToast(`팀을 나눴습니다 · ${tell}`);
+}
+
+/** 그 팀의 1순위 */
+function rlHostOf(d, name) {
+  const t = d.teams.find(x => x.name === name);
+  return t ? t.order[0] : '';
 }
 
 /** 결과 등록 칸 — 아직이면 버튼, 끝났으면 적어둔 결과 */
-function rlShowResult(d) {
-  const fin = document.getElementById('rlFinish');
-  const done = document.getElementById('rlDone');
-  if (!fin || !done) return;
-  if (d.result) {
+function rlShowResult(i) {
+  const d = rlDraw;
+  if (!d) return;
+  const p = d.pairs[i];
+  const fin = document.querySelector(`.rl-finish[data-pair="${i}"]`);
+  const done = document.getElementById('rlDone' + i);
+  if (!p || !fin || !done) return;
+
+  if (p.result) {
     fin.hidden = true;
     done.hidden = false;
-    done.innerHTML = `경기 결과: <b>${esc(d.result)} Team 승리</b>`
-      + ` · ${esc(d.resultBy || '')} 님이 등록`
-      + (d.resultTs ? ` · ${esc(formatDateTime(d.resultTs))}` : '');
+    done.innerHTML = `경기 결과: <b>${esc(p.result)} Team 승리</b>`
+      + ` · ${esc(p.by || '')} 님이 등록`
+      + (p.at ? ` · ${esc(formatDateTime(p.at))}` : '');
     return;
   }
   done.hidden = true;
@@ -5984,7 +6047,9 @@ async function rlGo() {
   rlBusy = true;
   renderRlPick();
   try {
-    const r = await apiPost('/api/match', { action: 'host', size: rlSize, entries });
+    const r = await apiPost('/api/match', {
+      action: 'host', size: rlSize, teams: rlTeamCount, entries,
+    });
     rlDraw = r.draw;
     rlBusy = false;
     rlSpinning = true;
@@ -5994,9 +6059,8 @@ async function rlGo() {
 
     const slow = window.matchMedia
       && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    // 두 판을 동시에 돌린다 — 팀이 나뉘는 것과 호스트가 정해지는 것이 한 장면이다
-    rlSpinTo('A', rlWheel.A, rlDraw.hostA, slow);
-    rlSpinTo('B', rlWheel.B, rlDraw.hostB, slow);
+    // 판을 모두 한꺼번에 돌린다 — 팀이 나뉘는 것과 호스트가 정해지는 것이 한 장면이다
+    for (const t of rlDraw.teams) rlSpinTo(t.name, rlWheel[t.name], t.order[0], slow);
     // 애니메이션 끝 신호가 오지 않아도(화면이 가려졌다거나) 멈춘 채 남지 않도록
     clearTimeout(rlTimer);
     rlTimer = setTimeout(rlStagePost, (slow ? 600 : RL_SPIN_MS) + 400);
@@ -6009,19 +6073,26 @@ async function rlGo() {
   }
 }
 
-async function rlReport(winner) {
-  if (!rlDraw || rlDraw.result || rlBusy) return;
+async function rlReport(i, winner) {
+  if (!rlDraw || rlBusy) return;
+  const p = rlDraw.pairs[i];
+  if (!p || p.result) return;
   const n = rlDraw.size;
-  if (!confirm(`${winner} Team 승리로 기록합니다.\n${n}:${n} · 점수가 바로 반영되고 되돌리려면 관리자가 취소해야 합니다.\n계속할까요?`)) return;
+  const which = rlDraw.pairs.length > 1 ? `${i + 1}경기 · ` : '';
+  if (!confirm(`${which}${winner} Team 승리로 기록합니다.\n${n}:${n} · 점수가 바로 반영되고 되돌리려면 관리자가 취소해야 합니다.\n계속할까요?`)) return;
 
   rlBusy = true;
-  rlShowResult(rlDraw);
+  rlShowResult(i);
   try {
-    await apiPost('/api/match', { action: 'hostResult', id: rlDraw.id, winner });
-    rlDraw = { ...rlDraw, result: winner, resultBy: me.handle, resultTs: Date.now() };
+    await apiPost('/api/match', { action: 'hostResult', id: rlDraw.id, pair: i, winner });
+    rlDraw = {
+      ...rlDraw,
+      pairs: rlDraw.pairs.map((x, k) => k !== i ? x
+        : { ...x, result: winner, by: me.handle, at: Date.now() }),
+    };
     rlBusy = false;
-    rlShowResult(rlDraw);
-    showToast(`${winner} Team 승리로 기록했습니다`);
+    rlShowResult(i);
+    showToast(`${which}${winner} Team 승리로 기록했습니다`);
     await Promise.all([
       loadState().then(() => { renderStanding(); renderTop5(); }),
       loadRlLog(1),
@@ -6029,7 +6100,7 @@ async function rlReport(winner) {
     renderRoulette();
   } catch (e) {
     rlBusy = false;
-    rlShowResult(rlDraw);
+    rlShowResult(i);
     showToast('기록 실패: ' + e.message);
   }
 }
@@ -6053,29 +6124,34 @@ function renderRlLog() {
   const d = rlLogData;
   const rows = (d && d.draws) || [];
   empty.hidden = rows.length > 0;
-  if (d && d.total === 0) empty.textContent = '아직 뽑은 기록이 없습니다.';
 
-  // 적힌 차례가 곧 호스트 순번이다. 1번이 못 잡았을 때 누가 맡았는지 보려면 이게 있어야 한다.
-  const team = (name, list, first) =>
-    `<div><b>${name} Team</b> `
-    + list.map((h, i) => `<span class="rl-log-ord">${i + 1}.</span>${esc(h)}`).join(' ')
+  // 적힌 차례가 곧 호스트 순번이다. 1순위가 못 잡았을 때 누가 맡았는지 보려면 이게 있어야 한다.
+  const team = (t, first) =>
+    `<div><b>${t.name} Team</b> `
+    + t.order.map((h, i) => `<span class="rl-log-ord">${i + 1}.</span>${esc(h)}`).join(' ')
     + `${first ? ' <span class="first">(선호스트)</span>' : ''}</div>`;
 
-  box.innerHTML = rows.map(r => `<div class="rl-log-row">
+  box.innerHTML = rows.map(r => {
+    const by = (name) => r.teams.find(t => t.name === name);
+    const many = r.pairs.length > 1;
+    return `<div class="rl-log-row">
       <div class="rl-log-top">
-        <span class="rl-log-size">${r.size}:${r.size}</span>
-        <span class="rl-log-host">A <b>${esc(r.hostA)}</b>${r.first === 'A' ? ' <span class="first">(선)</span>' : ''}
-          · B <b>${esc(r.hostB)}</b>${r.first === 'B' ? ' <span class="first">(선)</span>' : ''}</span>
+        <span class="rl-log-size">${r.size}:${r.size}${many ? ` · ${r.teams.length}팀` : ''}</span>
+        <span class="rl-log-host">${r.pairs.map(p =>
+          `${esc(p.a)} <b>${esc((by(p.a) || { order: [] }).order[0] || '')}</b>`
+          + `${p.first === p.a ? ' <span class="first">(선)</span>' : ''}`
+          + ` vs ${esc(p.b)} <b>${esc((by(p.b) || { order: [] }).order[0] || '')}</b>`
+          + `${p.first === p.b ? ' <span class="first">(선)</span>' : ''}`).join(' &nbsp;/&nbsp; ')}</span>
         <span class="rl-log-when">${esc(formatDateTime(r.ts))} · ${esc(r.by)}</span>
       </div>
       <div class="rl-log-team">
-        ${team('A', r.teamA, r.first === 'A')}
-        ${team('B', r.teamB, r.first === 'B')}
+        ${r.teams.map(t => team(t, r.pairs.some(p => p.first === t.name))).join('')}
       </div>
-      <span class="rl-log-res${r.result ? '' : ' wait'}">${r.result
-        ? `${esc(r.result)} Team 승리 · ${esc(r.resultBy || '')}`
-        : '결과 미등록'}</span>
-    </div>`).join('');
+      ${r.pairs.map((p, i) => `<span class="rl-log-res${p.result ? '' : ' wait'}">`
+        + `${many ? `${i + 1}경기 ` : ''}`
+        + `${p.result ? `${esc(p.result)} Team 승리 · ${esc(p.by || '')}` : '결과 미등록'}</span>`).join(' ')}
+    </div>`;
+  }).join('');
 
   const wipe = document.getElementById('rlLogWipe');
   if (wipe) wipe.hidden = !isAdmin() || !(d && d.total > 0);
@@ -6089,19 +6165,19 @@ function renderRlLog() {
 /**
  * 뽑기 기록을 통째로 비운다 (관리자).
  *
- * 되돌릴 수 없고, 결과까지 올린 판이 있으면 그 경기는 리폿에 그대로 남는다 —
+ * 되돌릴 수 없고, 결과까지 올린 경기가 있으면 그 경기는 리폿에 그대로 남는다 —
  * 점수를 되돌리는 것은 리폿에서 따로 취소해야 하는 일이라 여기서 하지 않는다.
  * 모르고 지우면 순위가 왜 그런지 설명할 길이 없어지므로 미리 알린다.
  */
 async function rlWipeLog() {
   const d = rlLogData;
   if (!d || !d.total) return;
-  const done = (d.draws || []).filter(r => r.result).length;
+  const done = (d.draws || []).filter(r => r.pairs.some(p => p.result)).length;
 
   let ask = `뽑기 기록 ${d.total}건을 모두 지웁니다. 되돌릴 수 없습니다.\n계속할까요?`;
   if (done) {
     ask = `뽑기 기록 ${d.total}건을 모두 지웁니다. 되돌릴 수 없습니다.\n\n`
-      + `※ 결과까지 올린 판이 섞여 있습니다. 그 경기와 점수는 리폿에 그대로 남습니다 —\n`
+      + `※ 결과까지 올린 경기가 섞여 있습니다. 그 경기와 점수는 리폿에 그대로 남습니다 —\n`
       + `   점수를 되돌리려면 리폿(경기결과)에서 해당 경기를 따로 취소해야 합니다.\n\n계속할까요?`;
   }
   if (!confirm(ask)) return;
@@ -6120,8 +6196,25 @@ async function rlWipeLog() {
 
 function initRouletteEvents() {
   rlPicked = new Set(rlReadJson(RL_PICK_KEY));
+  const savedTeams = Number(readKey(RL_TEAMS_KEY));
+  if (RL_TEAM_OPTIONS.includes(savedTeams)) rlTeamCount = savedTeams;
   const saved = Number(readKey(RL_SIZE_KEY));
-  if (RL_SIZES.includes(saved)) rlSize = saved;
+  if (RL_SIZES[rlTeamCount].includes(saved)) rlSize = saved;
+
+  const teamsBox = document.getElementById('rlTeams');
+  if (teamsBox) teamsBox.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-teams]');
+    if (!btn || rlSpinning || rlBusy) return;
+    rlTeamCount = Number(btn.dataset.teams);
+    // 팀 수를 바꾸면 고를 수 있는 규모도 달라진다. 못 고르는 값이면 가장 가까운 값으로.
+    if (!RL_SIZES[rlTeamCount].includes(rlSize)) {
+      const can = RL_SIZES[rlTeamCount];
+      rlSize = can.reduce((a, c) => Math.abs(c - rlSize) < Math.abs(a - rlSize) ? c : a, can[0]);
+      writeKey(RL_SIZE_KEY, String(rlSize), true);
+    }
+    writeKey(RL_TEAMS_KEY, String(rlTeamCount), true);
+    renderRoulette();
+  });
 
   const sizes = document.getElementById('rlSizes');
   if (sizes) sizes.addEventListener('click', (e) => {
@@ -6155,12 +6248,20 @@ function initRouletteEvents() {
   const go = document.getElementById('rlGo');
   if (go) go.addEventListener('click', rlGo);
 
-  const fin = document.getElementById('rlFinish');
-  if (fin) fin.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-win]');
-    if (!btn || btn.disabled) return;
-    rlReport(btn.dataset.win);
-  });
+  // 결과 버튼과 판은 돌릴 때마다 새로 지으므로 바깥에서 한 번만 받는다
+  const stage = document.getElementById('rlMatches');
+  if (stage) {
+    stage.addEventListener('click', (e) => {
+      const btn = e.target.closest('.rl-win');
+      if (!btn || btn.disabled) return;
+      const box = btn.closest('.rl-finish');
+      rlReport(Number(box.dataset.pair), btn.dataset.win);
+    });
+    // 판이 멈추면 이름을 적는다. 모두 같이 출발했으므로 처음 끝나는 하나면 된다.
+    stage.addEventListener('transitionend', (e) => {
+      if (e.target && e.target.id && e.target.id.startsWith('rlSpin')) rlStagePost();
+    });
+  }
 
   const refresh = document.getElementById('rlLogRefresh');
   if (refresh) refresh.addEventListener('click', () => loadRlLog(1));
@@ -6169,12 +6270,6 @@ function initRouletteEvents() {
   if (wipe) wipe.addEventListener('click', rlWipeLog);
 
   bindPager('rlPager', 'rlpage', n => { rlLogPage = n; }, () => loadRlLog());
-
-  // 판이 멈추면 이름을 적는다. 두 판 중 늦게 끝나는 쪽은 없다 — 같이 출발했다.
-  ['A', 'B'].forEach(side => {
-    const g = document.getElementById('rlSpin' + side);
-    if (g) g.addEventListener('transitionend', () => { if (side === 'A') rlStagePost(); });
-  });
 }
 
 /* ---------- 초기화 ---------- */

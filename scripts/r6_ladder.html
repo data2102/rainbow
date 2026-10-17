@@ -1104,6 +1104,13 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .rl-size:hover{ border-color:var(--accent); color:var(--accent); }
 .rl-size.on{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
 .rl-size:focus-visible{ outline:none; box-shadow:var(--shadow-focus); }
+/* 칩 안에 '16명' 처럼 몇 명이 필요한지 같이 적는다 */
+.rl-size-n{
+  margin-left:var(--sp-2); font-size:var(--fs-footnote); font-weight:var(--fw-medium);
+  opacity:.7;
+}
+/* 팀 수는 설명이 길어 칩도 넓다 */
+.rl-size.rl-wide{ font-size:var(--fs-footnote); }
 
 .rl-tools{ display:flex; gap:var(--sp-2); align-items:center; margin-bottom:var(--sp-2); }
 /* 전역 input 규칙이 min-width:200px 을 걸어 좁은 화면에서 옆칸을 밀어낸다.
@@ -1142,6 +1149,14 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 
 /* ---- 이번 판 ---- */
 .rl-when{ font-size:var(--fs-footnote); color:var(--text-tertiary); }
+/* 네 팀이면 경기가 둘이다. 묶음끼리 줄로 갈라 어디까지가 한 경기인지 보인다. */
+.rl-match + .rl-match{
+  margin-top:var(--sp-6); padding-top:var(--sp-6); border-top:2px solid var(--border-strong);
+}
+.rl-match-h{
+  margin-bottom:var(--sp-3); font-size:var(--fs-caption); font-weight:var(--fw-bold);
+  color:var(--text-secondary); letter-spacing:.04em;
+}
 .rl-teams{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:var(--sp-4); }
 .rl-team{
   border:1px solid var(--border); border-radius:var(--radius-md);
@@ -1176,8 +1191,10 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   border-top:17px solid var(--danger);
   filter:drop-shadow(0 1px 2px rgba(0,0,0,.3));
 }
-/* 판은 뷰박스 한가운데를 축으로 돈다 */
-#rlSpinA, #rlSpinB{ transform-box:view-box; transform-origin:100px 100px; }
+/* 판은 뷰박스 한가운데를 축으로 돈다.
+   한때 #rlSpinA, #rlSpinB 로 적어두었더니 네 팀으로 늘렸을 때 C·D 판이
+   왼쪽 위 모서리를 축으로 돌아 화면 밖으로 날아갔다. 이름이 아니라 갈래로 건다. */
+.rl-spin{ transform-box:view-box; transform-origin:100px 100px; }
 .rl-slice{ stroke:var(--surface); stroke-width:1.2; }
 /* 글자색은 조각 색에 맞춰 그릴 때 하나씩 넣는다 */
 .rl-name{ font-family:var(--font-sans); font-weight:var(--fw-bold); pointer-events:none; }
@@ -3209,7 +3226,10 @@ if (/[?&]room=\d+/.test(location.search)) {
         팀도 호스트도 <b>서버가 정하고 아래 기록에 남습니다</b> — 돌린 사람이 짜 넣을 수 없습니다.
       </div>
 
-      <div class="side-label">경기 규모 · Match Size</div>
+      <div class="side-label">팀 수 · Teams</div>
+      <div class="rl-sizes" id="rlTeams"></div>
+
+      <div class="side-label" style="margin-top:var(--sp-5);">경기 규모 · Match Size</div>
       <div class="rl-sizes" id="rlSizes"></div>
 
       <div class="side-label" style="margin-top:var(--sp-5);">참가자 · Players</div>
@@ -3225,62 +3245,14 @@ if (/[?&]room=\d+/.test(location.search)) {
       </div>
     </div>
 
-    <!-- 뽑은 결과 — 돌리기 전에는 없는 칸이다 -->
+    <!-- 뽑은 결과 — 돌리기 전에는 없는 칸이다.
+         팀이 둘일 때도 넷일 때도 같은 자리를 쓰므로 안쪽은 app.js 가 짓는다. -->
     <div class="panel hud-corner" id="rlStage" hidden>
       <div class="panel-head">
         <h2>이번 판 · This Round</h2>
         <span class="rl-when" id="rlWhen"></span>
       </div>
-
-      <div class="rl-teams">
-        <div class="rl-team" data-team="A">
-          <div class="rl-team-h">
-            <span class="rl-team-n">A TEAM</span>
-            <span class="rl-first off" id="rlFirstA">선호스트 · 먼저 잡습니다</span>
-          </div>
-          <div class="rl-wheel-wrap">
-            <div class="rl-pin" aria-hidden="true"></div>
-            <svg class="rl-wheel" viewBox="0 0 200 200" role="img" aria-label="A팀 호스트 룰렛">
-              <g id="rlSpinA"></g>
-              <circle cx="100" cy="100" r="95" fill="none" stroke="var(--border-strong)" stroke-width="2"/>
-              <circle cx="100" cy="100" r="15" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="2"/>
-            </svg>
-          </div>
-          <div class="rl-host"><span class="rl-host-k">HOST</span><b id="rlHostA">—</b></div>
-          <div class="rl-roster" id="rlRosterA"></div>
-        </div>
-
-        <div class="rl-team" data-team="B">
-          <div class="rl-team-h">
-            <span class="rl-team-n">B TEAM</span>
-            <span class="rl-first off" id="rlFirstB">선호스트 · 먼저 잡습니다</span>
-          </div>
-          <div class="rl-wheel-wrap">
-            <div class="rl-pin" aria-hidden="true"></div>
-            <svg class="rl-wheel" viewBox="0 0 200 200" role="img" aria-label="B팀 호스트 룰렛">
-              <g id="rlSpinB"></g>
-              <circle cx="100" cy="100" r="95" fill="none" stroke="var(--border-strong)" stroke-width="2"/>
-              <circle cx="100" cy="100" r="15" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="2"/>
-            </svg>
-          </div>
-          <div class="rl-host"><span class="rl-host-k">HOST</span><b id="rlHostB">—</b></div>
-          <div class="rl-roster" id="rlRosterB"></div>
-        </div>
-      </div>
-
-      <div class="rl-first-line" id="rlFirstLine" hidden></div>
-
-      <div class="rl-finish" id="rlFinish" hidden>
-        <div class="side-label">경기 결과 · Report</div>
-        <div class="foot-note" style="margin-top:0;margin-bottom:10px;">
-          나눠준 팀 그대로 점수가 들어갑니다 · 리폿 탭에 쓰는 것과 같은 기록이라 <b>두 번 쓰지 마세요</b>.
-        </div>
-        <div class="rl-win-btns">
-          <button type="button" class="btn-mini rl-win" data-win="A">A Team 승리</button>
-          <button type="button" class="btn-mini rl-win" data-win="B">B Team 승리</button>
-        </div>
-      </div>
-      <div class="rl-done" id="rlDone" hidden></div>
+      <div id="rlMatches"></div>
     </div>
 
     <!-- 진행 기록 -->

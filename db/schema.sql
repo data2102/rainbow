@@ -199,13 +199,19 @@ CREATE TABLE IF NOT EXISTS host_draws (
   team_b     JSONB NOT NULL,
   host_a     TEXT NOT NULL,                 -- team_a 의 맨 앞 (1번)
   host_b     TEXT NOT NULL,                 -- team_b 의 맨 앞 (1번)
-  first_team TEXT NOT NULL CHECK (first_team IN ('A','B')),  -- 선호스트
+  first_team TEXT NOT NULL,                 -- 선호스트 (첫 경기)
   drawn_by   TEXT NOT NULL,
   season     TEXT,
   -- 경기까지 끝났으면 그 결과. 아직이면 비어 있다.
-  result     TEXT CHECK (result IN ('A','B')),
+  result     TEXT,
   match_id   BIGINT,
   result_by  TEXT,
-  result_ts  BIGINT
+  result_ts  BIGINT,
+  -- 팀이 둘뿐이 아닐 수 있다. 네 팀으로 나눠 두 경기를 동시에 하기도 한다.
+  --   teams [{ name:'A', order:[1순위, 2순위, ...] }, ...]
+  --   pairs [{ a:'A', b:'B', first:'A', result, matchId, by, at }, ...]
+  -- 위의 team_a~result_ts 는 두 팀짜리 시절의 칸이다. 두 팀일 때는 같이 채운다.
+  teams      JSONB,
+  pairs      JSONB
 );
 CREATE INDEX IF NOT EXISTS idx_host_draws_ts ON host_draws (ts DESC);

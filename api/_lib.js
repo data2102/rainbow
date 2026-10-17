@@ -399,6 +399,10 @@ export async function ensureMatchVoid() {
 /**
  * 호스트 뽑기 표가 아직 없는 데이터베이스일 수 있다.
  * 배포만 하면 쓸 수 있도록 처음 불릴 때 한 번 만든다.
+ *
+ * teams·pairs 는 나중에 붙였다. 처음에는 두 팀뿐이라 team_a·team_b 로 족했는데,
+ * 네 팀으로 나눠 두 경기를 동시에 하고 싶다는 말이 나와 일반화했다.
+ * 옛 칸은 그대로 둔다 — 지난 기록을 읽어야 하고, 두 팀짜리는 거기에도 채운다.
  */
 let drawsReady = false;
 export async function ensureHostDraws() {
@@ -421,25 +425,45 @@ export async function ensureHostDraws() {
       result_ts  BIGINT
     );
     CREATE INDEX IF NOT EXISTS idx_host_draws_ts ON host_draws (ts DESC);
+    -- 팀이 둘뿐이 아닐 수 있다. [{name, order}] 와 [{a, b, first, result, ...}]
+    ALTER TABLE host_draws ADD COLUMN IF NOT EXISTS teams JSONB;
+    ALTER TABLE host_draws ADD COLUMN IF NOT EXISTS pairs JSONB;
   `);
   drawsReady = true;
 }
 
+/** 팀 이름. 네 팀까지 쓴다. */
+export const TEAM_NAMES = ['A', 'B', 'C', 'D'];
+
+/**
+ * 뽑기 한 줄을 화면이 쓰는 모양으로.
+ *
+ * teams 가 있으면 그것이 전부다. 없으면 teams·pairs 가 생기기 전의 기록이므로
+ * 두 팀짜리로 지어서 돌려준다 — 화면은 한 가지 모양만 알면 된다.
+ */
 export function rowToDraw(r) {
-  return {
+  const base = {
     id: Number(r.id),
     ts: Number(r.ts),
     size: r.size,
-    teamA: r.team_a || [],
-    teamB: r.team_b || [],
-    hostA: r.host_a,
-    hostB: r.host_b,
-    first: r.first_team,
     by: r.drawn_by,
-    result: r.result || null,
-    matchId: r.match_id == null ? null : Number(r.match_id),
-    resultBy: r.result_by || null,
-    resultTs: r.result_ts == null ? null : Number(r.result_ts),
+  };
+  if (r.teams && r.teams.length) {
+    return { ...base, teams: r.teams, pairs: r.pairs || [] };
+  }
+  return {
+    ...base,
+    teams: [
+      { name: 'A', order: r.team_a || [] },
+      { name: 'B', order: r.team_b || [] },
+    ],
+    pairs: [{
+      a: 'A', b: 'B', first: r.first_team,
+      result: r.result || null,
+      matchId: r.match_id == null ? null : Number(r.match_id),
+      by: r.result_by || null,
+      at: r.result_ts == null ? null : Number(r.result_ts),
+    }],
   };
 }
 
