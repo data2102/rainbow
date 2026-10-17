@@ -281,7 +281,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 92;
+const APP_VERSION = 93;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -5695,10 +5695,15 @@ async function handleImportFile(e) {
  * 세우는 것뿐이다 — 그래야 돌린 사람이 짜 넣을 수 없다.
  */
 const RL_TEAM_OPTIONS = [2, 4];
-/** 팀 수마다 고를 수 있는 한 팀 인원 */
-const RL_SIZES = { 2: [2, 3, 4, 5, 6, 7, 8], 4: [2, 3, 4, 5] };
+/**
+ * 고를 수 있는 머릿수. 팀 인원이 아니라 모인 사람 수로 고른다 —
+ * 스물둘·스물여섯처럼 네 팀으로 딱 떨어지지 않는 수가 있기 때문이다.
+ * api/match.js 의 HOST_TOTAL_MIN·HOST_TOTAL_MAX 와 같아야 한다.
+ */
+const RL_TOTAL_MAX = 26;
+const RL_TOTAL_MIN = { 2: 4, 4: 8 };
 const RL_PICK_KEY = 'r6-host-pick';
-const RL_SIZE_KEY = 'r6-host-size';
+const RL_SIZE_KEY = 'r6-host-total';
 const RL_TEAMS_KEY = 'r6-host-teams';
 /** 조각이 이보다 많으면 이름이 겹친다 — 그때는 적지 않는다 */
 const RL_NAME_MAX = 16;
@@ -5707,7 +5712,7 @@ const RL_SPIN_MS = 4600;
 
 let rlPicked = new Set();
 let rlTeamCount = 2;
-let rlSize = 4;
+let rlTotal = 8;
 let rlDraw = null;        // 지금 화면에 올라와 있는 판
 let rlSpinning = false;
 let rlBusy = false;       // 서버에 묻는 중
@@ -5748,8 +5753,34 @@ function rlShown() {
     || String(p.clan || '').toLowerCase().includes(term));
 }
 
+/** 고를 수 있는 머릿수 — 짝수만 */
+function rlTotals(teams) {
+  const out = [];
+  for (let n = RL_TOTAL_MIN[teams]; n <= RL_TOTAL_MAX; n += 2) out.push(n);
+  return out;
+}
+
+/**
+ * 팀마다 몇 명씩 들어가는지. api/match.js 의 groupSizes() 와 같아야 한다.
+ * 한 경기 안의 두 팀은 언제나 같은 인원이고, 경기끼리는 다를 수 있다.
+ */
+function rlGroupSizes(total, teams) {
+  if (teams === 2) return [total / 2, total / 2];
+  const half = total / 2;
+  const big = Math.ceil(half / 2);
+  return [big, big, half - big, half - big];
+}
+
+/** '8:8' · '6:6 · 5:5' 처럼 대진을 적는다 */
+function rlSizeText(total, teams) {
+  const g = rlGroupSizes(total, teams);
+  const out = [];
+  for (let i = 0; i < g.length; i += 2) out.push(`${g[i]}:${g[i + 1]}`);
+  return out.join(' · ');
+}
+
 /** 지금 고른 짜임에 필요한 인원 */
-function rlNeed() { return rlSize * rlTeamCount; }
+function rlNeed() { return rlTotal; }
 
 /* ---- 판 짜기 화면 ---- */
 
@@ -5765,9 +5796,9 @@ function renderRlTeams() {
 function renderRlSizes() {
   const box = document.getElementById('rlSizes');
   if (!box) return;
-  box.innerHTML = RL_SIZES[rlTeamCount].map(n =>
-    `<button type="button" class="rl-size${n === rlSize ? ' on' : ''}" data-size="${n}"
-       aria-pressed="${n === rlSize}">${n}:${n}<span class="rl-size-n">${n * rlTeamCount}명</span></button>`
+  box.innerHTML = rlTotals(rlTeamCount).map(n =>
+    `<button type="button" class="rl-size${n === rlTotal ? ' on' : ''}" data-size="${n}"
+       aria-pressed="${n === rlTotal}">${n}명<span class="rl-size-n">${rlSizeText(n, rlTeamCount)}</span></button>`
   ).join('');
 }
 
@@ -5805,9 +5836,10 @@ function renderRlPick() {
   const note = document.getElementById('rlNote');
   if (note) {
     const how = rlTeamCount === 2 ? 'A·B 두 팀' : 'A·B·C·D 네 팀';
+    const deal = rlSizeText(need, rlTeamCount);
     if (!me) note.textContent = '로그인하면 룰렛을 돌릴 수 있습니다.';
-    else if (n < need) note.textContent = `${rlSize}:${rlSize} ${rlTeamCount}팀은 ${need}명이 필요합니다 · ${need - n}명 더 체크해주세요.`;
-    else note.textContent = `${need}명이 모였습니다 · 돌리면 ${how}과 팀별 호스트가 한 번에 정해집니다.`;
+    else if (n < need) note.textContent = `${rlTeamCount}팀 ${deal} 은 ${need}명이 필요합니다 · ${need - n}명 더 체크해주세요.`;
+    else note.textContent = `${need}명이 모였습니다 · 돌리면 ${how}(${deal})과 팀별 호스트가 한 번에 정해집니다.`;
   }
 
   const go = document.getElementById('rlGo');
@@ -6048,7 +6080,7 @@ async function rlGo() {
   renderRlPick();
   try {
     const r = await apiPost('/api/match', {
-      action: 'host', size: rlSize, teams: rlTeamCount, entries,
+      action: 'host', teams: rlTeamCount, entries,
     });
     rlDraw = r.draw;
     rlBusy = false;
@@ -6077,9 +6109,9 @@ async function rlReport(i, winner) {
   if (!rlDraw || rlBusy) return;
   const p = rlDraw.pairs[i];
   if (!p || p.result) return;
-  const n = rlDraw.size;
+  const size = (name) => ((rlDraw.teams.find(t => t.name === name) || { order: [] }).order.length);
   const which = rlDraw.pairs.length > 1 ? `${i + 1}경기 · ` : '';
-  if (!confirm(`${which}${winner} Team 승리로 기록합니다.\n${n}:${n} · 점수가 바로 반영되고 되돌리려면 관리자가 취소해야 합니다.\n계속할까요?`)) return;
+  if (!confirm(`${which}${winner} Team 승리로 기록합니다.\n${size(p.a)}:${size(p.b)} · 점수가 바로 반영되고 되돌리려면 관리자가 취소해야 합니다.\n계속할까요?`)) return;
 
   rlBusy = true;
   rlShowResult(i);
@@ -6136,7 +6168,9 @@ function renderRlLog() {
     const many = r.pairs.length > 1;
     return `<div class="rl-log-row">
       <div class="rl-log-top">
-        <span class="rl-log-size">${r.size}:${r.size}${many ? ` · ${r.teams.length}팀` : ''}</span>
+        <span class="rl-log-size">${r.pairs.map(p =>
+          `${(by(p.a) || { order: [] }).order.length}:${(by(p.b) || { order: [] }).order.length}`
+        ).join(' · ')}${many ? ` · ${r.teams.length}팀` : ''}</span>
         <span class="rl-log-host">${r.pairs.map(p =>
           `${esc(p.a)} <b>${esc((by(p.a) || { order: [] }).order[0] || '')}</b>`
           + `${p.first === p.a ? ' <span class="first">(선)</span>' : ''}`
@@ -6199,18 +6233,18 @@ function initRouletteEvents() {
   const savedTeams = Number(readKey(RL_TEAMS_KEY));
   if (RL_TEAM_OPTIONS.includes(savedTeams)) rlTeamCount = savedTeams;
   const saved = Number(readKey(RL_SIZE_KEY));
-  if (RL_SIZES[rlTeamCount].includes(saved)) rlSize = saved;
+  if (rlTotals(rlTeamCount).includes(saved)) rlTotal = saved;
 
   const teamsBox = document.getElementById('rlTeams');
   if (teamsBox) teamsBox.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-teams]');
     if (!btn || rlSpinning || rlBusy) return;
     rlTeamCount = Number(btn.dataset.teams);
-    // 팀 수를 바꾸면 고를 수 있는 규모도 달라진다. 못 고르는 값이면 가장 가까운 값으로.
-    if (!RL_SIZES[rlTeamCount].includes(rlSize)) {
-      const can = RL_SIZES[rlTeamCount];
-      rlSize = can.reduce((a, c) => Math.abs(c - rlSize) < Math.abs(a - rlSize) ? c : a, can[0]);
-      writeKey(RL_SIZE_KEY, String(rlSize), true);
+    // 팀 수를 바꾸면 고를 수 있는 머릿수도 달라진다. 못 고르는 값이면 가장 가까운 값으로.
+    if (!rlTotals(rlTeamCount).includes(rlTotal)) {
+      const can = rlTotals(rlTeamCount);
+      rlTotal = can.reduce((a, c) => Math.abs(c - rlTotal) < Math.abs(a - rlTotal) ? c : a, can[0]);
+      writeKey(RL_SIZE_KEY, String(rlTotal), true);
     }
     writeKey(RL_TEAMS_KEY, String(rlTeamCount), true);
     renderRoulette();
@@ -6220,8 +6254,8 @@ function initRouletteEvents() {
   if (sizes) sizes.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-size]');
     if (!btn || rlSpinning || rlBusy) return;
-    rlSize = Number(btn.dataset.size);
-    writeKey(RL_SIZE_KEY, String(rlSize), true);
+    rlTotal = Number(btn.dataset.size);
+    writeKey(RL_SIZE_KEY, String(rlTotal), true);
     renderRoulette();
   });
 

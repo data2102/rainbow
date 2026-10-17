@@ -314,14 +314,27 @@ function winnerHandles(row) {
 /* ---------- 호스트 뽑기 ---------- */
 
 /**
- * 한 팀 인원. 1:1 은 래더 경기가 아니다.
+ * 모인 사람 수. 팀 수로 나누는 것이 아니라 머릿수로 받는다.
  *
- * 두 팀으로 나눌 때는 8:8 까지. 네 팀으로 나눌 때는 두 경기를 동시에 하므로
- * 5:5 까지만 둔다 — 그 위는 스무 명이 넘어 한 자리에 모이지 않는다.
- * (8:8 한 경기는 오래 걸려서 네 명씩 나눠 두 경기를 돌리고 싶다는 말에서 나왔다)
+ * 스물둘·스물여섯처럼 네 팀으로 딱 떨어지지 않는 수가 있어서다. 그때는
+ * 경기 안에서만 인원을 맞춘다 — 22명이면 1경기 6:6, 2경기 5:5.
+ * 한 경기 안의 두 팀은 언제나 같은 인원이다.
  */
-const HOST_MIN = 2;
-const HOST_MAX = { 2: 8, 4: 5 };
+const HOST_TOTAL_MIN = { 2: 4, 4: 8 };
+const HOST_TOTAL_MAX = 26;
+
+/**
+ * 팀마다 몇 명씩 들어갈지. 앞에서부터 둘씩 한 경기가 된다.
+ *   2팀 16명 → [8, 8]
+ *   4팀 24명 → [6, 6, 6, 6]
+ *   4팀 22명 → [6, 6, 5, 5]   (1경기 6:6 · 2경기 5:5)
+ */
+function groupSizes(total, teams) {
+  if (teams === 2) return [total / 2, total / 2];
+  const half = total / 2;              // 경기마다 한 팀씩 몫을 나눠 갖는다
+  const big = Math.ceil(half / 2);
+  return [big, big, half - big, half - big];
+}
 /** 한 쪽에 보여줄 기록 수 */
 const LOG_PER = 10;
 
@@ -361,37 +374,49 @@ const SPLIT_SLACK = 0.15;
  * '충분히 고른' 것들을 모아 그중에서 제비를 뽑는다. 몇 점 차이는 어차피
  * 경기에서 느껴지지 않고, 매번 다른 사람과 한 편이 되는 쪽이 낫다.
  */
-function splitTeams(rows, groups) {
-  const per = rows.length / groups;
+function splitTeams(rows, sizes) {
   const total = rows.reduce((n, p) => n + p.point, 0);
   // 점수가 전부 0인 달(새 시즌 첫날)에도 멈추지 않도록 바닥을 둔다
-  const slack = Math.max(2, Math.round((total / groups) * SPLIT_SLACK));
+  const slack = Math.max(2, Math.round((total / sizes.length) * SPLIT_SLACK));
 
   let best = Infinity;
   const tries = [];
   for (let t = 0; t < SPLIT_TRIES; t++) {
     const mix = shuffle([...rows]);
     const parts = [];
-    for (let g = 0; g < groups; g++) parts.push(mix.slice(g * per, (g + 1) * per));
-    const sums = parts.map(part => part.reduce((n, p) => n + p.point, 0));
-    // 팀이 셋 이상이면 '차이' 는 가장 센 팀과 가장 약한 팀의 사이다
-    const spread = Math.max(...sums) - Math.min(...sums);
+    let at = 0;
+    for (const n of sizes) { parts.push(mix.slice(at, at + n)); at += n; }
+
+    // 맞붙는 두 팀끼리만 견준다. 6명 팀과 5명 팀의 합을 맞대는 것은 뜻이 없고,
+    // 어차피 한 경기 안의 두 팀은 인원이 같다.
+    const sum = (part) => part.reduce((n, p) => n + p.point, 0);
+    let spread = 0;
+    for (let i = 0; i < parts.length; i += 2) {
+      spread = Math.max(spread, Math.abs(sum(parts[i]) - sum(parts[i + 1])));
+    }
     if (spread < best) best = spread;
     tries.push({ parts, spread });
   }
 
   const fair = tries.filter(t => t.spread <= best + slack);
   const pick = fair[randomInt(fair.length)];
-  // 이름표도 섞어 붙인다. A 가 늘 센 팀이면 이름이 뜻을 가져버리고,
-  // 네 팀일 때는 A-B / C-D 로 붙으므로 대진까지 한쪽으로 쏠린다.
-  return shuffle(pick.parts).map(part => part.map(p => p.handle));
+
+  // 이름표도 섞어 붙인다. A 가 늘 센 팀이면 이름이 뜻을 가져버린다.
+  // 다만 짝은 흐트러뜨리지 않는다 — 6명 팀이 5명 팀과 붙으면 안 된다.
+  const pairs = [];
+  for (let i = 0; i < pick.parts.length; i += 2) {
+    pairs.push(shuffle([pick.parts[i], pick.parts[i + 1]]));
+  }
+  return shuffle(pairs).flat().map(part => part.map(p => p.handle));
 }
 
 /**
- * POST {action:'host', size, entries, teams}
+ * POST {action:'host', entries, teams}
  *
  * 팀을 나누고 팀마다 호스트 순번을 매긴다. 대진과 선호스트도 여기서 정한다.
  * teams 가 2 면 A·B 한 경기, 4 면 A·B / C·D 두 경기를 동시에 한다.
+ * 인원은 entries 의 머릿수로 받는다 — 22명처럼 네 팀으로 딱 떨어지지 않아도
+ * 경기 안에서만 맞추면 되기 때문이다(1경기 6:6 · 2경기 5:5).
  *
  * 팀도 순번도 서버가 고른다. 화면에서 짜 올리게 두면 돌리는 사람이 원하는
  * 대로 만들 수 있고, 그러면 기록을 남기는 뜻이 없어진다.
@@ -404,24 +429,29 @@ async function hostDraw(req, res, b) {
   if (teams !== 2 && teams !== 4) {
     return res.status(400).json({ error: '두 팀 또는 네 팀으로만 나눌 수 있습니다.' });
   }
-  const max = HOST_MAX[teams];
-  const size = Number(b.size);
-  if (!Number.isInteger(size) || size < HOST_MIN || size > max) {
-    return res.status(400).json({
-      error: `${teams}팀으로 나눌 때는 ${HOST_MIN}:${HOST_MIN} 부터 ${max}:${max} 까지 고를 수 있습니다.`,
-    });
-  }
   const entries = Array.isArray(b.entries) ? b.entries.map(String) : null;
   if (!entries) return res.status(400).json({ error: '참가자 목록이 올바르지 않습니다.' });
   if (new Set(entries).size !== entries.length) {
     return res.status(400).json({ error: '같은 사람이 두 번 들어 있습니다.' });
   }
-  const need = size * teams;
-  if (entries.length !== need) {
+
+  const total = entries.length;
+  const min = HOST_TOTAL_MIN[teams];
+  if (total < min || total > HOST_TOTAL_MAX) {
     return res.status(400).json({
-      error: `${size}:${size} ${teams}팀은 ${need}명을 골라야 합니다 · 지금 ${entries.length}명입니다.`,
+      error: `${teams}팀으로 나눌 때는 ${min}명부터 ${HOST_TOTAL_MAX}명까지 고를 수 있습니다 · 지금 ${total}명입니다.`,
     });
   }
+  // 한 경기 안의 두 팀은 인원이 같아야 하므로 짝수여야 한다
+  if (total % 2) {
+    return res.status(400).json({ error: `짝수로 골라주세요 · 지금 ${total}명입니다.` });
+  }
+  const sizes = groupSizes(total, teams);
+  if (sizes.some(n => n < 2)) {
+    return res.status(400).json({ error: '한 팀에 두 명은 있어야 합니다.' });
+  }
+  // 표에 남기는 대표 인원. 경기마다 다를 수 있어 가장 큰 쪽을 적는다.
+  const size = sizes[0];
 
   try {
     await ensureHostDraws();
@@ -437,7 +467,7 @@ async function hostDraw(req, res, b) {
 
       // 팀 안의 차례를 섞는다. 이 순서가 곧 호스트 순번이다 —
       // 1순위가 호스트를 못 잡으면 2순위, 그래도 안 되면 3순위가 맡는다.
-      const parts = splitTeams(rows, teams);
+      const parts = splitTeams(rows, sizes);
       const names = TEAM_NAMES.slice(0, teams);
       const teamRows = parts.map((handles, i) => ({ name: names[i], order: shuffle([...handles]) }));
 
@@ -467,7 +497,7 @@ async function hostDraw(req, res, b) {
       return rowToDraw(ins.rows[0]);
     });
 
-    await audit(me, 'host_draw', { id: out.id, size, teams, pairs: out.pairs,
+    await audit(me, 'host_draw', { id: out.id, size, teams, total, sizes, pairs: out.pairs,
       order: out.teams.map(t => `${t.name}:${t.order.join('>')}`) });
     res.status(200).json({ ok: true, draw: out });
   } catch (e) {

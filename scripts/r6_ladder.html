@@ -1104,11 +1104,13 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .rl-size:hover{ border-color:var(--accent); color:var(--accent); }
 .rl-size.on{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
 .rl-size:focus-visible{ outline:none; box-shadow:var(--shadow-focus); }
-/* 칩 안에 '16명' 처럼 몇 명이 필요한지 같이 적는다 */
+/* 칩 안에 '6:6 · 5:5' 처럼 대진을 같이 적는다. 머릿수가 크고 대진이 작다. */
 .rl-size-n{
-  margin-left:var(--sp-2); font-size:var(--fs-footnote); font-weight:var(--fw-medium);
-  opacity:.7;
+  display:block; margin-top:1px;
+  font-size:var(--fs-footnote); font-weight:var(--fw-medium);
+  opacity:.7; letter-spacing:0;
 }
+#rlSizes .rl-size{ line-height:1.25; padding:var(--sp-2) var(--sp-3); }
 /* 팀 수는 설명이 길어 칩도 넓다 */
 .rl-size.rl-wide{ font-size:var(--fs-footnote); }
 
