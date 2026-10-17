@@ -39,7 +39,7 @@ async function record(req, res, b) {
   const me = await requireUser(req, res);
   if (!me) return;
 
-  const { winners = [], losers = [], late = [] } = b;
+  const { winners = [], losers = [] } = b;
   if (!Array.isArray(winners) || !Array.isArray(losers)) {
     return res.status(400).json({ error: '승리 팀과 패배 팀을 선택해주세요.' });
   }
@@ -49,27 +49,19 @@ async function record(req, res, b) {
       error: `${MIN_SIDE}:${MIN_SIDE} 경기부터 기록할 수 있습니다 · 각 팀에 ${MIN_SIDE}명 이상 골라주세요.`,
     });
   }
-  if (!Array.isArray(late)) {
-    return res.status(400).json({ error: '늦은 참석자 목록이 올바르지 않습니다.' });
-  }
   const dup = winners.filter(w => losers.includes(w));
   if (dup.length) {
     return res.status(400).json({ error: '같은 선수를 양쪽에 동시에 넣을 수 없습니다: ' + dup.join(', ') });
   }
-  // 늦은 참석자는 승패 어느 쪽도 아니다. 양쪽에 겹치면 점수가 두 번 들어간다.
-  const both = late.filter(h => winners.includes(h) || losers.includes(h));
-  if (both.length) {
-    return res.status(400).json({
-      error: '늦은 참석자는 승리·패배 팀에 함께 넣을 수 없습니다: ' + both.join(', '),
-    });
-  }
+  // 늦은 참석자 칸은 없앴다. 새로 들어오는 기록에는 담지 않는다 —
+  // 새로고침하지 않은 화면이 아직 보내올 수 있어 조용히 흘린다.
 
   try {
     // 늦은 참석자 칸이 아직 없는 데이터베이스일 수 있다
     await ensureMatchVoid();
-    const result = await tx((c) => recordCore(c, me, winners, losers, late));
+    const result = await tx((c) => recordCore(c, me, winners, losers));
 
-    await audit(me, 'record_match', { winners, losers, late });
+    await audit(me, 'record_match', { winners, losers });
     res.status(200).json({ ok: true, ...result });
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -82,10 +74,10 @@ async function record(req, res, b) {
  * 리폿 화면과 호스트 뽑기 화면이 같은 길을 쓴다 — 어느 쪽으로 넣든
  * 점수가 달라지면 안 되기 때문이다.
  */
-async function recordCore(c, me, winners, losers, late) {
+async function recordCore(c, me, winners, losers) {
   // 달이 바뀐 뒤 첫 기록이면 여기서 시즌을 넘긴다. 새 경기는 새 시즌에 들어간다.
   const season = await ensureSeason(c);
-  const all = [...winners, ...losers, ...late];
+  const all = [...winners, ...losers];
   const { rows } = await c.query(
     `SELECT * FROM players WHERE handle = ANY($1) FOR UPDATE`, [all]
   );
@@ -119,18 +111,10 @@ async function recordCore(c, me, winners, losers, late) {
     );
   }
 
-  // 늦은 참석자는 전적에 넣지 않는다 — 경기 수도, 승도, 패도, 연승도
-  // 건드리지 않고 점수만 얹는다. 어느 편으로 세도 사실과 달라지기 때문이다.
-  for (const h of late) {
-    await c.query(
-      `UPDATE players SET point = point + $1 WHERE handle = $2`, [lateGain(), h]
-    );
-  }
-
   const ins = await c.query(
     `INSERT INTO matches (winners, losers, late, ts, recorded_by, season)
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-    [JSON.stringify(winnerResults), JSON.stringify(losers), JSON.stringify(late),
+    [JSON.stringify(winnerResults), JSON.stringify(losers), JSON.stringify([]),
      ts, me, season.current ? season.current.id : null]
   );
 
@@ -284,8 +268,9 @@ async function replay(c, seasonId) {
       s.lastMatch = ts;
     }
 
-    // 늦은 참석자는 점수만 받는다. 연승도, 마지막 경기일도 건드리지 않는다 —
-    // 전적에 없는 경기가 연승을 끊거나 이어붙이면 사실과 어긋난다.
+    // 지각 팀은 없앴지만, 그 칸이 있던 시절의 기록은 여기서 그대로 되살린다.
+    // 빼버리면 관리자가 경기 하나를 취소하는 순간 지난 달에 받은 점수까지
+    // 소리 없이 사라져 순위가 달라진다. 새 기록에는 이 칸이 비어 있다.
     for (const h of (Array.isArray(m.late) ? m.late : [])) {
       if (!h) continue;
       of(h).point += lateGain();
@@ -540,7 +525,7 @@ async function hostResult(req, res, b) {
       const order = (name) => (d.teams.find(t => t.name === name) || { order: [] }).order;
       const winners = order(winner);
       const losers = order(winner === pair.a ? pair.b : pair.a);
-      const r = await recordCore(c, me, winners, losers, []);
+      const r = await recordCore(c, me, winners, losers);
 
       const next = d.pairs.map((p, i) => i !== at ? p
         : { ...p, result: winner, matchId: r.matchId, by: me, at: r.ts });

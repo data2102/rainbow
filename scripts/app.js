@@ -281,7 +281,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 94;
+const APP_VERSION = 95;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -840,23 +840,14 @@ function getChecked(listId) {
   return Array.from(document.querySelectorAll(`#${listId} input[type=checkbox]:checked`)).map(el => el.value);
 }
 
-/**
- * 늦은 참석자로 고른 사람들.
- *
- * 승패 두 칸과 달리 한두 명뿐이라, 명단을 통째로 늘어놓으면 자리만 차지하고
- * 눈이 그쪽으로 끌린다. 고르는 칸 하나와 고른 사람 딱지로 둔다.
- */
-let latePicked = [];
-
 function renderChecklists() {
   const winChecked = new Set(getChecked('winList'));
   const loseChecked = new Set(getChecked('loseList'));
-  const lateSet = new Set(latePicked);
 
-  // 한 사람은 세 곳 중 한 곳에만 들어갈 수 있다. 다른 곳에 이미 들어가 있으면
+  // 한 사람은 한쪽에만 들어갈 수 있다. 다른 쪽에 이미 들어가 있으면
   // 여기서는 누르지 못하게 막아, 눌러본 뒤에 거절당하는 일이 없게 한다.
   const rowHtml = (p, side) => {
-    const picked = { win: winChecked, lose: loseChecked, late: lateSet };
+    const picked = { win: winChecked, lose: loseChecked };
     const checked = picked[side].has(p.handle);
     const disabled = !checked && Object.keys(picked)
       .some(k => k !== side && picked[k].has(p.handle));
@@ -879,19 +870,16 @@ function renderChecklists() {
     el.addEventListener('change', renderChecklists);
   });
 
-  // 승패 쪽이 바뀌면 고를 수 있는 사람도 달라진다
-  renderLateBox(byId, winChecked, loseChecked);
-
   const nWin = getChecked('winList').length;
   const nLose = getChecked('loseList').length;
-  showPickCount(nWin, nLose, latePicked.length);
+  showPickCount(nWin, nLose);
 
   const submit = document.getElementById('submitMatch');
   if (submit) submit.disabled = !(nWin >= MIN_SIDE && nLose >= MIN_SIDE);
 
   // 지울 게 있을 때만 켠다 — 빈 화면에서 눌러봐야 아무 일도 안 일어난다
   const reset = document.getElementById('resetPick');
-  if (reset) reset.disabled = !(nWin || nLose || latePicked.length);
+  if (reset) reset.disabled = !(nWin || nLose);
 
   // 칸마다 붙은 지우기는 고른 사람이 있을 때만 나타난다
   const showClear = (id, n) => {
@@ -900,14 +888,12 @@ function renderChecklists() {
   };
   showClear('winClear', nWin);
   showClear('loseClear', nLose);
-  showClear('lateClear', latePicked.length);
 }
 
 /** 체크를 전부 푼다. 기록을 넣은 뒤에도, 잘못 골랐을 때도 같은 길을 쓴다. */
 function clearPicks() {
   document.querySelectorAll('#winList input, #loseList input')
     .forEach(el => { el.checked = false; });
-  latePicked = [];
   renderChecklists();
 }
 
@@ -916,60 +902,14 @@ function clearPicks() {
  * 한 명뿐이면 묻지 않는다 — 다시 누르는 데 한 번이면 되는 것을 붙잡지 않는다.
  */
 function clearSide(which) {
-  const label = { win: '승리 팀', lose: '패배 팀', late: '늦은 참석자' }[which];
-  const n = which === 'late' ? latePicked.length : getChecked(which + 'List').length;
+  const label = { win: '승리 팀', lose: '패배 팀' }[which];
+  const n = getChecked(which + 'List').length;
   if (!n) return;
-  const ask = which === 'late'
-    ? `늦은 참석자로 고른 ${n}명을 지울까요?`
-    : `${label}에 체크한 ${n}명을 지울까요?`;
-  if (n >= 2 && !confirm(ask)) return;
+  if (n >= 2 && !confirm(`${label}에 체크한 ${n}명을 지울까요?`)) return;
 
-  if (which === 'late') latePicked = [];
-  else document.querySelectorAll(`#${which}List input`).forEach(el => { el.checked = false; });
+  document.querySelectorAll(`#${which}List input`).forEach(el => { el.checked = false; });
   renderChecklists();
   showToast(`${label} 체크를 지웠습니다`);
-}
-
-/** 늦은 참석자 — 고르는 칸과 고른 사람 딱지. */
-function renderLateBox(byId, winChecked, loseChecked) {
-  const sel = document.getElementById('lateSelect');
-  const chips = document.getElementById('lateChips');
-  if (!sel || !chips) return;
-
-  // 승패에 이미 들어간 사람과 이미 고른 사람은 목록에서 뺀다
-  const taken = new Set([...winChecked, ...loseChecked, ...latePicked]);
-  const free = byId.filter(p => !taken.has(p.handle));
-  sel.innerHTML = '<option value="">선수를 고르세요</option>'
-    + free.map(p => `<option value="${esc(p.handle)}">${esc(p.handle)}${p.clan ? ` · ${esc(p.clan)}` : ''}</option>`).join('');
-  sel.disabled = free.length === 0;
-
-  chips.innerHTML = latePicked.map(h =>
-    `<span class="late-chip">${esc(h)}<button type="button" data-late-del="${esc(h)}"
-       aria-label="${esc(h)} 빼기">&times;</button></span>`).join('');
-}
-
-function initLateEvents() {
-  const sel = document.getElementById('lateSelect');
-  const add = document.getElementById('lateAdd');
-  const chips = document.getElementById('lateChips');
-  if (!sel || !add || !chips) return;
-
-  const take = () => {
-    const h = sel.value;
-    if (!h || latePicked.includes(h)) return;
-    latePicked.push(h);
-    renderChecklists();
-  };
-  add.addEventListener('click', take);
-  // 고르자마자 담기게 두면 버튼을 못 보고 지나쳐도 동작한다
-  sel.addEventListener('change', take);
-
-  chips.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-late-del]');
-    if (!btn) return;
-    latePicked = latePicked.filter(h => h !== btn.dataset.lateDel);
-    renderChecklists();
-  });
 }
 
 /**
@@ -979,7 +919,7 @@ function initLateEvents() {
  * 확정 버튼 위에 대진을 크게 띄운다. 인원이 안 맞아도 막지는 않는다 —
  * 7:8 같은 경기도 기록해야 하기 때문이다. 다르다는 사실만 알려준다.
  */
-function showPickCount(nWin, nLose, nLate = 0) {
+function showPickCount(nWin, nLose) {
   const set = (id, n) => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -988,14 +928,10 @@ function showPickCount(nWin, nLose, nLate = 0) {
   };
   set('winCount', nWin);
   set('loseCount', nLose);
-  set('lateCount', nLate);
 
   const sum = document.getElementById('pickSum');
   if (sum) {
-    // 늦은 참석자는 대진에 섞지 않는다. 7:7 에 한 명이 늦게 붙어도 경기는
-    // 7:7 이지, 8:7 이 아니기 때문이다.
-    sum.innerHTML = `<span class="pw">${nWin}</span><span class="px">:</span><span class="pl">${nLose}</span>`
-      + (nLate ? `<span class="plate">늦은 참석자 ${nLate}명 · 점수만 +1</span>` : '');
+    sum.innerHTML = `<span class="pw">${nWin}</span><span class="px">:</span><span class="pl">${nLose}</span>`;
     sum.classList.toggle('zero', nWin === 0 && nLose === 0);
   }
 
@@ -5632,15 +5568,14 @@ function initPlayingWatch() {
 
 /* ---------- 경기 기록 ---------- */
 
-async function recordTeamMatch(winners, losers, late = []) {
+async function recordTeamMatch(winners, losers) {
   const btn = document.getElementById('submitMatch');
   btn.disabled = true;
   try {
-    await apiPost('/api/match', { winners, losers, late });
+    await apiPost('/api/match', { winners, losers });
     await refreshAll();
     clearPicks();
-    showToast(`승리 ${winners.length}명 / 패배 ${losers.length}명`
-      + (late.length ? ` / 늦은 참석자 ${late.length}명` : '') + ' 기록 완료');
+    showToast(`승리 ${winners.length}명 / 패배 ${losers.length}명 기록 완료`);
   } catch (e) {
     showToast(e.message);
     btn.disabled = false;
@@ -6407,7 +6342,7 @@ function initAdminEvents() {
   document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
   document.getElementById('importFile').addEventListener('change', handleImportFile);
 
-  for (const which of ['win', 'lose', 'late']) {
+  for (const which of ['win', 'lose']) {
     const btn = document.getElementById(which + 'Clear');
     if (btn) btn.addEventListener('click', () => clearSide(which));
   }
@@ -6415,7 +6350,7 @@ function initAdminEvents() {
   document.getElementById('resetPick').addEventListener('click', () => {
     const nWin = getChecked('winList').length;
     const nLose = getChecked('loseList').length;
-    const total = nWin + nLose + latePicked.length;
+    const total = nWin + nLose;
     if (!total) return;
     if (total >= 2 && !confirm(`체크한 ${total}명을 모두 지우고 처음부터 다시 고를까요?`)) return;
     clearPicks();
@@ -6426,7 +6361,7 @@ function initAdminEvents() {
     const winners = getChecked('winList');
     const losers = getChecked('loseList');
     if (winners.length < MIN_SIDE || losers.length < MIN_SIDE) return;
-    await recordTeamMatch(winners, losers, [...latePicked]);
+    await recordTeamMatch(winners, losers);
   });
 
   document.getElementById('resetBtn').addEventListener('click', async () => {
@@ -6547,7 +6482,6 @@ async function boot() {
   initStandingEvents();
   initAdminEvents();
   initHistoryEvents();
-  initLateEvents();
   initAccountEvents();
   initTournamentEvents();
   initBoardEvents();

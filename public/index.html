@@ -1317,46 +1317,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .pick-sum .pl{ color:var(--danger-strong); }
 .pick-sum .px{ color:var(--text-tertiary); font-weight:var(--fw-regular); }
 .pick-sum.zero .pw, .pick-sum.zero .pl{ color:var(--text-tertiary); }
-/* 늦은 참석자는 점수만 받는 사람이라 승패 숫자와 나란히 두지 않는다 */
-.pick-sum .plate{
-  display:block; font-size:var(--fs-footnote); font-weight:var(--fw-regular);
-  color:var(--warm); margin-top:var(--sp-2);
-}
-
-/* 늦은 참석자 — 승패 두 칸과 성격이 달라 아래에 따로 둔다 */
-.late-box{
-  border:1px dashed var(--border-strong); border-radius:var(--radius-md);
-  background:var(--surface-sunken); padding:var(--sp-3) var(--sp-4);
-  margin-top:var(--sp-4);
-}
-.late-label{ color:var(--warm); }
-.late-why{ margin:0 0 var(--sp-2); }
-.late-pick{ display:flex; gap:var(--sp-2); flex-wrap:wrap; }
-.late-pick select{
-  flex:1 1 220px; min-width:0;
-  background:var(--surface); color:var(--text-primary);
-  border:1px solid var(--border-strong); border-radius:var(--radius-sm);
-  padding:var(--sp-2) var(--sp-3); font-family:inherit; font-size:var(--fs-caption);
-}
-.late-pick select:focus{ outline:none; border-color:var(--accent); }
-.late-pick select:disabled{ color:var(--text-tertiary); background:var(--surface-sunken); }
-.late-chips{ display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-top:var(--sp-3); }
-.late-chips:empty{ display:none; }
-.late-chip{
-  display:inline-flex; align-items:center; gap:var(--sp-2);
-  background:var(--warm-bg); color:var(--warm);
-  border-radius:var(--radius-pill); padding:var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-3);
-  font-size:var(--fs-footnote); font-weight:var(--fw-bold);
-}
-.late-chip button{
-  appearance:none; border:none; background:none; cursor:pointer;
-  color:inherit; font-family:inherit; font-size:13px; line-height:1;
-  padding:0 var(--sp-1); opacity:.7;
-}
-.late-chip button:hover{ opacity:1; }
-.late-chip button:focus-visible{ outline:none; box-shadow:var(--shadow-focus); border-radius:50%; }
-
-/* 기록 표의 늦은 참석자 칸 — 승패와 나란히 세운다 */
+/* 기록 표의 늦은 참석자 칸 — 지각 팀을 쓰던 시절의 기록을 위해 남겨둔다 */
 .h-chip.x{ background:var(--warm-bg); color:var(--warm); }
 .h-none{ color:var(--text-disabled); }
 .pick-note{
@@ -3077,7 +3038,7 @@ if (/[?&]room=\d+/.test(location.search)) {
     <div id="reportBox" style="display:none;">
     <div class="panel hud-corner">
       <h2>승패 기록(리폿 쓰기) · Report Match</h2>
-      <div class="foot-note" style="margin-top:0;margin-bottom:14px;">2:2 부터 기록합니다 · 7:7, 8:8, 7:8 등 인원이 달라도 그대로 기록할 수 있습니다 — 승리한 인원과 패배한 인원을 각각 체크한 뒤 기록하세요.</div>
+      <div class="foot-note" style="margin-top:0;margin-bottom:14px;">2:2 부터 기록합니다 · 7:7, 8:8, 7:8 등 인원이 달라도 그대로 기록할 수 있습니다 — 늦게 온 사람도 <b>실제로 뛴 팀</b>에 체크하세요.</div>
       <div class="team-grid">
         <div>
           <div class="side-label" style="color:var(--success-strong);">WIN TEAM · 승리 팀<span class="pick-n" id="winCount">0명</span><button type="button" class="pick-clear" id="winClear" hidden>초기화</button></div>
@@ -3088,30 +3049,15 @@ if (/[?&]room=\d+/.test(location.search)) {
           <div class="checklist" id="loseList"></div>
         </div>
       </div>
-      <div class="late-box">
-        <div class="side-label late-label">LATE TEAM · 지각 팀<span class="pick-n" id="lateCount">0명</span><button type="button" class="pick-clear" id="lateClear" hidden>초기화</button></div>
-        <div class="foot-note late-why">
-          인원이 맞지 않아 뒤늦게 합류한 사람 · <b>경기 수·승·패에 넣지 않고</b> 점수만 +1 드립니다.
-        </div>
-        <div class="late-pick">
-          <select id="lateSelect" aria-label="늦은 참석자 고르기">
-            <option value="">선수를 고르세요</option>
-          </select>
-          <button type="button" class="btn-mini btn-approve" id="lateAdd">추가</button>
-        </div>
-        <div class="late-chips" id="lateChips"></div>
-      </div>
-
       <div class="pick-sum zero" id="pickSum" aria-live="polite">
         <span class="pw">0</span><span class="px">:</span><span class="pl">0</span>
-        <span class="plate" id="pickLate" hidden></span>
       </div>
       <div class="pick-note" id="pickNote"></div>
       <div class="pick-actions">
         <button class="btn" id="submitMatch" disabled>기록 확정 (Record Match)</button>
         <button type="button" class="btn btn-reset" id="resetPick" disabled>체크 초기화</button>
       </div>
-      <div class="foot-note">동일 선수를 양쪽에 동시 체크할 수 없습니다 · 늦은 참석자는 승패 팀과 겹칠 수 없습니다 · 최소 2:2 경기부터 기록할 수 있습니다 · 한 칸만 잘못 골랐으면 그 칸의 <b>초기화</b>를, 전부 다시 고르려면 아래 <b>체크 초기화</b>를 누르세요.</div>
+      <div class="foot-note">동일 선수를 양쪽에 동시 체크할 수 없습니다 · 최소 2:2 경기부터 기록할 수 있습니다 · 한 칸만 잘못 골랐으면 그 칸의 <b>초기화</b>를, 전부 다시 고르려면 아래 <b>체크 초기화</b>를 누르세요.</div>
     </div>
     </div>
 
@@ -3429,9 +3375,8 @@ if (/[?&]room=\d+/.test(location.search)) {
             <div class="rrep">
               <div class="rrep-h">리폿 쓰는 법</div>
               <div class="rrep-row"><b class="sc">4 : 3</b> 진행 →
-                <span class="w">승리팀 3명</span> · <span class="l">패배팀 3명</span> ·
-                <span class="x">늦은 참석자 1명</span></div>
-              <div class="rrep-note">늦은 참석자는 <b>승·패에 들어가지 않고</b> 참여점수 <b>+1점</b>만 받습니다.</div>
+                <span class="w">승리팀 전원</span> · <span class="l">패배팀 전원</span></div>
+              <div class="rrep-note">늦게 온 사람도 <b>뛴 팀에 그대로</b> 체크합니다 · 인원이 달라도(4:3) 그대로 기록됩니다.</div>
             </div>
           </div>
         </article>
@@ -3448,9 +3393,8 @@ if (/[?&]room=\d+/.test(location.search)) {
             <div class="rrep">
               <div class="rrep-h">리폿 쓰는 법</div>
               <div class="rrep-row"><b class="sc">6 : 6</b> 진행 →
-                <span class="w">승리팀 5명</span> · <span class="l">패배팀 5명</span> ·
-                <span class="x">늦은 참석자 2명</span></div>
-              <div class="rrep-note">늦은 참석자 2명은 <b>승·패에 들어가지 않고</b> 참여점수 <b>+1점</b>씩 받습니다.</div>
+                <span class="w">승리팀 6명</span> · <span class="l">패배팀 6명</span></div>
+              <div class="rrep-note">늦게 합류한 사람도 <b>들어간 팀에 함께</b> 체크합니다.</div>
             </div>
           </div>
         </article>
@@ -3462,8 +3406,8 @@ if (/[?&]room=\d+/.test(location.search)) {
               <b>호스트가 바뀌면 그때마다</b> 새 호스트의 반대편으로 옮깁니다.</p>
             <div class="rrep">
               <div class="rrep-h">리폿 쓰는 법</div>
-              <div class="rrep-row"><span class="x">늦은 참석자</span>로 넣습니다</div>
-              <div class="rrep-note">승·패에 들어가지 않고 참여점수 <b>+1점</b>만 받습니다.</div>
+              <div class="rrep-row">들어간 팀에 <span class="w">그대로</span> 체크합니다</div>
+              <div class="rrep-note">따로 빼지 않습니다 · 그 팀이 이기면 승, 지면 패가 됩니다.</div>
             </div>
           </div>
         </article>
@@ -4271,7 +4215,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 94;
+const APP_VERSION = 95;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -4830,23 +4774,14 @@ function getChecked(listId) {
   return Array.from(document.querySelectorAll(`#${listId} input[type=checkbox]:checked`)).map(el => el.value);
 }
 
-/**
- * 늦은 참석자로 고른 사람들.
- *
- * 승패 두 칸과 달리 한두 명뿐이라, 명단을 통째로 늘어놓으면 자리만 차지하고
- * 눈이 그쪽으로 끌린다. 고르는 칸 하나와 고른 사람 딱지로 둔다.
- */
-let latePicked = [];
-
 function renderChecklists() {
   const winChecked = new Set(getChecked('winList'));
   const loseChecked = new Set(getChecked('loseList'));
-  const lateSet = new Set(latePicked);
 
-  // 한 사람은 세 곳 중 한 곳에만 들어갈 수 있다. 다른 곳에 이미 들어가 있으면
+  // 한 사람은 한쪽에만 들어갈 수 있다. 다른 쪽에 이미 들어가 있으면
   // 여기서는 누르지 못하게 막아, 눌러본 뒤에 거절당하는 일이 없게 한다.
   const rowHtml = (p, side) => {
-    const picked = { win: winChecked, lose: loseChecked, late: lateSet };
+    const picked = { win: winChecked, lose: loseChecked };
     const checked = picked[side].has(p.handle);
     const disabled = !checked && Object.keys(picked)
       .some(k => k !== side && picked[k].has(p.handle));
@@ -4869,19 +4804,16 @@ function renderChecklists() {
     el.addEventListener('change', renderChecklists);
   });
 
-  // 승패 쪽이 바뀌면 고를 수 있는 사람도 달라진다
-  renderLateBox(byId, winChecked, loseChecked);
-
   const nWin = getChecked('winList').length;
   const nLose = getChecked('loseList').length;
-  showPickCount(nWin, nLose, latePicked.length);
+  showPickCount(nWin, nLose);
 
   const submit = document.getElementById('submitMatch');
   if (submit) submit.disabled = !(nWin >= MIN_SIDE && nLose >= MIN_SIDE);
 
   // 지울 게 있을 때만 켠다 — 빈 화면에서 눌러봐야 아무 일도 안 일어난다
   const reset = document.getElementById('resetPick');
-  if (reset) reset.disabled = !(nWin || nLose || latePicked.length);
+  if (reset) reset.disabled = !(nWin || nLose);
 
   // 칸마다 붙은 지우기는 고른 사람이 있을 때만 나타난다
   const showClear = (id, n) => {
@@ -4890,14 +4822,12 @@ function renderChecklists() {
   };
   showClear('winClear', nWin);
   showClear('loseClear', nLose);
-  showClear('lateClear', latePicked.length);
 }
 
 /** 체크를 전부 푼다. 기록을 넣은 뒤에도, 잘못 골랐을 때도 같은 길을 쓴다. */
 function clearPicks() {
   document.querySelectorAll('#winList input, #loseList input')
     .forEach(el => { el.checked = false; });
-  latePicked = [];
   renderChecklists();
 }
 
@@ -4906,60 +4836,14 @@ function clearPicks() {
  * 한 명뿐이면 묻지 않는다 — 다시 누르는 데 한 번이면 되는 것을 붙잡지 않는다.
  */
 function clearSide(which) {
-  const label = { win: '승리 팀', lose: '패배 팀', late: '늦은 참석자' }[which];
-  const n = which === 'late' ? latePicked.length : getChecked(which + 'List').length;
+  const label = { win: '승리 팀', lose: '패배 팀' }[which];
+  const n = getChecked(which + 'List').length;
   if (!n) return;
-  const ask = which === 'late'
-    ? `늦은 참석자로 고른 ${n}명을 지울까요?`
-    : `${label}에 체크한 ${n}명을 지울까요?`;
-  if (n >= 2 && !confirm(ask)) return;
+  if (n >= 2 && !confirm(`${label}에 체크한 ${n}명을 지울까요?`)) return;
 
-  if (which === 'late') latePicked = [];
-  else document.querySelectorAll(`#${which}List input`).forEach(el => { el.checked = false; });
+  document.querySelectorAll(`#${which}List input`).forEach(el => { el.checked = false; });
   renderChecklists();
   showToast(`${label} 체크를 지웠습니다`);
-}
-
-/** 늦은 참석자 — 고르는 칸과 고른 사람 딱지. */
-function renderLateBox(byId, winChecked, loseChecked) {
-  const sel = document.getElementById('lateSelect');
-  const chips = document.getElementById('lateChips');
-  if (!sel || !chips) return;
-
-  // 승패에 이미 들어간 사람과 이미 고른 사람은 목록에서 뺀다
-  const taken = new Set([...winChecked, ...loseChecked, ...latePicked]);
-  const free = byId.filter(p => !taken.has(p.handle));
-  sel.innerHTML = '<option value="">선수를 고르세요</option>'
-    + free.map(p => `<option value="${esc(p.handle)}">${esc(p.handle)}${p.clan ? ` · ${esc(p.clan)}` : ''}</option>`).join('');
-  sel.disabled = free.length === 0;
-
-  chips.innerHTML = latePicked.map(h =>
-    `<span class="late-chip">${esc(h)}<button type="button" data-late-del="${esc(h)}"
-       aria-label="${esc(h)} 빼기">&times;</button></span>`).join('');
-}
-
-function initLateEvents() {
-  const sel = document.getElementById('lateSelect');
-  const add = document.getElementById('lateAdd');
-  const chips = document.getElementById('lateChips');
-  if (!sel || !add || !chips) return;
-
-  const take = () => {
-    const h = sel.value;
-    if (!h || latePicked.includes(h)) return;
-    latePicked.push(h);
-    renderChecklists();
-  };
-  add.addEventListener('click', take);
-  // 고르자마자 담기게 두면 버튼을 못 보고 지나쳐도 동작한다
-  sel.addEventListener('change', take);
-
-  chips.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-late-del]');
-    if (!btn) return;
-    latePicked = latePicked.filter(h => h !== btn.dataset.lateDel);
-    renderChecklists();
-  });
 }
 
 /**
@@ -4969,7 +4853,7 @@ function initLateEvents() {
  * 확정 버튼 위에 대진을 크게 띄운다. 인원이 안 맞아도 막지는 않는다 —
  * 7:8 같은 경기도 기록해야 하기 때문이다. 다르다는 사실만 알려준다.
  */
-function showPickCount(nWin, nLose, nLate = 0) {
+function showPickCount(nWin, nLose) {
   const set = (id, n) => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -4978,14 +4862,10 @@ function showPickCount(nWin, nLose, nLate = 0) {
   };
   set('winCount', nWin);
   set('loseCount', nLose);
-  set('lateCount', nLate);
 
   const sum = document.getElementById('pickSum');
   if (sum) {
-    // 늦은 참석자는 대진에 섞지 않는다. 7:7 에 한 명이 늦게 붙어도 경기는
-    // 7:7 이지, 8:7 이 아니기 때문이다.
-    sum.innerHTML = `<span class="pw">${nWin}</span><span class="px">:</span><span class="pl">${nLose}</span>`
-      + (nLate ? `<span class="plate">늦은 참석자 ${nLate}명 · 점수만 +1</span>` : '');
+    sum.innerHTML = `<span class="pw">${nWin}</span><span class="px">:</span><span class="pl">${nLose}</span>`;
     sum.classList.toggle('zero', nWin === 0 && nLose === 0);
   }
 
@@ -9622,15 +9502,14 @@ function initPlayingWatch() {
 
 /* ---------- 경기 기록 ---------- */
 
-async function recordTeamMatch(winners, losers, late = []) {
+async function recordTeamMatch(winners, losers) {
   const btn = document.getElementById('submitMatch');
   btn.disabled = true;
   try {
-    await apiPost('/api/match', { winners, losers, late });
+    await apiPost('/api/match', { winners, losers });
     await refreshAll();
     clearPicks();
-    showToast(`승리 ${winners.length}명 / 패배 ${losers.length}명`
-      + (late.length ? ` / 늦은 참석자 ${late.length}명` : '') + ' 기록 완료');
+    showToast(`승리 ${winners.length}명 / 패배 ${losers.length}명 기록 완료`);
   } catch (e) {
     showToast(e.message);
     btn.disabled = false;
@@ -10397,7 +10276,7 @@ function initAdminEvents() {
   document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
   document.getElementById('importFile').addEventListener('change', handleImportFile);
 
-  for (const which of ['win', 'lose', 'late']) {
+  for (const which of ['win', 'lose']) {
     const btn = document.getElementById(which + 'Clear');
     if (btn) btn.addEventListener('click', () => clearSide(which));
   }
@@ -10405,7 +10284,7 @@ function initAdminEvents() {
   document.getElementById('resetPick').addEventListener('click', () => {
     const nWin = getChecked('winList').length;
     const nLose = getChecked('loseList').length;
-    const total = nWin + nLose + latePicked.length;
+    const total = nWin + nLose;
     if (!total) return;
     if (total >= 2 && !confirm(`체크한 ${total}명을 모두 지우고 처음부터 다시 고를까요?`)) return;
     clearPicks();
@@ -10416,7 +10295,7 @@ function initAdminEvents() {
     const winners = getChecked('winList');
     const losers = getChecked('loseList');
     if (winners.length < MIN_SIDE || losers.length < MIN_SIDE) return;
-    await recordTeamMatch(winners, losers, [...latePicked]);
+    await recordTeamMatch(winners, losers);
   });
 
   document.getElementById('resetBtn').addEventListener('click', async () => {
@@ -10537,7 +10416,6 @@ async function boot() {
   initStandingEvents();
   initAdminEvents();
   initHistoryEvents();
-  initLateEvents();
   initAccountEvents();
   initTournamentEvents();
   initBoardEvents();
