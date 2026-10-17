@@ -194,17 +194,21 @@
   /* 로고 빨강 — 원본 로고의 빨강. 상태색(--danger)과는 쓰임이 다르다. */
   --r6-red:            #e21b1b;
 
-  /* 룰렛 조각 — 한 팀이 여덟 명까지이므로 여덟 색을 둔다. 같은 판에 같은 색이
-     두 번 나오지 않는다. 색마다 글자색을 따로 두는 까닭은, 밝은 색 위의 흰 글씨와
-     어두운 색 위의 검은 글씨가 둘 다 안 읽히기 때문이다. */
-  --rl-1: #e63946;  --rl-1-ink: #ffffff;   /* 빨강 */
-  --rl-2: #f77f00;  --rl-2-ink: #ffffff;   /* 주황 */
-  --rl-3: #fcbf49;  --rl-3-ink: #3d2b00;   /* 노랑 */
-  --rl-4: #2ec4b6;  --rl-4-ink: #06302c;   /* 민트 */
-  --rl-5: #118ab2;  --rl-5-ink: #ffffff;   /* 파랑 */
-  --rl-6: #7c5cff;  --rl-6-ink: #ffffff;   /* 보라 */
-  --rl-7: #ff6fb5;  --rl-7-ink: #4a0f2e;   /* 분홍 */
-  --rl-8: #8ac926;  --rl-8-ink: #1c2e05;   /* 연두 */
+  /* 룰렛 조각 — 여덟 색. 한 팀이 여덟 명까지이므로 같은 판에 같은 색이 없다.
+     파랑·보라·청록·초록 네 가지를 진한 단과 연한 단으로 두 번씩 쓰고,
+     이웃끼리 밝기가 엇갈리게 늘어놓는다. 밝기 차이가 색 차이를 대신해주므로
+     채도를 낮춰도 조각이 구분된다 — 쨍한 원색 여덟 개는 촌스럽다는 말을 들었다.
+     이웃한 조각의 색 차이(OKLab ΔE)는 최소 27, 색각 이상에서도 25다.
+     글자색은 조각마다 따로 둔다. 진한 칸은 흰 글씨(대비 6.4 이상),
+     연한 칸은 짙은 남색(6.8 이상)이다. */
+  --rl-1: #225a93;  --rl-1-ink: #ffffff;   /* 파랑 진한 */
+  --rl-2: #74b9b8;  --rl-2-ink: #10213a;   /* 청록 연한 */
+  --rl-3: #674689;  --rl-3-ink: #ffffff;   /* 보라 진한 */
+  --rl-4: #8ab895;  --rl-4-ink: #10213a;   /* 초록 연한 */
+  --rl-5: #006a6b;  --rl-5-ink: #ffffff;   /* 청록 진한 */
+  --rl-6: #8baed6;  --rl-6-ink: #10213a;   /* 파랑 연한 */
+  --rl-7: #176938;  --rl-7-ink: #ffffff;   /* 초록 진한 */
+  --rl-8: #b5a0cf;  --rl-8-ink: #10213a;   /* 보라 연한 */
 }
 
 /* ============================================================
@@ -261,15 +265,16 @@
   /* 어두운 바탕에서는 같은 빨강이 가라앉아 한 단계 밝힌다 */
   --r6-red:            #ff2b2b;
 
-  /* 어두운 바탕에서는 같은 색이 가라앉는다. 한 단계씩 밝혀 또렷하게. */
-  --rl-1: #ff5c69;  --rl-1-ink: #3d0007;
-  --rl-2: #ff9f2e;  --rl-2-ink: #3d2300;
-  --rl-3: #ffd166;  --rl-3-ink: #3d2b00;
-  --rl-4: #3ddbc9;  --rl-4-ink: #052e29;
-  --rl-5: #38b6e0;  --rl-5-ink: #042836;
-  --rl-6: #9b85ff;  --rl-6-ink: #19083f;
-  --rl-7: #ff8ac6;  --rl-7-ink: #4a0f2e;
-  --rl-8: #a8e034;  --rl-8-ink: #1c2e05;
+  /* 어두운 바탕에서는 진한 단이 바탕에 묻는다. 그 단만 한 칸 밝혀 세운다
+     (바탕과의 대비 3.3 이상). 색과 짜임은 밝은 쪽과 같다. */
+  --rl-1: #3771af;  --rl-1-ink: #ffffff;
+  --rl-2: #75c0c0;  --rl-2-ink: #10213a;
+  --rl-3: #7e5ca4;  --rl-3-ink: #ffffff;
+  --rl-4: #8dbf9a;  --rl-4-ink: #10213a;
+  --rl-5: #008283;  --rl-5-ink: #ffffff;
+  --rl-6: #8fb5e0;  --rl-6-ink: #10213a;
+  --rl-7: #2f814c;  --rl-7-ink: #ffffff;
+  --rl-8: #bca5d8;  --rl-8-ink: #10213a;
 }
 
 /* ============================================================
@@ -1197,7 +1202,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
    한때 #rlSpinA, #rlSpinB 로 적어두었더니 네 팀으로 늘렸을 때 C·D 판이
    왼쪽 위 모서리를 축으로 돌아 화면 밖으로 날아갔다. 이름이 아니라 갈래로 건다. */
 .rl-spin{ transform-box:view-box; transform-origin:100px 100px; }
-.rl-slice{ stroke:var(--surface); stroke-width:1.2; }
+.rl-slice{ stroke:var(--surface); stroke-width:1; }
 /* 글자색은 조각 색에 맞춰 그릴 때 하나씩 넣는다 */
 .rl-name{ font-family:var(--font-sans); font-weight:var(--fw-bold); pointer-events:none; }
 .rl-host{
@@ -4266,7 +4271,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 93;
+const APP_VERSION = 94;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
