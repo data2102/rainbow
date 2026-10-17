@@ -281,7 +281,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 95;
+const APP_VERSION = 96;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -860,11 +860,14 @@ function renderChecklists() {
   const winList = document.getElementById('winList');
   const loseList = document.getElementById('loseList');
   if (!winList || !loseList) return;
-  // 점수 순이 아니라 아이디 순(ABC)으로 늘어놓는다. 체크할 사람을 눈으로 찾기 쉽도록.
-  const byId = [...players].sort((a, b) =>
-    a.handle.localeCompare(b.handle, 'en', { sensitivity: 'base' }));
-  winList.innerHTML = byId.map(p => rowHtml(p, 'win')).join('');
-  loseList.innerHTML = byId.map(p => rowHtml(p, 'lose')).join('');
+  // 이번 달 포인트 높은 순. 자주 뛰는 사람이 위에 모여 체크가 빨라진다.
+  // 순위도 점수도 적지 않는다 — 고르는 칸에 숫자가 있으면 누가 센지부터 따지게 된다.
+  // (호스트 뽑기의 rlRanked() 와 같은 순서다)
+  const byPoint = [...players].sort((a, b) =>
+    (b.point - a.point) || (b.wins - a.wins)
+    || a.handle.localeCompare(b.handle, 'en', { sensitivity: 'base' }));
+  winList.innerHTML = byPoint.map(p => rowHtml(p, 'win')).join('');
+  loseList.innerHTML = byPoint.map(p => rowHtml(p, 'lose')).join('');
 
   document.querySelectorAll('#winList input, #loseList input').forEach(el => {
     el.addEventListener('change', renderChecklists);
