@@ -281,11 +281,14 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 98;
+const APP_VERSION = 99;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
 const LOSS_GAIN = 1;
+
+/** 새 계정·되살린 계정이 받는 임시 비밀번호. api/_lib.js 의 TEMP_PASSWORD 와 같아야 한다. */
+const TEMP_PW = '1234';
 
 /** 한 팀의 최소 인원. 1:1 은 래더 경기로 치지 않는다. 서버도 같은 값으로 막는다. */
 const MIN_SIDE = 2;
@@ -3717,6 +3720,7 @@ const ACCT_ACTION_LABEL = {
   create_player: '계정 추가',
   update_player: '계정 수정',
   remove_player: '계정 삭제',
+  restore_player: '계정 되살림',
   set_role: '권한 변경',
   void_match: '기록 취소',
   restore_match: '취소 되돌림',
@@ -4021,6 +4025,29 @@ async function setTeamField(handle, field, value) {
 function initAdminPagers() {
   bindPager('rolePager', 'rpage', n => { rolePage = n; }, renderAccounts);
   bindPager('acctLogPager', 'lpage', n => { logPage = n; }, renderAcctLogs);
+
+  // 잘못 지운 계정을 로그 줄에서 바로 되살린다. 줄은 쪽을 넘길 때마다 새로
+  // 그려지므로 표 바깥에서 한 번만 받는다.
+  const logTable = document.querySelector('#acctLogTable');
+  if (logTable) logTable.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-undo]');
+    if (!btn || btn.disabled) return;
+    const handle = btn.dataset.undo;
+    if (!confirm(`${handle} 계정을 되살립니다.\n\n`
+      + `· CLAN·이메일은 삭제 기록에서 가져옵니다\n`
+      + `· 이번 달 성적은 경기 기록에서 다시 계산합니다\n`
+      + `· 비밀번호는 임시 비밀번호(${TEMP_PW})로 시작합니다\n\n계속할까요?`)) return;
+    btn.disabled = true;
+    try {
+      const r = await apiPost('/api/player', { action: 'restore', handle });
+      await refreshAll();
+      const p = r.player || {};
+      showToast(`${handle} 되살렸습니다 · ${p.point}점 ${p.wins}승 ${p.losses}패`);
+    } catch (err) {
+      btn.disabled = false;
+      showToast('되살리기 실패: ' + err.message);
+    }
+  });
   bindPager('tmPager', 'tpage', n => { tmPage = n; }, renderTeamPanel);
 
   const search = document.getElementById('tmSearch');
@@ -4082,6 +4109,7 @@ function renderAcctLogs() {
     const d = l.detail || {};
     let target = d.handle || d.to || d.target || '-';
     let extra = '';
+    let back = '';
     if (l.action === 'void_match' || l.action === 'restore_match') {
       // 표에 붙는 #번호가 아니라 경기 일시로 가리킨다. 번호는 보는 달에 따라
       // 달라지지만 일시는 어디서 봐도 같은 경기를 가리킨다.
@@ -4107,11 +4135,20 @@ function renderAcctLogs() {
       if (d.clan) parts.push(`CLAN ${d.clan}`);
       if (d.point != null) parts.push(`${d.point}점 ${d.wins || 0}승 ${d.losses || 0}패`);
       if (parts.length) extra = ` (${parts.join(' · ')})`;
+      // 이미 명단에 있으면 되살릴 것이 없다
+      if (d.handle && !players.some(p => p.handle.toLowerCase() === String(d.handle).toLowerCase())) {
+        back = `<button type="button" class="btn-mini acct-undo" data-undo="${esc(d.handle)}">되살리기</button>`;
+      }
+    } else if (l.action === 'restore_player') {
+      const parts = [];
+      if (d.clan) parts.push(`CLAN ${d.clan}`);
+      if (d.point != null) parts.push(`${d.point}점 ${d.wins || 0}승 ${d.losses || 0}패`);
+      if (parts.length) extra = ` (${parts.join(' · ')})`;
     }
     return `<tr>
       <td class="h-inline" data-l="일시">${formatDateTime(l.ts)}</td>
       <td class="h-inline" data-l="내용">${esc(ACCT_ACTION_LABEL[l.action] || l.action)}</td>
-      <td class="h-inline" data-l="대상">${esc(target)}${esc(extra)}</td>
+      <td class="h-inline" data-l="대상">${esc(target)}${esc(extra)}${back}</td>
       <td class="h-by-cell" data-l="처리자">${esc(l.by || '-')}</td>
     </tr>`;
   }).join('');

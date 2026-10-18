@@ -1,7 +1,8 @@
 import {
   q, tx, body, methodGuard, requireAdmin, currentUser, audit, parseHandle,
-  cleanEmail, hashPw, TEMP_PASSWORD,
+  cleanEmail, hashPw, TEMP_PASSWORD, replay,
 } from './_lib.js';
+import { ensureSeason } from './_season.js';
 
 /**
  * 회원(=계정) 정보를 관리자가 직접 손보는 곳.
@@ -14,6 +15,7 @@ export default async function handler(req, res) {
     const { action } = body(req);
     if (action === 'create') return await create(req, res);
     if (action === 'remove') return await remove(req, res);
+    if (action === 'restore') return await restore(req, res);
     if (action === 'update') return await update(req, res);
     return res.status(400).json({ error: '알 수 없는 요청입니다.' });
   } catch (e) {
@@ -122,10 +124,68 @@ async function remove(req, res) {
 
   if (!removed) return res.status(404).json({ error: '이미 삭제된 회원입니다.' });
 
+  // 되살릴 때 쓸 값은 여기 남는 것이 전부다. 이메일·권한도 같이 적어 둔다.
   await audit(admin, 'remove_player', {
     handle, clan: removed.clan, point: removed.point, wins: removed.wins, losses: removed.losses,
+    email: removed.email || '', role: removed.role || 'member',
   });
   res.status(200).json({ ok: true });
+}
+
+/* ---------- 되살리기 ---------- */
+
+/**
+ * 실수로 지운 회원을 되살린다.
+ *
+ * 지울 때 명단에서만 빠질 뿐 경기 기록은 그대로 남으므로, 명단에 다시 넣고
+ * 이번 달 성적을 경기 기록에서 다시 세면 지우기 직전과 같아진다.
+ * CLAN·이메일·권한은 삭제할 때 남긴 기록(audit_log)에서 꺼내 온다.
+ *
+ * 되돌릴 수 없는 것은 비밀번호뿐이다. 임시 비밀번호로 시작한다.
+ */
+async function restore(req, res) {
+  const me = await requireAdmin(req, res);
+  if (!me) return;
+
+  const handle = String(body(req).handle || '').trim();
+  if (!handle) return res.status(400).json({ error: '어떤 계정인지 알 수 없습니다.' });
+
+  const dup = await q(`SELECT 1 FROM players WHERE lower(handle) = lower($1)`, [handle]);
+  if (dup.length) return res.status(409).json({ error: '이미 명단에 있는 ID입니다: ' + handle });
+
+  // 가장 마지막에 지운 기록을 본다. 지웠다 살렸다를 되풀이했어도 최근 것이 맞다.
+  const logs = await q(
+    `SELECT detail FROM audit_log
+      WHERE action = 'remove_player' AND detail->>'handle' = $1
+      ORDER BY ts DESC LIMIT 1`, [handle]
+  );
+  if (!logs.length) {
+    return res.status(404).json({ error: '삭제 기록이 없어 되살릴 수 없습니다: ' + handle });
+  }
+  const was = logs[0].detail || {};
+
+  const out = await tx(async (c) => {
+    const season = await ensureSeason(c);
+    const parsed = parseHandle(handle);
+    await c.query(
+      `INSERT INTO players (handle, clan, name, email, pw_hash, role, point, wins, losses, streak)
+       VALUES ($1,$2,$3,$4,$5,$6,0,0,0,0)`,
+      [handle, was.clan || parsed.clan, parsed.name, was.email || null,
+       hashPw(TEMP_PASSWORD), was.role === 'master' ? 'member' : (was.role || 'member')]
+    );
+    // 경기 기록에서 이번 달 성적을 다시 센다 — 지우기 전 숫자가 그대로 돌아온다
+    await replay(c, season.current ? season.current.id : null);
+    const { rows } = await c.query(
+      `SELECT handle, clan, point, wins, losses FROM players WHERE handle = $1`, [handle]
+    );
+    return rows[0];
+  });
+
+  await audit(me, 'restore_player', {
+    handle, clan: out.clan, point: out.point, wins: out.wins, losses: out.losses,
+    was: { point: was.point, wins: was.wins, losses: was.losses },
+  });
+  res.status(200).json({ ok: true, player: out, was });
 }
 
 /* ---------- 수정 ---------- */

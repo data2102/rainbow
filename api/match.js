@@ -1,8 +1,8 @@
 import { randomInt } from 'node:crypto';
 import {
   q, tx, body, methodGuard, requireUser, requireAdmin, audit,
-  winGain, lossGain, lateGain, cleanReason, ensureMatchVoid,
-  ensureHostDraws, rowToDraw, TEAM_NAMES,
+  winGain, lossGain, cleanReason, ensureMatchVoid,
+  ensureHostDraws, rowToDraw, TEAM_NAMES, replay,
 } from './_lib.js';
 import { ensureSeason } from './_season.js';
 
@@ -208,87 +208,6 @@ async function apply(id, change) {
     await replay(c, seasonId);
     return row;
   });
-}
-
-/**
- * 살아있는 기록만으로 시즌 성적을 처음부터 다시 계산한다.
- *
- * 취소한 경기의 점수만 빼는 방법은 쓸 수 없다. 연승 보너스 때문에 한 경기를
- * 들어내면 그 뒤 경기들의 획득 점수까지 달라지기 때문이다. 그래서 시즌 첫
- * 경기부터 순서대로 다시 돌린다. 한 달 경기 수가 많지 않아 이 편이 정확하고
- * 단순하다. 달라진 획득 점수는 기록에도 반영한다.
- */
-async function replay(c, seasonId) {
-  await c.query(
-    `UPDATE players SET point = 0, wins = 0, losses = 0, streak = 0,
-            last_result = NULL, last_match = NULL`
-  );
-
-  const { rows } = seasonId
-    ? await c.query(
-        `SELECT * FROM matches WHERE season = $1 AND voided_at IS NULL ORDER BY ts ASC, id ASC`,
-        [seasonId])
-    : await c.query(
-        `SELECT * FROM matches WHERE season IS NULL AND voided_at IS NULL ORDER BY ts ASC, id ASC`);
-
-  const stats = new Map();
-  const of = (h) => {
-    if (!stats.has(h)) {
-      stats.set(h, { point: 0, wins: 0, losses: 0, streak: 0, lastResult: null, lastMatch: null });
-    }
-    return stats.get(h);
-  };
-
-  for (const m of rows) {
-    const winners = Array.isArray(m.winners) ? m.winners : [];
-    const losers = Array.isArray(m.losers) ? m.losers : [];
-    const ts = Number(m.ts);
-    const redone = [];
-
-    for (const w of winners) {
-      const h = typeof w === 'string' ? w : w.handle;
-      if (!h) continue;
-      const s = of(h);
-      s.streak = s.lastResult === 'W' ? s.streak + 1 : 1;
-      const gained = winGain(s.streak);
-      s.point += gained;
-      s.wins += 1;
-      s.lastResult = 'W';
-      s.lastMatch = ts;
-      redone.push({ handle: h, gained });
-    }
-
-    for (const h of losers) {
-      if (!h) continue;
-      const s = of(h);
-      s.streak = s.lastResult === 'L' ? s.streak - 1 : -1;
-      s.point += lossGain();
-      s.losses += 1;
-      s.lastResult = 'L';
-      s.lastMatch = ts;
-    }
-
-    // 지각 팀은 없앴지만, 그 칸이 있던 시절의 기록은 여기서 그대로 되살린다.
-    // 빼버리면 관리자가 경기 하나를 취소하는 순간 지난 달에 받은 점수까지
-    // 소리 없이 사라져 순위가 달라진다. 새 기록에는 이 칸이 비어 있다.
-    for (const h of (Array.isArray(m.late) ? m.late : [])) {
-      if (!h) continue;
-      of(h).point += lateGain();
-    }
-
-    if (JSON.stringify(redone) !== JSON.stringify(winners)) {
-      await c.query(`UPDATE matches SET winners = $1 WHERE id = $2`, [JSON.stringify(redone), m.id]);
-    }
-  }
-
-  for (const [handle, s] of stats) {
-    await c.query(
-      `UPDATE players SET point = $1, wins = $2, losses = $3, streak = $4,
-              last_result = $5, last_match = $6 WHERE handle = $7`,
-      [s.point, s.wins, s.losses, s.streak, s.lastResult,
-       s.lastMatch == null ? null : new Date(s.lastMatch), handle]
-    );
-  }
 }
 
 function winnerHandles(row) {

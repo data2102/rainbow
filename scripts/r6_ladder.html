@@ -1292,6 +1292,15 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .rl-log-res.wait{ background:var(--surface); color:var(--text-tertiary); border:1px solid var(--border); }
 /* 시험 삼아 돌려본 기록을 치우는 길. 관리자에게만 보인다. */
 .rl-log-wipe{ border-color:var(--danger); color:var(--danger-strong); }
+/* 계정 로그에서 바로 되살리는 단추 */
+.acct-undo{
+  margin-left:var(--sp-2); font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+  padding:1px var(--sp-2); border-radius:var(--radius-sm);
+  border:1px solid var(--accent); background:var(--accent-bg); color:var(--accent-strong);
+  cursor:pointer; font-family:inherit; white-space:nowrap;
+}
+.acct-undo:hover:not(:disabled){ background:var(--accent); color:var(--on-accent); }
+.acct-undo:disabled{ opacity:.5; cursor:not-allowed; }
 .rl-log-wipe:hover{ background:var(--danger); border-color:var(--danger); color:#fff; }
 
 @media (max-width:620px){
