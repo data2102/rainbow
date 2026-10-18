@@ -4215,7 +4215,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 97;
+const APP_VERSION = 98;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -8033,6 +8033,14 @@ function renderAcctLogs() {
       if (parts.length) extra = ` (${parts.join(' · ')})`;
     } else if (l.action === 'create_player' && d.clan) {
       extra = ` (${d.clan}${d.email ? ' · ' + d.email : ''})`;
+    } else if (l.action === 'remove_player') {
+      // 잘못 지웠을 때 여기만 보고 되살릴 수 있어야 한다.
+      // CLAN 은 다시 만들 때 그대로 넣어야 하는 값이고, 전적은 재계산이
+      // 제대로 됐는지 맞춰보는 기준이 된다.
+      const parts = [];
+      if (d.clan) parts.push(`CLAN ${d.clan}`);
+      if (d.point != null) parts.push(`${d.point}점 ${d.wins || 0}승 ${d.losses || 0}패`);
+      if (parts.length) extra = ` (${parts.join(' · ')})`;
     }
     return `<tr>
       <td class="h-inline" data-l="일시">${formatDateTime(l.ts)}</td>
