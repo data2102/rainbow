@@ -268,29 +268,6 @@ const SPLIT_TRIES = 300;
 const SPLIT_SLACK = 0.15;
 
 /**
- * 같은 편으로 묶지 않을 짝.
- *
- * 값은 운영 환경변수(TEAM_AVOID)에서만 읽는다. 저장소가 공개라서 여기에
- * 적어두면 누구든 볼 수 있고, 그러면 두는 뜻이 없어진다.
- * 형식: `AAA|BBB,AAA|CCC` — 세로줄이 한 짝, 쉼표로 여러 짝.
- * 비어 있으면 아무 제약도 걸리지 않는다.
- */
-const AVOID = String(process.env.TEAM_AVOID || '')
-  .split(',')
-  .map(one => one.split('|').map(h => h.trim().toLowerCase()).filter(Boolean))
-  .filter(pair => pair.length === 2);
-
-/** 한 묶음 안에 걸린 짝이 함께 있는가 */
-function avoidOk(parts) {
-  if (!AVOID.length) return true;
-  for (const part of parts) {
-    const here = new Set(part.map(p => p.handle.toLowerCase()));
-    for (const [a, b] of AVOID) if (here.has(a) && here.has(b)) return false;
-  }
-  return true;
-}
-
-/**
  * 팀을 나눈다 — 이번 달 포인트로 균형을 맞추되, 매번 같은 짝이 되지 않게.
  *
  * 처음에는 차이가 가장 적은 조합을 끝까지 찾아 들어갔다. 그랬더니 점수가
@@ -323,13 +300,8 @@ function splitTeams(rows, sizes) {
     tries.push({ parts, spread });
   }
 
-  // 걸린 짝이 갈라진 조합만 쓴다. 그런 조합이 하나도 안 나오면(인원이 적어
-  // 갈라놓을 수가 없는 날) 그냥 전부에서 고른다 — 뽑기가 멈추는 것보다 낫다.
-  const keep = tries.filter(t => avoidOk(t.parts));
-  const pool = keep.length ? keep : tries;
-
-  const best = Math.min(...pool.map(t => t.spread));
-  const fair = pool.filter(t => t.spread <= best + slack);
+  const best = Math.min(...tries.map(t => t.spread));
+  const fair = tries.filter(t => t.spread <= best + slack);
   const pick = fair[randomInt(fair.length)];
 
   // 이름표도 섞어 붙인다. A 가 늘 센 팀이면 이름이 뜻을 가져버린다.
