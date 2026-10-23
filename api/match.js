@@ -267,6 +267,49 @@ const SPLIT_TRIES = 300;
  */
 const SPLIT_SLACK = 0.15;
 
+/** 하루의 경계. 한국 시각 00시에 넘어간다. */
+const KST = 9 * 60 * 60 * 1000;
+function dayStart(ms = Date.now()) {
+  return Math.floor((ms + KST) / 86400000) * 86400000 - KST;
+}
+
+/**
+ * 오늘 호스트로 뽑힌 횟수. 아이디(소문자)마다 몇 번인지 센다.
+ *
+ * 하루에 두 번 맡는 일이 없게 하려고 본다. 사람이 적어 어쩔 수 없는 날에는
+ * 두 번째도 맡아야 하므로 '못 한다'가 아니라 '뒤로 민다'로 쓴다.
+ * 1순위만 센다 — 1순위가 못 잡아 2순위가 맡은 날까지는 알 길이 없다.
+ */
+async function hostCountToday(c) {
+  const { rows } = await c.query(
+    `SELECT teams, host_a, host_b FROM host_draws WHERE ts >= $1`, [dayStart()]
+  );
+  const n = new Map();
+  const add = (h) => {
+    if (!h) return;
+    const k = String(h).toLowerCase();
+    n.set(k, (n.get(k) || 0) + 1);
+  };
+  for (const r of rows) {
+    // teams 가 생기기 전 기록은 host_a·host_b 에만 있다
+    if (r.teams && r.teams.length) for (const t of r.teams) add((t.order || [])[0]);
+    else { add(r.host_a); add(r.host_b); }
+  }
+  return n;
+}
+
+/**
+ * 팀 안의 차례를 정한다. 이 차례가 곧 호스트 순번이다.
+ *
+ * 먼저 섞은 뒤 오늘 호스트를 맡은 횟수가 적은 사람부터 앞에 세운다.
+ * 같은 횟수끼리는 섞인 차례 그대로다(정렬이 안정적이라 그렇다) — 그래서
+ * 아직 안 맡은 사람들 사이에서는 여전히 제비뽑기다.
+ */
+function hostOrder(handles, today) {
+  const n = (h) => today.get(String(h).toLowerCase()) || 0;
+  return shuffle([...handles]).sort((a, b) => n(a) - n(b));
+}
+
 /**
  * 팀을 나눈다 — 이번 달 포인트로 균형을 맞추되, 매번 같은 짝이 되지 않게.
  *
@@ -368,11 +411,12 @@ async function hostDraw(req, res, b) {
       const missing = entries.filter(h => !found.has(h));
       if (missing.length) throw new Error('명단에 없는 선수입니다: ' + missing.join(', '));
 
-      // 팀 안의 차례를 섞는다. 이 순서가 곧 호스트 순번이다 —
-      // 1순위가 호스트를 못 잡으면 2순위, 그래도 안 되면 3순위가 맡는다.
+      // 팀 안의 차례가 곧 호스트 순번이다 — 1순위가 호스트를 못 잡으면 2순위,
+      // 그래도 안 되면 3순위가 맡는다. 오늘 이미 맡은 사람은 뒤로 민다.
       const parts = splitTeams(rows, sizes);
       const names = TEAM_NAMES.slice(0, teams);
-      const teamRows = parts.map((handles, i) => ({ name: names[i], order: shuffle([...handles]) }));
+      const today = await hostCountToday(c);
+      const teamRows = parts.map((handles, i) => ({ name: names[i], order: hostOrder(handles, today) }));
 
       // 앞에서부터 둘씩 붙여 대진을 만든다. 이름표를 이미 섞었으므로 어느 팀이
       // 어느 팀과 붙을지도 여기서 갈린다.
