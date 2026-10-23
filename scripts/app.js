@@ -281,7 +281,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 99;
+const APP_VERSION = 100;
 let toldToRefresh = false;
 
 /** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
@@ -6132,6 +6132,26 @@ async function loadRlLog(page) {
   renderRlLog();
 }
 
+/**
+ * 기록 한 줄의 경기 결과 칸.
+ *
+ * 돌려만 놓고 창을 닫으면 '이번 판' 화면이 사라져, 리폿 탭에서 손으로 다시
+ * 체크해야 했다. 나눠준 팀이 여기 그대로 적혀 있으니 여기서 바로 올린다.
+ * 로그인한 사람에게만 단추가 보인다 — 서버도 같은 자리에서 막는다.
+ */
+function rlLogResult(r, p, i, many) {
+  const head = many ? `${i + 1}경기 ` : '';
+  if (p.result) {
+    return `<span class="rl-log-res">${head}${esc(p.result)} Team 승리`
+      + `${p.by ? ` · ${esc(p.by)}` : ''}</span>`;
+  }
+  if (!me) return `<span class="rl-log-res wait">${head}결과 미등록</span>`;
+  return `<span class="rl-log-res wait">${head}결과 미등록</span>`
+    + [p.a, p.b].map(name =>
+        `<button type="button" class="rl-log-win" data-draw="${r.id}" data-pair="${i}"
+           data-win="${esc(name)}">${esc(name)} Team 승리</button>`).join('');
+}
+
 function renderRlLog() {
   const box = document.getElementById('rlLog');
   const empty = document.getElementById('rlLogEmpty');
@@ -6164,9 +6184,7 @@ function renderRlLog() {
       <div class="rl-log-team">
         ${r.teams.map(t => team(t, r.pairs.some(p => p.first === t.name))).join('')}
       </div>
-      ${r.pairs.map((p, i) => `<span class="rl-log-res${p.result ? '' : ' wait'}">`
-        + `${many ? `${i + 1}경기 ` : ''}`
-        + `${p.result ? `${esc(p.result)} Team 승리 · ${esc(p.by || '')}` : '결과 미등록'}</span>`).join(' ')}
+      ${r.pairs.map((p, i) => rlLogResult(r, p, i, many)).join(' ')}
     </div>`;
   }).join('');
 
@@ -6177,6 +6195,44 @@ function renderRlLog() {
   const total = (d && d.total) || 0;
   const per = (d && d.per) || 10;
   renderPager('rlPager', 'rlpage', total, pages, rlLogPage, (rlLogPage - 1) * per, rows.length, '건');
+}
+
+/**
+ * 기록 줄에서 바로 결과를 올린다.
+ *
+ * '이번 판' 화면과 같은 길(hostResult)을 쓰므로 점수도 똑같이 들어간다.
+ * 다만 경기 일시는 **올리는 지금**으로 찍힌다 — 손으로 리폿을 쓸 때와 같다.
+ * 달을 넘겨 올리면 이번 달 경기로 들어가니, 늦었으면 그 점을 알려준다.
+ */
+async function rlReportFromLog(btn) {
+  const id = Number(btn.dataset.draw);
+  const pair = Number(btn.dataset.pair);
+  const winner = btn.dataset.win;
+  const row = (rlLogData && rlLogData.draws || []).find(d => d.id === id);
+  if (!row) return;
+  const p = row.pairs[pair];
+  if (!p || p.result) return;
+
+  const size = (name) => ((row.teams.find(t => t.name === name) || { order: [] }).order.length);
+  const which = row.pairs.length > 1 ? `${pair + 1}경기 · ` : '';
+  const late = new Date(row.ts).getMonth() !== new Date().getMonth();
+  if (!confirm(`${which}${winner} Team 승리로 기록합니다.\n`
+    + `${size(p.a)}:${size(p.b)} · ${formatDateTime(row.ts)} 에 나눈 판입니다.\n`
+    + (late ? '\n※ 달이 바뀌었습니다. 경기 일시는 오늘로 찍혀 이번 달 성적에 들어갑니다.\n' : '')
+    + `\n점수가 바로 반영되고 되돌리려면 관리자가 취소해야 합니다. 계속할까요?`)) return;
+
+  btn.disabled = true;
+  try {
+    await apiPost('/api/match', { action: 'hostResult', id, pair, winner });
+    await Promise.all([
+      loadState().then(() => { renderStanding(); renderTop5(); }),
+      loadRlLog(),
+    ]);
+    showToast(`${which}${winner} Team 승리로 기록했습니다`);
+  } catch (e) {
+    btn.disabled = false;
+    showToast('기록 실패: ' + e.message);
+  }
 }
 
 /**
@@ -6282,6 +6338,12 @@ function initRouletteEvents() {
 
   const refresh = document.getElementById('rlLogRefresh');
   if (refresh) refresh.addEventListener('click', () => loadRlLog(1));
+
+  const log = document.getElementById('rlLog');
+  if (log) log.addEventListener('click', (e) => {
+    const btn = e.target.closest('.rl-log-win');
+    if (btn && !btn.disabled) rlReportFromLog(btn);
+  });
 
   const wipe = document.getElementById('rlLogWipe');
   if (wipe) wipe.addEventListener('click', rlWipeLog);
