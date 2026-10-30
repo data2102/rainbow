@@ -1,4 +1,7 @@
-import { q, tx, body, methodGuard, currentUser, requireUser, requireAdmin, audit } from './_lib.js';
+import {
+  q, tx, body, methodGuard, currentUser, requireUser, requireAdmin, audit,
+  ruleV2, kstHour, nightDay, ATTEND_CLOSE_HOUR,
+} from './_lib.js';
 import { syncSeason } from './_season.js';
 
 /**
@@ -19,19 +22,40 @@ export const SPECIAL_SLOTS = [SLOT_UNSURE, SLOT_ABSENT];
 export const SLOTS = [...HOUR_SLOTS, ...SPECIAL_SLOTS];
 
 const KST = 9 * 60 * 60 * 1000;
-/** 접속 예상 시간이 초기화되는 시각 (한국 시각) */
-export const RESET_HOUR = 7;
+/**
+ * 접속 예상 시간이 초기화되는 시각 (한국 시각).
+ *
+ * 11월부터 **0시**다. 그전에는 아침 7시였다 — 새벽까지 놀고 자는 사람이
+ * 전날 체크를 그대로 보게 하려던 것인데, 이제 출석이 0시~18시에만 받는
+ * '그날의 신고'가 되었으므로 날짜와 함께 넘어가야 한다.
+ */
+export const RESET_HOUR_V1 = 7;
+export const RESET_HOUR_V2 = 0;
+export function resetHourAt(ms = Date.now()) {
+  return ruleV2(ms) ? RESET_HOUR_V2 : RESET_HOUR_V1;
+}
+/** 지금 쓰이는 초기화 시각. 화면에 적어 보내는 값이다. */
+export const RESET_HOUR = RESET_HOUR_V1;
 
 function pad2(n) { return String(n).padStart(2, '0'); }
 
 /**
- * 그 시각이 속한 "하루". 한국 시각 07:00 에 넘어간다.
- * 00:00~06:59 는 아직 전날이므로 전날 체크가 그대로 보인다.
+ * 그 시각이 속한 "하루". 11월부터는 0시, 그전에는 07:00 에 넘어간다.
  * 화면(app.js)의 playDay 와 계산이 같아야 한다.
  */
 export function playDay(ms = Date.now()) {
-  const d = new Date(ms + KST - RESET_HOUR * 60 * 60 * 1000);
+  const d = new Date(ms + KST - resetHourAt(ms) * 60 * 60 * 1000);
   return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+}
+
+/**
+ * 지금 출석 체크를 받을 수 있는지. 11월부터 **0시~18시**만 받는다.
+ *
+ * 18시면 그날 밤이 시작되므로, 그 뒤에 체크를 받으면 "경기 끝나고
+ * 점수 받으러 체크"가 되어 규칙이 뜻을 잃는다.
+ */
+export function attendOpen(ms = Date.now()) {
+  return !ruleV2(ms) || kstHour(ms) < ATTEND_CLOSE_HOUR;
 }
 
 /**
@@ -107,9 +131,15 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       const id = (req.query && req.query.season) || (season ? season.id : null);
       const day = playDay();
-      const [rows, picks] = await Promise.all([
+      // 리폿은 '이 밤'의 출석을 본다. 새벽 2시에는 오늘(day)이 아니라
+      // 어젯밤(night)의 체크가 기준이므로 그쪽 명단도 함께 내려보낸다.
+      const night = nightDay();
+      const [rows, picks, nightPicks] = await Promise.all([
         id ? q(`SELECT * FROM attendance WHERE season = $1 ORDER BY clock_in ASC`, [id]) : [],
         q(`SELECT handle, slot FROM play_schedule WHERE day = $1 ORDER BY handle, slot`, [day]),
+        night === day
+          ? null
+          : q(`SELECT handle FROM play_schedule WHERE day = $1`, [night]),
       ]);
       res.setHeader('Cache-Control', 'no-store');
       return res.status(200).json({
@@ -117,8 +147,15 @@ export default async function handler(req, res) {
         logs: rows.map(rowToLog),
         slots: SLOTS,
         day,
-        resetHour: RESET_HOUR,
+        resetHour: resetHourAt(),
+        closeHour: ATTEND_CLOSE_HOUR,
+        open: attendOpen(),
+        ruleV2: ruleV2(Date.now()),
         schedule: picks.map(r => ({ handle: r.handle, slot: r.slot })),
+        night: {
+          day: night,
+          handles: (nightPicks || picks).map(r => r.handle),
+        },
       });
     }
 
@@ -132,6 +169,11 @@ export default async function handler(req, res) {
       // 대상은 세션에서 가져온다. 화면이 보내온 아이디는 쓰지 않는다.
       const me = await requireUser(req, res);
       if (!me) return;
+      if (!attendOpen()) {
+        return res.status(400).json({
+          error: `출석 체크는 0시부터 ${ATTEND_CLOSE_HOUR}시까지만 할 수 있습니다 · 오늘은 마감되었습니다.`,
+        });
+      }
       return await setSchedule(res, me, body(req).slots);
     }
     if (action === 'remove') return await remove(req, res, id);

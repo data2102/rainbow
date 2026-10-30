@@ -31,7 +31,10 @@ CREATE TABLE IF NOT EXISTS matches (
   -- 중복 등록 등으로 취소된 기록. 지우지 않고 남겨 취소선으로 보여준다.
   voided_at   BIGINT,           -- 취소 시각 (epoch ms). NULL 이면 살아있는 기록
   voided_by   TEXT,             -- 취소한 사람
-  void_reason TEXT              -- 취소 사유
+  void_reason TEXT,             -- 취소 사유
+  -- 2026-11 규칙: 그날 0시~18시에 출석 체크를 하지 않아 점수를 못 받은 사람.
+  -- 기록해 두는 까닭은 나중에 다시 셀 때(replay) 그날의 사실이 필요해서다.
+  noscore     JSONB             -- ["handle", ...]
 );
 CREATE INDEX IF NOT EXISTS idx_matches_ts ON matches (ts DESC);
 CREATE INDEX IF NOT EXISTS idx_matches_season ON matches (season, ts DESC);

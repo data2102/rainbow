@@ -20,6 +20,11 @@ let seasons = [];           // 시즌 목록(진행 중 + 마감)
 let viewSeasonId = null;    // 화면에서 보고 있는 달. null 이면 진행 중인 달
 const seasonCache = {};     // 지난 달 상세 (id -> {players, matches})
 let playSlots = [];         // 고를 수 있는 시간대
+let attendOpen = true;      // 지금 출석 체크를 받는지 (0시~18시)
+let attendCloseHour = 18;   // 출석이 닫히는 시각 (한국 시각)
+let attendResetHour = 7;    // 출석이 초기화되는 시각 (한국 시각)
+let nightDayStr = null;     // 리폿이 보는 '이 밤'의 날짜
+let nightAttended = [];     // 그 밤에 출석 체크를 한 아이디
 let playSchedule = [];      // [{handle, slot}] 오늘의 접속 예상 시간
 let playToday = null;       // 그 예정이 어느 날짜 것인지
 let openCommentForm = null; // 댓글 입력창이 열린 글 id
@@ -223,7 +228,16 @@ async function loadAttendance() {
     if (d.slots) playSlots = d.slots;
     playSchedule = d.schedule || [];
     playToday = d.day || null;
-  } catch { playSchedule = []; playToday = null; }
+    if (d.resetHour != null) attendResetHour = d.resetHour;
+    if (d.closeHour != null) attendCloseHour = d.closeHour;
+    attendOpen = d.open !== false;
+    if (typeof d.ruleV2 === 'boolean') serverRuleV2 = d.ruleV2;
+    nightDayStr = (d.night && d.night.day) || null;
+    nightAttended = (d.night && d.night.handles) || [];
+  } catch {
+    playSchedule = []; playToday = null;
+    nightDayStr = null; nightAttended = [];
+  }
 }
 
 /** 런쳐 방 현황. 이 요청 자체가 "아직 있다"는 신호가 된다. */
@@ -281,11 +295,16 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 103;
+const APP_VERSION = 104;
 let toldToRefresh = false;
 
-/** 져도, 늦게 와도 받는 점수. 서버의 lossGain() 과 같은 값이다. */
+/**
+ * 그 경기에서 진 사람이 받은 점수. 서버의 lossGain() 과 같아야 한다.
+ * 10월까지는 +1, 11월부터는 0 이다. 기록을 보여줄 때는 **그 경기가 열린 때**로
+ * 재야 한다 — 지금으로 재면 지난달 기록까지 0 으로 보인다.
+ */
 const LOSS_GAIN = 1;
+function lossGainAt(ts) { return ruleV2(ts) ? 0 : LOSS_GAIN; }
 
 /** 새 계정·되살린 계정이 받는 임시 비밀번호. api/_lib.js 의 TEMP_PASSWORD 와 같아야 한다. */
 const TEMP_PW = '1234';
@@ -669,6 +688,9 @@ function sortedPlayers() {
 /* ---------- 렌더 ---------- */
 
 function renderStanding() {
+  // 11월부터 Loss·Ratio·Streak 칸을 걷어낸다. 칸을 지우지 않고 감추는 까닭은
+  // 10월까지는 그대로 보여야 하기 때문이다 — 머리글과 칸이 한 스위치로 같이 움직인다.
+  document.body.classList.toggle('rule-v2', ruleNow());
   const q = document.getElementById('searchInput').value.trim().toLowerCase();
   const tbody = document.querySelector('#standingTable tbody');
   const ranked = sortedPlayers().map((p, i) => ({ ...p, rank: i + 1 }));
@@ -695,8 +717,8 @@ function renderStanding() {
       <td>${p.wins + p.losses}</td>
       <td class="win-txt">${p.wins}</td>
       <td class="loss-txt">${p.losses}</td>
-      <td>${ratio(p)}%</td>
-      <td>${streakCell}</td>
+      <td class="ratio-txt">${ratio(p)}%</td>
+      <td class="streak-txt">${streakCell}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="9" class="log-empty">검색 결과 없음</td></tr>';
 
@@ -843,20 +865,46 @@ function getChecked(listId) {
   return Array.from(document.querySelectorAll(`#${listId} input[type=checkbox]:checked`)).map(el => el.value);
 }
 
+/**
+ * 그 밤에 출석 체크를 한 사람들 (소문자 아이디).
+ * 서버가 내려준 명단을 그대로 쓴다 — 어느 날짜를 봐야 하는지는 서버가 정한다.
+ */
+function attendedSet() {
+  return new Set(nightAttended.map(h => String(h).toLowerCase()));
+}
+
+/** 11월 규칙에서 점수를 못 받을 사람들 (고른 사람 중 출석 체크가 없는 쪽) */
+function noScoreAmong(handles) {
+  if (!ruleNow()) return [];
+  const came = attendedSet();
+  return handles.filter(h => !came.has(String(h).toLowerCase()));
+}
+
+/** "A · B 회원은 출석체크를 하지 않아 점수가 반영되지 않습니다" */
+function noScoreText(list) {
+  if (!list.length) return '';
+  return `${list.join(' · ')} 회원은 출석체크를 하지 않았기에 점수 반영이 되지 않습니다.`;
+}
+
 function renderChecklists() {
   const winChecked = new Set(getChecked('winList'));
   const loseChecked = new Set(getChecked('loseList'));
 
   // 한 사람은 한쪽에만 들어갈 수 있다. 다른 쪽에 이미 들어가 있으면
   // 여기서는 누르지 못하게 막아, 눌러본 뒤에 거절당하는 일이 없게 한다.
+  // 출석 체크를 안 한 사람은 골라도 점수가 들어가지 않는다. 고르기 전에
+  // 알 수 있도록 이름 옆에 표를 달아둔다 — 막지는 않는다, 경기는 기록해야 하므로.
+  const came = attendedSet();
+  const absent = (h) => ruleNow() && !came.has(String(h).toLowerCase());
   const rowHtml = (p, side) => {
     const picked = { win: winChecked, lose: loseChecked };
     const checked = picked[side].has(p.handle);
     const disabled = !checked && Object.keys(picked)
       .some(k => k !== side && picked[k].has(p.handle));
-    return `<label class="check-item ${disabled ? 'disabled' : ''}">
+    const off = absent(p.handle);
+    return `<label class="check-item ${disabled ? 'disabled' : ''}${off ? ' noscore' : ''}"${off ? ' title="출석체크를 하지 않아 점수가 반영되지 않습니다"' : ''}>
       <input type="checkbox" value="${esc(p.handle)}" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''} data-side="${side}">
-      <span>${esc(p.handle)}</span> <span class="clan-mini">${esc(p.clan)}</span>
+      <span>${esc(p.handle)}</span> <span class="clan-mini">${esc(p.clan)}</span>${off ? '<span class="ns-tag">미출석</span>' : ''}
     </label>`;
   };
 
@@ -951,6 +999,15 @@ function showPickCount(nWin, nLose) {
     msg = `${MIN_SIDE}:${MIN_SIDE} 경기부터 기록할 수 있습니다 · 각 팀에 ${MIN_SIDE}명 이상 골라주세요.`;
   } else if (nWin !== nLose) msg = '양 팀 인원이 다릅니다 · 7:8 같은 경기도 그대로 기록할 수 있습니다.';
   note.textContent = msg;
+
+  // 고른 사람 중 출석 체크가 없는 사람을 따로 일러둔다.
+  // 경기를 못 넣게 막지는 않는다 — 기록은 남고, 그 사람 점수만 빠진다.
+  const warn = document.getElementById('pickNoScore');
+  if (warn) {
+    const miss = noScoreAmong([...getChecked('winList'), ...getChecked('loseList')]);
+    warn.textContent = noScoreText(miss);
+    warn.hidden = !miss.length;
+  }
 }
 
 /**
@@ -1056,13 +1113,17 @@ function renderHistory() {
     const date = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
     const time = `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
 
+    // 출석 체크가 없어 점수가 빠진 사람. 숫자는 이미 0 으로 들어가 있지만,
+    // 왜 0 인지는 표가 없으면 알 수 없다.
+    const miss = new Set(m.noScore || []);
+    const nsTip = (h) => miss.has(h) ? ' title="출석체크를 하지 않아 점수가 반영되지 않았습니다"' : '';
     const winChips = winners.map(w =>
-      `<span class="h-chip w who-id" data-pcard="${esc(w.handle)}" role="button" tabindex="0">${esc(w.handle)}<span class="h-gain">+${w.gained !== undefined ? w.gained : '-'}</span></span>`
+      `<span class="h-chip w who-id${miss.has(w.handle) ? ' h-noscore' : ''}" data-pcard="${esc(w.handle)}" role="button" tabindex="0"${nsTip(w.handle)}>${esc(w.handle)}<span class="h-gain">+${w.gained !== undefined ? w.gained : '-'}</span></span>`
     ).join('') || '<span class="h-chip l">-</span>';
-    // 진 사람도 나온 값은 있다. 이긴 쪽만 +3 이 붙어 있으니 진 쪽은
-    // 아무것도 못 받은 것처럼 보였다 — 실제로는 다 같이 +1 을 받는다.
+    // 진 사람도 나온 값은 있다 (10월까지 +1). 11월부터는 0 이라 숫자가 0 으로 뜬다.
+    const lg = lossGainAt(m.ts);
     const loseChips = losers.map(h =>
-      `<span class="h-chip l who-id" data-pcard="${esc(h)}" role="button" tabindex="0">${esc(h)}<span class="h-gain">+${LOSS_GAIN}</span></span>`).join('')
+      `<span class="h-chip l who-id${miss.has(h) ? ' h-noscore' : ''}" data-pcard="${esc(h)}" role="button" tabindex="0"${nsTip(h)}>${esc(h)}<span class="h-gain">+${miss.has(h) ? 0 : lg}</span></span>`).join('')
       || '<span class="h-none">-</span>';
     // 늦은 참석자는 칸을 따로 갖는다. 패배 칸에 이어 붙였더니 진 사람과
     // 섞여 보였다 — 이 사람들은 지지 않았고, 이긴 것도 아니다.
@@ -2213,15 +2274,45 @@ function initFileEvents() {
 
 /* ---------- 접속 예상 시간 ---------- */
 
-const SCHEDULE_RESET_HOUR = 7;   // api/attendance.js 의 RESET_HOUR 와 같아야 한다
-
 /**
- * 지금이 속한 "하루". 한국 시각 07:00 에 넘어간다.
+ * 지금이 속한 "하루". 11월부터는 0시, 그전에는 07:00 에 넘어간다.
+ *
+ * 몇 시에 넘어가는지는 **서버가 알려준 값**(attendResetHour)을 쓴다.
+ * 여기서 숫자를 따로 들고 있으면 규칙이 바뀌는 날 둘이 어긋난다.
  * 서버와 계산이 같아야 하므로 보는 사람의 시간대와 무관하게 KST 로 센다.
  */
 function playDay(ms = Date.now()) {
-  const d = new Date(ms + 9 * 3600000 - SCHEDULE_RESET_HOUR * 3600000);
+  const d = new Date(ms + 9 * 3600000 - attendResetHour * 3600000);
   return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+}
+
+/**
+ * 새 규칙이 시작되는 시각 — 2026년 11월 1일 0시 (한국 시각).
+ * api/_lib.js 의 RULE_V2_AT 와 같은 값이어야 한다.
+ *
+ * 화면에서는 '어느 칸을 보여줄지'에만 쓴다. 점수와 출석을 실제로 판단하는
+ * 것은 언제나 서버다 — 보는 사람의 시계가 틀려도 결과는 달라지지 않는다.
+ */
+const RULE_V2_AT = Date.parse('2026-11-01T00:00:00+09:00');
+
+/** 그 **시각**이 새 규칙에 드는가. 지난 경기를 보여줄 때 쓴다. */
+function ruleV2(ms) { return ms >= RULE_V2_AT; }
+
+/** 서버가 알려준 "지금은 새 규칙인가". 받기 전에는 null. */
+let serverRuleV2 = null;
+
+/**
+ * **지금**이 새 규칙인가.
+ *
+ * 보는 사람의 시계가 아니라 서버의 대답을 먼저 믿는다. 시계가 하루쯤 어긋난
+ * 컴퓨터가 드물지 않고, 그러면 혼자만 다른 순위표를 보게 된다.
+ * 서버 대답을 아직 못 받았을 때만 제 시계로 어림한다.
+ */
+function ruleNow() { return serverRuleV2 == null ? ruleV2(Date.now()) : serverRuleV2; }
+
+/** 지금의 한국 시각 '시' (0~23). 보는 사람의 시간대와 무관하다. */
+function kstHourNow(ms = Date.now()) {
+  return new Date(ms + 9 * 3600000).getUTCHours();
 }
 
 /** handle -> Set(시간대) */
@@ -2389,11 +2480,14 @@ function renderSlotMine() {
     return;
   }
   const on = scheduleMap().get(me.handle) || new Set();
+  // 18시가 지나면 칸을 잠근다. 고른 것은 그대로 보이되 누를 수는 없다 —
+  // 경기가 끝난 뒤 점수를 받으러 체크하는 길을 막는 것이 이 규칙의 뜻이다.
+  const shut = !attendOpen;
   el.innerHTML = `<span class="mine-k">내 시간대</span>
     <span class="mine-id">${esc(me.handle)}</span>
-    <span class="mine-right"><span class="slot-chips">${playSlots.map(slot =>
+    <span class="mine-right">${shut ? `<span class="slot-shut">오늘 출석 체크는 마감되었습니다 (0시~${attendCloseHour}시)</span>` : ''}<span class="slot-chips">${playSlots.map(slot =>
       `<button type="button" class="slot-chip${on.has(slot) ? ' on' : ''}${isSpecialSlot(slot) ? ' wide' : ''}"
-        data-slot="${slot}" aria-pressed="${on.has(slot)}">${slotChipLabel(slot)}</button>`).join('')}</span></span>`;
+        data-slot="${slot}" aria-pressed="${on.has(slot)}"${shut ? ' disabled' : ''}>${slotChipLabel(slot)}</button>`).join('')}</span></span>`;
 }
 
 function renderSchedule() {
@@ -2412,6 +2506,10 @@ function renderSchedule() {
 /** 칩 하나를 눌러 내 그 시간대를 켜고 끈다 (대상은 언제나 로그인한 계정) */
 async function toggleSlot(slot) {
   if (!isLoggedIn()) return;
+  if (!attendOpen) {
+    showToast(`출석 체크는 0시부터 ${attendCloseHour}시까지입니다 · 오늘은 마감되었습니다.`);
+    return;
+  }
   const handle = me.handle;
   const on = new Set(scheduleMap().get(handle) || []);
 
@@ -2443,12 +2541,14 @@ function initScheduleEvents() {
     if (btn) toggleSlot(Number(btn.dataset.slot));
   });
 
-  // 07시를 넘겨 페이지를 켜둔 채로 두면 하루가 바뀐 것을 알아채고 다시 받아온다
+  // 페이지를 켜둔 채 날짜가 바뀌거나 18시를 넘기면 알아채고 다시 받아온다
   const panel = document.getElementById('tab-attendance');
   if (!panel) return;
   setInterval(async () => {
     if (!panel.classList.contains('active') || !pageVisible()) return;
-    if (playToday && playToday !== playDay()) {
+    const dayChanged = playToday && playToday !== playDay();
+    const shutNow = ruleNow() && kstHourNow() >= attendCloseHour;
+    if (dayChanged || shutNow !== !attendOpen) {
       await loadAttendance();
       renderAttendance();
     }
@@ -5620,14 +5720,30 @@ async function recordTeamMatch(winners, losers) {
   const btn = document.getElementById('submitMatch');
   btn.disabled = true;
   try {
-    await apiPost('/api/match', { winners, losers });
+    const r = await apiPost('/api/match', { winners, losers });
     await refreshAll();
     clearPicks();
     showToast(`승리 ${winners.length}명 / 패배 ${losers.length}명 기록 완료`);
+    // 점수가 빠진 사람이 있으면 한 번 더, 사라지지 않는 줄로 알린다.
+    // 토스트만으로는 못 보고 지나치기 쉬운 이야기다.
+    showNoScore(r && r.noScore);
   } catch (e) {
     showToast(e.message);
     btn.disabled = false;
   }
+}
+
+/**
+ * 출석 체크가 없어 점수가 빠진 사람을 알린다.
+ * 서버가 돌려준 명단을 그대로 쓴다 — 실제로 어떻게 처리되었는지는 서버만 안다.
+ */
+function showNoScore(list) {
+  const box = document.getElementById('noScoreBar');
+  if (!box) return;
+  const miss = Array.isArray(list) ? list : [];
+  box.textContent = noScoreText(miss);
+  box.hidden = !miss.length;
+  if (miss.length) showToast(noScoreText(miss));
 }
 
 /* ---------- 데이터 관리 ---------- */
@@ -6099,7 +6215,8 @@ async function rlReport(i, winner) {
   rlBusy = true;
   rlShowResult(i);
   try {
-    await apiPost('/api/match', { action: 'hostResult', id: rlDraw.id, pair: i, winner });
+    const r = await apiPost('/api/match', { action: 'hostResult', id: rlDraw.id, pair: i, winner });
+    if (r && r.noScore && r.noScore.length) showToast(noScoreText(r.noScore));
     rlDraw = {
       ...rlDraw,
       pairs: rlDraw.pairs.map((x, k) => k !== i ? x
@@ -6223,7 +6340,8 @@ async function rlReportFromLog(btn) {
 
   btn.disabled = true;
   try {
-    await apiPost('/api/match', { action: 'hostResult', id, pair, winner });
+    const r = await apiPost('/api/match', { action: 'hostResult', id, pair, winner });
+    if (r && r.noScore && r.noScore.length) showToast(noScoreText(r.noScore));
     await Promise.all([
       loadState().then(() => { renderStanding(); renderTop5(); }),
       loadRlLog(),

@@ -306,20 +306,78 @@ export function normalizeMatch(m) {
   return m;
 }
 
-/** 패배 시 점수 변화 */
-export function lossGain() {
-  return 1;
+/**
+ * 새 규칙이 시작되는 시각 — 2026년 11월 1일 0시 (한국 시각).
+ *
+ * 이 시각을 **경기가 기록된 때**(`ts`)와 견준다. "지금"과 견주지 않는 까닭:
+ * 관리자가 경기를 하나 취소하면 `replay()` 가 그 달 경기를 처음부터 다시
+ * 계산하는데, 그때 '지금'을 쓰면 **10월 경기까지 새 점수로 다시 매겨져**
+ * 지난 순위가 소리 없이 바뀐다. 기록된 때로 재면 10월 경기는 10월 규칙,
+ * 11월 경기는 11월 규칙으로 영원히 고정된다.
+ */
+export const RULE_V2_AT = Date.parse('2026-11-01T00:00:00+09:00');
+export function ruleV2(ts) { return Number(ts) >= RULE_V2_AT; }
+
+/**
+ * 패배 시 점수 변화.
+ * 11월부터는 0 — 져도 깎이지 않지만 붙는 것도 없다. 그전에는 +1 이었다.
+ */
+export function lossGain(ts) {
+  return ruleV2(ts) ? 0 : 1;
 }
 
 /**
- * 연승 고비마다 붙는 보너스. 그 수에 '닿는 순간' 한 번만 준다 —
- * 4연승·6연승처럼 고비가 아닌 판은 기본 점수만 받는다.
+ * 연승 고비마다 붙던 보너스. 그 수에 '닿는 순간' 한 번만 줬다 —
+ * 4연승·6연승처럼 고비가 아닌 판은 기본 점수만 받았다.
+ * 11월부터는 쓰지 않는다. 10월까지의 기록을 다시 계산할 때만 쓰인다.
  */
 const STREAK_BONUS = { 3: 1, 5: 2, 7: 3, 10: 5 };
 
-/** 승리 시 획득 점수: 기본 +3 에 연승 보너스를 더한다 */
-export function winGain(newStreak) {
-  return 3 + (STREAK_BONUS[newStreak] || 0);
+/**
+ * 승리 시 획득 점수.
+ * 11월부터는 연승과 상관없이 **+1**. 그전에는 기본 +3 에 연승 보너스를 더했다.
+ */
+export function winGain(newStreak, ts) {
+  return ruleV2(ts) ? 1 : 3 + (STREAK_BONUS[newStreak] || 0);
+}
+
+/* ---------- 하룻밤의 경계 ---------- */
+
+const KST_OFFSET = 9 * 60 * 60 * 1000;
+/** 하룻밤이 시작되는 시각 (한국 시각). 18시에 넘어간다. */
+export const NIGHT_START_HOUR = 18;
+/** 출석 체크가 닫히는 시각 (한국 시각). 하룻밤이 시작되는 때와 같다. */
+export const ATTEND_CLOSE_HOUR = NIGHT_START_HOUR;
+
+/**
+ * 그 시각이 속한 하룻밤의 시작. 한국 시각 18시에 넘어간다.
+ *
+ * 모이는 시간이 저녁 6시부터 새벽 4시쯤까지라, 자정으로 끊으면 하룻밤이
+ * 두 날로 쪼개진다. 호스트를 하룻밤에 한 번만 맡게 하는 규칙도, 출석을
+ * 보는 규칙도 모두 이 경계를 쓴다.
+ */
+export function nightStart(ms = Date.now()) {
+  const edge = NIGHT_START_HOUR * 60 * 60 * 1000;
+  return Math.floor((ms + KST_OFFSET - edge) / 86400000) * 86400000 + edge - KST_OFFSET;
+}
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+/**
+ * 그 하룻밤의 이름표 (`YYYY-MM-DD`, 한국 시각 기준).
+ *
+ * 밤이 시작된 날의 날짜다. 11월 1일 20시도, 11월 2일 새벽 2시도 모두
+ * `2026-11-01` 이다. 출석 체크는 그 날 0시~18시에 받으므로, 새벽 2시에
+ * 올린 리폿도 **전날 낮에 한 출석**을 보게 된다.
+ */
+export function nightDay(ms = Date.now()) {
+  const d = new Date(nightStart(ms) + KST_OFFSET);
+  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+}
+
+/** 그 시각의 한국 시각 '시' (0~23) */
+export function kstHour(ms = Date.now()) {
+  return new Date(ms + KST_OFFSET).getUTCHours();
 }
 
 export function rowToPlayer(r) {
@@ -342,6 +400,8 @@ export function rowToMatch(r) {
     winners: r.winners,
     losers: r.losers,
     late: Array.isArray(r.late) ? r.late : [],
+    // 출석 체크가 없어 점수를 못 받은 사람들 (2026-11 규칙)
+    noScore: Array.isArray(r.noscore) ? r.noscore : [],
     ts: Number(r.ts),
     recordedBy: r.recorded_by,
     season: r.season || null,
@@ -377,7 +437,9 @@ export function cleanReason(v) {
  * 예전에 받은 점수가 소리 없이 사라져 순위가 달라진다.
  */
 export function lateGain() {
-  return lossGain();
+  // 그 시절 패배 점수와 같은 +1 로 못 박아 둔다. lossGain() 을 부르면
+  // 11월부터 0 이 되어, 지난 기록을 다시 셀 때 받았던 점수가 사라진다.
+  return 1;
 }
 
 let voidReady = false;
@@ -396,7 +458,47 @@ export async function ensureMatchVoid() {
       ALTER TABLE matches ADD COLUMN IF NOT EXISTS late JSONB;
     `);
   }
+  // 출석 체크가 없어 점수를 못 받은 사람 (2026-11 규칙). 위 if 바깥에서 따로
+  // 보는 까닭은 late 칸이 이미 있는 데이터베이스에도 이 칸은 없기 때문이다.
+  // ALTER 는 표를 잠그므로, 있는지 먼저 보고 없을 때만 건드린다.
+  const hasNoScore = await q(
+    `SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'matches' AND column_name = 'noscore'`
+  );
+  if (!hasNoScore.length) {
+    await q(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS noscore JSONB`);
+  }
   voidReady = true;
+}
+
+/**
+ * 그 하룻밤에 출석 체크를 한 사람들 (소문자 아이디 집합).
+ *
+ * 출석 체크란 '출석' 메뉴에서 들어올 시간대를 고르는 것을 말한다.
+ * 미정·불참도 **대답을 한 것**이므로 출석으로 친다 — 아무것도 안 누른
+ * 사람만 걸린다.
+ */
+export async function attendedOn(c, day) {
+  const { rows } = await c.query(
+    `SELECT DISTINCT handle FROM play_schedule WHERE day = $1`, [day]
+  );
+  return new Set(rows.map(r => String(r.handle).toLowerCase()));
+}
+
+/**
+ * 이 경기에서 출석 체크가 없어 점수를 못 받을 사람들을 골라낸다.
+ * 11월 전 경기에는 빈 목록을 돌려준다 — 그때는 이 규칙이 없었다.
+ */
+export async function noScoreFor(c, handles, ts) {
+  if (!ruleV2(ts)) return [];
+  // play_schedule 표가 아직 없는 데이터베이스일 수 있다 ('출석' 을 한 번도
+  // 안 연 경우). 그럴 때는 아무도 벌하지 않는다.
+  const { rows: has } = await c.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'play_schedule'`
+  );
+  if (!has.length) return [];
+  const came = await attendedOn(c, nightDay(ts));
+  return handles.filter(h => !came.has(String(h).toLowerCase()));
 }
 
 /**
@@ -503,6 +605,9 @@ export async function replay(c, seasonId) {
     const winners = Array.isArray(m.winners) ? m.winners : [];
     const losers = Array.isArray(m.losers) ? m.losers : [];
     const ts = Number(m.ts);
+    // 그 경기 때 출석 체크가 없어 점수를 못 받은 사람들. 기록해 둔 것을 그대로
+    // 쓴다 — 지금 출석표를 다시 보면 안 된다. 그날의 사실이 바뀌어 버린다.
+    const skipped = new Set(Array.isArray(m.noscore) ? m.noscore : []);
     const redone = [];
 
     for (const w of winners) {
@@ -510,7 +615,7 @@ export async function replay(c, seasonId) {
       if (!h) continue;
       const s = of(h);
       s.streak = s.lastResult === 'W' ? s.streak + 1 : 1;
-      const gained = winGain(s.streak);
+      const gained = skipped.has(h) ? 0 : winGain(s.streak, ts);
       s.point += gained;
       s.wins += 1;
       s.lastResult = 'W';
@@ -522,7 +627,7 @@ export async function replay(c, seasonId) {
       if (!h) continue;
       const s = of(h);
       s.streak = s.lastResult === 'L' ? s.streak - 1 : -1;
-      s.point += lossGain();
+      s.point += skipped.has(h) ? 0 : lossGain(ts);
       s.losses += 1;
       s.lastResult = 'L';
       s.lastMatch = ts;

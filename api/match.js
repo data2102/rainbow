@@ -1,8 +1,8 @@
 import { randomInt } from 'node:crypto';
 import {
   q, tx, body, methodGuard, requireUser, requireAdmin, audit,
-  winGain, lossGain, cleanReason, ensureMatchVoid,
-  ensureHostDraws, rowToDraw, TEAM_NAMES, replay,
+  winGain, lossGain, cleanReason, ensureMatchVoid, noScoreFor,
+  ensureHostDraws, rowToDraw, TEAM_NAMES, replay, nightStart,
 } from './_lib.js';
 import { ensureSeason } from './_season.js';
 
@@ -87,12 +87,17 @@ async function recordCore(c, me, winners, losers) {
 
   const now = new Date();
   const ts = now.getTime();
+
+  // 11월부터는 그날 0시~18시에 출석 체크를 한 사람만 점수를 받는다.
+  // 경기는 그대로 기록된다 — 빠지는 것은 점수뿐이다.
+  const noScore = await noScoreFor(c, all, ts);
+  const skipped = new Set(noScore);
   const winnerResults = [];
 
   for (const h of winners) {
     const p = rows.find(r => r.handle === h);
     const streak = p.last_result === 'W' ? p.streak + 1 : 1;
-    const gained = winGain(streak);
+    const gained = skipped.has(h) ? 0 : winGain(streak, ts);
     await c.query(
       `UPDATE players SET point = point + $1, wins = wins + 1, streak = $2,
               last_result = 'W', last_match = $3 WHERE handle = $4`,
@@ -107,18 +112,18 @@ async function recordCore(c, me, winners, losers) {
     await c.query(
       `UPDATE players SET point = point + $1, losses = losses + 1, streak = $2,
               last_result = 'L', last_match = $3 WHERE handle = $4`,
-      [lossGain(), streak, now, h]
+      [skipped.has(h) ? 0 : lossGain(ts), streak, now, h]
     );
   }
 
   const ins = await c.query(
-    `INSERT INTO matches (winners, losers, late, ts, recorded_by, season)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+    `INSERT INTO matches (winners, losers, late, noscore, ts, recorded_by, season)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
     [JSON.stringify(winnerResults), JSON.stringify(losers), JSON.stringify([]),
-     ts, me, season.current ? season.current.id : null]
+     JSON.stringify(noScore), ts, me, season.current ? season.current.id : null]
   );
 
-  return { winnerResults, ts, matchId: Number(ins.rows[0].id), season };
+  return { winnerResults, noScore, ts, matchId: Number(ins.rows[0].id), season };
 }
 
 /* ---------- 취소 · 되돌리기 ---------- */
@@ -295,22 +300,8 @@ const SPLIT_SLACK = 0.30;
 const REPEAT_SLACK = 0.2;
 
 /**
- * 하루의 경계. 한국 시각 **18시**에 넘어간다.
- *
- * 자정이 아닌 까닭: 모이는 시간이 저녁 6시부터 새벽 4시쯤까지라, 자정으로 끊으면
- * 하룻밤이 두 날로 쪼개진다. 11시에 호스트를 맡은 사람이 1시에 또 걸려도
- * 서버는 '다른 날'로 보는 것이다. 18시로 끊으면 하룻밤이 한 덩어리로 묶인다.
- */
-const KST = 9 * 60 * 60 * 1000;
-const DAY_START_HOUR = 18;
-function dayStart(ms = Date.now()) {
-  const edge = DAY_START_HOUR * 60 * 60 * 1000;
-  return Math.floor((ms + KST - edge) / 86400000) * 86400000 + edge - KST;
-}
-
-/**
  * 이 밤에 호스트로 뽑힌 횟수. 아이디(소문자)마다 몇 번인지 센다.
- * '이 밤'은 18시에 시작해 다음 날 18시에 끝난다(`dayStart`).
+ * '이 밤'은 18시에 시작해 다음 날 18시에 끝난다(`nightStart` · _lib.js).
  *
  * 하룻밤에 두 번 맡는 일이 없게 하려고 본다. 사람이 적어 어쩔 수 없는 날에는
  * 두 번째도 맡아야 하므로 '못 한다'가 아니라 '뒤로 민다'로 쓴다.
@@ -318,7 +309,7 @@ function dayStart(ms = Date.now()) {
  */
 async function hostCountToday(c) {
   const { rows } = await c.query(
-    `SELECT teams, host_a, host_b FROM host_draws WHERE ts >= $1`, [dayStart()]
+    `SELECT teams, host_a, host_b FROM host_draws WHERE ts >= $1`, [nightStart()]
   );
   const n = new Map();
   const add = (h) => {
@@ -610,7 +601,8 @@ async function hostResult(req, res, b) {
     });
 
     await audit(me, 'host_result', { id, pair: at, winner, winners: out.winners, losers: out.losers });
-    res.status(200).json({ ok: true, winnerResults: out.winnerResults, ts: out.ts, pairs: out.pairs });
+    res.status(200).json({ ok: true, winnerResults: out.winnerResults, noScore: out.noScore || [],
+      ts: out.ts, pairs: out.pairs });
   } catch (e) {
     res.status(400).json({ error: e.message });
   }

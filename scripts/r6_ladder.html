@@ -1147,6 +1147,57 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   .kakao-go{ display:none; }
 }
 
+/* ===== 2026-11 규칙 =====
+   승리 +1 / 패배 0 이 되면서 Loss·Ratio·Streak 는 순위표에서 뜻을 잃었다.
+   지우지 않고 감추는 까닭은 10월까지의 화면은 그대로여야 하기 때문이다 —
+   body.rule-v2 하나로 머리글과 칸이 같이 움직인다. */
+body.rule-v2 #standingTable th[data-key="loss"],
+body.rule-v2 #standingTable th[data-key="ratio"],
+body.rule-v2 #standingTable th[data-key="streak"],
+body.rule-v2 #standingTable .loss-txt,
+body.rule-v2 #standingTable .ratio-txt,
+body.rule-v2 #standingTable .streak-txt{ display:none; }
+
+/* 출석을 안 해 점수가 빠지는 사람을 알리는 줄. 막는 것이 아니라 일러두는 것이라
+   빨강(위험)이 아니라 노랑(주의)으로 둔다. */
+.noscore-bar{
+  margin:var(--sp-3) 0 0;
+  padding:var(--sp-3) var(--sp-4);
+  border:1px solid var(--warning);
+  border-left:3px solid var(--warning-strong);
+  border-radius:var(--radius-md);
+  background:var(--warning-bg); color:var(--warning-strong);
+  font-size:var(--fs-caption); line-height:1.5;
+}
+.noscore-bar.done{ margin-top:var(--sp-4); }
+
+/* 고르는 칸의 미출석 표시 */
+.check-item.noscore > span:first-of-type{ color:var(--text-tertiary); }
+.ns-tag{
+  margin-left:auto; flex:none;
+  font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+  padding:1px var(--sp-2); border-radius:var(--radius-pill);
+  background:var(--warning-bg); color:var(--warning-strong); border:1px solid var(--warning);
+}
+
+/* 18시가 지나 출석이 닫혔을 때 */
+.slot-shut{
+  font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+  color:var(--warning-strong); background:var(--warning-bg);
+  border:1px solid var(--warning); border-radius:var(--radius-pill);
+  padding:2px var(--sp-3); margin-right:var(--sp-2); white-space:nowrap;
+}
+.slot-chip[disabled]{ opacity:.45; cursor:not-allowed; }
+.slot-chip[disabled]:hover{ border-color:var(--border-strong); color:var(--text-secondary); }
+
+/* 기록 줄에서 점수가 빠진 사람 */
+.h-chip.h-noscore{ opacity:.55; text-decoration:line-through var(--warning-strong); }
+
+/* 아직 오지 않은 규칙임을 알리는 말머리 */
+.rule-new{
+  color:var(--accent); font-weight:var(--fw-bold);
+}
+
 /* ===== 호스트 룰렛 =====
    팀 나누기와 호스트 뽑기는 서버가 하고, 여기서는 그 결과를 보여주기만 한다. */
 .rl-sizes{ display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-bottom:var(--sp-2); }
@@ -3149,10 +3200,15 @@ if (/[?&]room=\d+/.test(location.search)) {
         <span class="pw">0</span><span class="px">:</span><span class="pl">0</span>
       </div>
       <div class="pick-note" id="pickNote"></div>
+      <!-- 출석 체크를 안 한 사람을 고르면 뜬다. 막지는 않는다 — 경기는 기록하되
+           그 사람 점수만 빠진다는 것을 미리 알리는 줄이다. -->
+      <div class="noscore-bar" id="pickNoScore" aria-live="polite" hidden></div>
       <div class="pick-actions">
         <button class="btn" id="submitMatch" disabled>기록 확정 (Record Match)</button>
         <button type="button" class="btn btn-reset" id="resetPick" disabled>체크 초기화</button>
       </div>
+      <!-- 기록한 뒤에도 남는 안내. 토스트는 몇 초 만에 사라진다. -->
+      <div class="noscore-bar done" id="noScoreBar" aria-live="polite" hidden></div>
       <div class="foot-note">동일 선수를 양쪽에 동시 체크할 수 없습니다 · 최소 2:2 경기부터 기록할 수 있습니다 · 한 칸만 잘못 골랐으면 그 칸의 <b>초기화</b>를, 전부 다시 고르려면 아래 <b>체크 초기화</b>를 누르세요.</div>
     </div>
     </div>
@@ -3230,8 +3286,13 @@ if (/[?&]room=\d+/.test(location.search)) {
       <div class="foot-note" style="margin-top:0;margin-bottom:14px;">
         오늘 들어올 시간대를 체크해두면 누가 언제 접속하는지 서로 볼 수 있습니다 ·
         <b>한 사람이 한 칸만</b> 고를 수 있고, 다른 칸을 누르면 먼저 고른 칸이 풀립니다 ·
-        아직 모르겠으면 <b>미정</b>, 오늘 못 오면 <b>불참</b>을 눌러주세요 ·
-        <b>매일 아침 7시에 초기화</b>됩니다 (0시~7시 사이에는 전날 체크가 그대로 보입니다).
+        아직 모르겠으면 <b>미정</b>, 오늘 못 오면 <b>불참</b>을 눌러주세요
+        (미정·불참도 출석으로 칩니다).
+        <br>
+        <b class="rule-new">2026년 11월 1일부터</b> ·
+        출석 체크는 <b>0시부터 18시까지</b>만 받습니다 (18시에 마감, 0시에 초기화) ·
+        <b>18시까지 체크하지 않으면 그날 밤 경기는 리폿에 올라가도 점수가 반영되지 않습니다</b>
+        (룰렛은 그대로 돌릴 수 있습니다).
       </div>
       <div class="mine" id="slotMine"></div>
       <div class="slot-divider"></div>
