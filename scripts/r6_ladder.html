@@ -1136,9 +1136,15 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 }
 .kakao-bar:hover .kakao-go{ background:var(--kakao-hover); }
 @media (max-width:620px){
-  /* 좁으면 설명을 접는다. 이름과 단추만 남아도 뜻은 통한다. */
-  .kakao-sub{ display:none; }
+  /* 전에는 좁으면 설명을 접었는데, 설명이 "설치를 도와준다"는 말로 바뀌면서
+     접을 수 없게 됐다 — 처음 오는 사람에게 가장 필요한 한 줄이다.
+     대신 띠를 얇게 눌러 자리를 번다. */
   .kakao-bar{ padding:var(--sp-2) var(--sp-3); gap:var(--sp-2); }
+}
+@media (max-width:430px){
+  /* 폰에서는 '참여하기' 단추를 뺀다. 띠 전체가 이미 링크라 단추는 자리만
+     차지하고, 그 자리를 글에 주면 다섯 줄이 세 줄로 줄어든다. */
+  .kakao-go{ display:none; }
 }
 
 /* ===== 호스트 룰렛 =====
@@ -2897,7 +2903,7 @@ if (/[?&]room=\d+/.test(location.search)) {
     </span>
     <span class="kakao-t">
       <b>레인보우식스 카카오톡 오픈채팅방</b>
-      <span class="kakao-sub">래더 일정과 공지는 여기서 주고받습니다 · 누구나 들어올 수 있습니다</span>
+      <span class="kakao-sub">누구나 참여 가능하며 게임 설치 및 참여를 도와 드립니다.</span>
     </span>
     <span class="kakao-go">참여하기 →</span>
   </a>
