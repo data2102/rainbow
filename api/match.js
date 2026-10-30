@@ -259,24 +259,60 @@ const SPLIT_TRIES = 300;
 /**
  * 한 팀 평균 점수의 이만큼까지는 '고르게 나뉘었다'고 친다.
  *
- * 여덟 명 기준으로 값을 바꿔가며 재본 결과다 (한 팀 평균 423점):
- *    6% → 조합 10가지, 점수 차이 평균  8점
- *   15% → 조합 19가지, 점수 차이 평균 21점  ← 여기
- *   20% → 조합 23가지, 점수 차이 평균 30점, 최대 72점
- * 20% 부터는 최대 차이가 센 사람 한 명 몫만큼 벌어져 경기에서 느껴진다.
+ * 처음에는 15% 였다. 그런데 점수가 많이 벌어진 명단에서는 이 창이 너무 좁아,
+ * 창 안에 드는 조합 자체가 **한쪽으로 치우쳐 있었다** — 꼴찌와 1등은 점수를
+ * 맞추려면 거의 늘 한 편이어야 해서, 그 둘이 같은 편인 비율이 63%였다.
+ * 아래 '신선도'를 아무리 세게 걸어도 창 밖은 고를 수 없으니 소용이 없었다.
+ *
+ * 그래서 창을 30%로 넓혔다. 여덟 명(160·140·125·110·95·80·60·45점,
+ * 한 팀 평균 408점)으로 300판씩 돌려 잰 값이다:
+ *
+ *             가장 붙어다닌 짝   쏠림    조합    두 팀 점수 차(평균/최대)
+ *   15%            63%         22%p    18가지     38점 / 65점
+ *   25%            51%         18%p    23가지     62점 / 105점
+ *   30%            54%        4.8%p    26가지     70점 / 125점   ← 여기
+ *   40%            44%        0.9%p    14가지    101점 / 155점
+ *
+ * 40% 면 짝은 완벽하게 고루 섞이지만 두 팀 점수 차가 한 팀 몫의 1/4까지
+ * 벌어진다 — 경기가 기운다. 30% 는 "맨날 쟤랑 같은 편"이라는 말이 나오지
+ * 않을 만큼(63% → 54%, 쏠림 22%p → 5%p) 섞으면서 점수 차는 한 팀의
+ * 17%에 묶어둔 자리다. 점수가 비슷한 명단에서는 두 팀 차가 13%까지 줄고
+ * 짝은 41~44%로 거의 완전히 고르다.
  */
-const SPLIT_SLACK = 0.15;
+const SPLIT_SLACK = 0.30;
+/**
+ * '충분히 고른' 조합들 가운데, 가장 신선한 것보다 이만큼까지는 같이 친다.
+ *
+ * 0 에 가까우면 늘 가장 신선한 하나만 남아 조합이 **고리처럼 돌기** 시작한다
+ * (0.1 로 두었더니 점수가 비슷한 명단에서 조합이 7가지로 줄어, 짝은 고루
+ * 섞이는데 같은 진용이 일곱 판마다 돌아왔다). 1 이면 신선도를 안 보는 것과 같다.
+ *
+ * 같은 명단 300판 기준:
+ *   0.1 → 조합  7가지, 짝 43%로 완전히 고름
+ *   0.2 → 조합 34가지, 짝 41~44%     ← 여기
+ *   0.5 → 조합 34가지, 짝 39~46%
+ */
+const REPEAT_SLACK = 0.2;
 
-/** 하루의 경계. 한국 시각 00시에 넘어간다. */
+/**
+ * 하루의 경계. 한국 시각 **18시**에 넘어간다.
+ *
+ * 자정이 아닌 까닭: 모이는 시간이 저녁 6시부터 새벽 4시쯤까지라, 자정으로 끊으면
+ * 하룻밤이 두 날로 쪼개진다. 11시에 호스트를 맡은 사람이 1시에 또 걸려도
+ * 서버는 '다른 날'로 보는 것이다. 18시로 끊으면 하룻밤이 한 덩어리로 묶인다.
+ */
 const KST = 9 * 60 * 60 * 1000;
+const DAY_START_HOUR = 18;
 function dayStart(ms = Date.now()) {
-  return Math.floor((ms + KST) / 86400000) * 86400000 - KST;
+  const edge = DAY_START_HOUR * 60 * 60 * 1000;
+  return Math.floor((ms + KST - edge) / 86400000) * 86400000 + edge - KST;
 }
 
 /**
- * 오늘 호스트로 뽑힌 횟수. 아이디(소문자)마다 몇 번인지 센다.
+ * 이 밤에 호스트로 뽑힌 횟수. 아이디(소문자)마다 몇 번인지 센다.
+ * '이 밤'은 18시에 시작해 다음 날 18시에 끝난다(`dayStart`).
  *
- * 하루에 두 번 맡는 일이 없게 하려고 본다. 사람이 적어 어쩔 수 없는 날에는
+ * 하룻밤에 두 번 맡는 일이 없게 하려고 본다. 사람이 적어 어쩔 수 없는 날에는
  * 두 번째도 맡아야 하므로 '못 한다'가 아니라 '뒤로 민다'로 쓴다.
  * 1순위만 센다 — 1순위가 못 잡아 2순위가 맡은 날까지는 알 길이 없다.
  */
@@ -299,9 +335,49 @@ async function hostCountToday(c) {
 }
 
 /**
+ * 최근 몇 판을 돌아볼지. 열 판이면 하룻밤 치가 넉넉히 들어온다.
+ */
+const PAIR_WINDOW = 10;
+
+/**
+ * 최근에 같은 편이었던 짝을 센다. `a|b`(소문자, 가나다순) → 무게.
+ *
+ * 가까운 판일수록 무겁게 센다(가장 최근 판이 10, 열 판 전이 1). 어제 같은 편이었던
+ * 것보다 **바로 앞 판에 같은 편이었던 것**이 훨씬 거슬리기 때문이다.
+ */
+async function recentTeammates(c) {
+  const { rows } = await c.query(
+    `SELECT teams, team_a, team_b FROM host_draws ORDER BY ts DESC LIMIT $1`, [PAIR_WINDOW]
+  );
+  const seen = new Map();
+  rows.forEach((r, i) => {
+    const weight = PAIR_WINDOW - i;
+    // teams 가 생기기 전 기록은 team_a·team_b 에만 있다
+    const parts = (r.teams && r.teams.length)
+      ? r.teams.map(t => t.order || [])
+      : [r.team_a || [], r.team_b || []];
+    for (const part of parts) {
+      for (let x = 0; x < part.length; x++) {
+        for (let y = x + 1; y < part.length; y++) {
+          const k = pairKey(part[x], part[y]);
+          seen.set(k, (seen.get(k) || 0) + weight);
+        }
+      }
+    }
+  });
+  return seen;
+}
+
+/** 짝 이름표. 순서를 타지 않게 가나다순으로 세운다. */
+function pairKey(a, b) {
+  const x = String(a).toLowerCase(), y = String(b).toLowerCase();
+  return x < y ? x + '|' + y : y + '|' + x;
+}
+
+/**
  * 팀 안의 차례를 정한다. 이 차례가 곧 호스트 순번이다.
  *
- * 먼저 섞은 뒤 오늘 호스트를 맡은 횟수가 적은 사람부터 앞에 세운다.
+ * 먼저 섞은 뒤 이 밤에 호스트를 맡은 횟수가 적은 사람부터 앞에 세운다.
  * 같은 횟수끼리는 섞인 차례 그대로다(정렬이 안정적이라 그렇다) — 그래서
  * 아직 안 맡은 사람들 사이에서는 여전히 제비뽑기다.
  */
@@ -320,8 +396,17 @@ function hostOrder(handles, today) {
  * 그래서 가장 고른 하나를 찾지 않는다. 여러 조합을 만들어 본 뒤
  * '충분히 고른' 것들을 모아 그중에서 제비를 뽑는다. 몇 점 차이는 어차피
  * 경기에서 느껴지지 않고, 매번 다른 사람과 한 편이 되는 쪽이 낫다.
+ *
+ * 그런데 제비뽑기만으로는 모자랐다. 창 안에 든 조합이 스무 가지라도 어떤 짝은
+ * 그중 열몇 가지에 들어 있다 — 점수가 그렇게 생겨 먹어서다. 그러면 아무리
+ * 고르게 뽑아도 그 둘은 두 판에 한 판보다 자주 한 편이 되고, 당하는 사람
+ * 눈에는 "맨날 쟤랑 같은 편"으로 보인다.
+ *
+ * 그래서 최근 열 판의 짝을 보고, **요즘 자주 같은 편이던 짝이 적게 든 조합**
+ * 쪽으로 제비를 몰아준다(`seen`). 여전히 제비뽑기지만, 방금 한 편이었던
+ * 사람과 또 묶이는 조합은 뒤로 빠진다.
  */
-function splitTeams(rows, sizes) {
+function splitTeams(rows, sizes, seen = new Map()) {
   const total = rows.reduce((n, p) => n + p.point, 0);
   // 점수가 전부 0인 달(새 시즌 첫날)에도 멈추지 않도록 바닥을 둔다
   const slack = Math.max(2, Math.round((total / sizes.length) * SPLIT_SLACK));
@@ -340,12 +425,31 @@ function splitTeams(rows, sizes) {
     for (let i = 0; i < parts.length; i += 2) {
       spread = Math.max(spread, Math.abs(sum(parts[i]) - sum(parts[i + 1])));
     }
-    tries.push({ parts, spread });
+
+    // 이 조합이 품고 있는 '요즘 자주 보던 짝'의 무게. 낮을수록 새 얼굴이다.
+    let repeat = 0;
+    for (const part of parts) {
+      for (let x = 0; x < part.length; x++) {
+        for (let y = x + 1; y < part.length; y++) {
+          repeat += seen.get(pairKey(part[x].handle, part[y].handle)) || 0;
+        }
+      }
+    }
+    tries.push({ parts, spread, repeat });
   }
 
   const best = Math.min(...tries.map(t => t.spread));
   const fair = tries.filter(t => t.spread <= best + slack);
-  const pick = fair[randomInt(fair.length)];
+
+  // 고른 것들 중에서 다시 신선한 쪽만 남긴다. 한계를 절대값이 아니라 이번에
+  // 나온 폭(span)의 비율로 잡는 까닭은, 무게가 사람 수·판 수에 따라 몇 배씩
+  // 달라지기 때문이다. 기록이 없어 다 똑같으면(span 0) 전부 남아 그냥 제비뽑기다.
+  const reps = fair.map(t => t.repeat);
+  const low = Math.min(...reps);
+  const span = Math.max(...reps) - low;
+  const limit = low + Math.max(1, Math.round(span * REPEAT_SLACK));
+  const fresh = fair.filter(t => t.repeat <= limit);
+  const pick = fresh[randomInt(fresh.length)];
 
   // 이름표도 섞어 붙인다. A 가 늘 센 팀이면 이름이 뜻을 가져버린다.
   // 다만 짝은 흐트러뜨리지 않는다 — 6명 팀이 5명 팀과 붙으면 안 된다.
@@ -412,8 +516,10 @@ async function hostDraw(req, res, b) {
       if (missing.length) throw new Error('명단에 없는 선수입니다: ' + missing.join(', '));
 
       // 팀 안의 차례가 곧 호스트 순번이다 — 1순위가 호스트를 못 잡으면 2순위,
-      // 그래도 안 되면 3순위가 맡는다. 오늘 이미 맡은 사람은 뒤로 민다.
-      const parts = splitTeams(rows, sizes);
+      // 그래도 안 되면 3순위가 맡는다. 이 밤에 이미 맡은 사람은 뒤로 민다.
+      // 최근에 같은 편이었던 짝은 덜 묶이게 한다
+      const seen = await recentTeammates(c);
+      const parts = splitTeams(rows, sizes, seen);
       const names = TEAM_NAMES.slice(0, teams);
       const today = await hostCountToday(c);
       const teamRows = parts.map((handles, i) => ({ name: names[i], order: hostOrder(handles, today) }));
