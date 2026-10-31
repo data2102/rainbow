@@ -232,6 +232,7 @@ async function loadAttendance() {
     if (d.closeHour != null) attendCloseHour = d.closeHour;
     attendOpen = d.open !== false;
     if (typeof d.ruleV2 === 'boolean') serverRuleV2 = d.ruleV2;
+    if (typeof d.attendRule === 'boolean') serverAttendRule = d.attendRule;
     nightDayStr = (d.night && d.night.day) || null;
     nightAttended = (d.night && d.night.handles) || [];
   } catch {
@@ -295,7 +296,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 104;
+const APP_VERSION = 105;
 let toldToRefresh = false;
 
 /**
@@ -875,7 +876,7 @@ function attendedSet() {
 
 /** 11월 규칙에서 점수를 못 받을 사람들 (고른 사람 중 출석 체크가 없는 쪽) */
 function noScoreAmong(handles) {
-  if (!ruleNow()) return [];
+  if (!attendRuleNow()) return [];
   const came = attendedSet();
   return handles.filter(h => !came.has(String(h).toLowerCase()));
 }
@@ -895,7 +896,7 @@ function renderChecklists() {
   // 출석 체크를 안 한 사람은 골라도 점수가 들어가지 않는다. 고르기 전에
   // 알 수 있도록 이름 옆에 표를 달아둔다 — 막지는 않는다, 경기는 기록해야 하므로.
   const came = attendedSet();
-  const absent = (h) => ruleNow() && !came.has(String(h).toLowerCase());
+  const absent = (h) => attendRuleNow() && !came.has(String(h).toLowerCase());
   const rowHtml = (p, side) => {
     const picked = { win: winChecked, lose: loseChecked };
     const checked = picked[side].has(p.handle);
@@ -2295,20 +2296,36 @@ function playDay(ms = Date.now()) {
  */
 const RULE_V2_AT = Date.parse('2026-11-01T00:00:00+09:00');
 
-/** 그 **시각**이 새 규칙에 드는가. 지난 경기를 보여줄 때 쓴다. */
+/**
+ * 출석 규칙이 시작되는 시각 — **11월 2일 0시**. 점수보다 하루 늦다.
+ * api/_lib.js 의 ATTEND_RULE_AT 와 같아야 한다.
+ *
+ * 10월 31일 밤 경기가 자정을 넘기면 11월 기록이 되는데, 출석까지 같이 켜면
+ * 규칙이 알려지기도 전 밤에 체크를 안 했다고 점수가 빠진다. 그 하룻밤을
+ * 비워두려고 하루 미뤘다.
+ */
+const ATTEND_RULE_AT = Date.parse('2026-11-02T00:00:00+09:00');
+
+/** 그 **시각**이 새 점수 규칙에 드는가. 지난 경기를 보여줄 때 쓴다. */
 function ruleV2(ms) { return ms >= RULE_V2_AT; }
 
-/** 서버가 알려준 "지금은 새 규칙인가". 받기 전에는 null. */
+/** 서버가 알려준 "지금". 받기 전에는 null. */
 let serverRuleV2 = null;
+let serverAttendRule = null;
 
 /**
- * **지금**이 새 규칙인가.
+ * **지금**이 새 점수 규칙인가 (순위표에서 어느 칸을 보여줄지).
  *
  * 보는 사람의 시계가 아니라 서버의 대답을 먼저 믿는다. 시계가 하루쯤 어긋난
  * 컴퓨터가 드물지 않고, 그러면 혼자만 다른 순위표를 보게 된다.
  * 서버 대답을 아직 못 받았을 때만 제 시계로 어림한다.
  */
 function ruleNow() { return serverRuleV2 == null ? ruleV2(Date.now()) : serverRuleV2; }
+
+/** **지금** 출석 규칙이 도는가 (리폿의 미출석 표시). 역시 서버 말을 따른다. */
+function attendRuleNow() {
+  return serverAttendRule == null ? Date.now() >= ATTEND_RULE_AT : serverAttendRule;
+}
 
 /** 지금의 한국 시각 '시' (0~23). 보는 사람의 시간대와 무관하다. */
 function kstHourNow(ms = Date.now()) {
@@ -2547,7 +2564,7 @@ function initScheduleEvents() {
   setInterval(async () => {
     if (!panel.classList.contains('active') || !pageVisible()) return;
     const dayChanged = playToday && playToday !== playDay();
-    const shutNow = ruleNow() && kstHourNow() >= attendCloseHour;
+    const shutNow = attendRuleNow() && kstHourNow() >= attendCloseHour;
     if (dayChanged || shutNow !== !attendOpen) {
       await loadAttendance();
       renderAttendance();

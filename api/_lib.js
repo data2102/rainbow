@@ -319,6 +319,16 @@ export const RULE_V2_AT = Date.parse('2026-11-01T00:00:00+09:00');
 export function ruleV2(ts) { return Number(ts) >= RULE_V2_AT; }
 
 /**
+ * 출석 규칙이 시작되는 시각 — 2026년 11월 2일 0시 (한국 시각). 점수보다 하루 늦다.
+ *
+ * 10월 31일 밤 경기가 자정을 넘기면 그 판은 11월 기록이 된다. 출석까지 같은
+ * 날 켜면 **규칙이 알려지기도 전 밤**에 체크를 안 했다는 이유로 점수가 빠진다.
+ * 그 하룻밤을 비워주려고 출석만 하루 뒤로 뒀다.
+ */
+export const ATTEND_RULE_AT = Date.parse('2026-11-02T00:00:00+09:00');
+export function attendRule(ts) { return Number(ts) >= ATTEND_RULE_AT; }
+
+/**
  * 패배 시 점수 변화.
  * 11월부터는 0 — 져도 깎이지 않지만 붙는 것도 없다. 그전에는 +1 이었다.
  */
@@ -487,10 +497,10 @@ export async function attendedOn(c, day) {
 
 /**
  * 이 경기에서 출석 체크가 없어 점수를 못 받을 사람들을 골라낸다.
- * 11월 전 경기에는 빈 목록을 돌려준다 — 그때는 이 규칙이 없었다.
+ * 11월 2일 전 경기에는 빈 목록을 돌려준다 — 그때는 이 규칙이 없었다.
  */
 export async function noScoreFor(c, handles, ts) {
-  if (!ruleV2(ts)) return [];
+  if (!attendRule(ts)) return [];
   // play_schedule 표가 아직 없는 데이터베이스일 수 있다 ('출석' 을 한 번도
   // 안 연 경우). 그럴 때는 아무도 벌하지 않는다.
   const { rows: has } = await c.query(

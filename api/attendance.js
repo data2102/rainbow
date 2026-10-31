@@ -1,6 +1,6 @@
 import {
   q, tx, body, methodGuard, currentUser, requireUser, requireAdmin, audit,
-  ruleV2, kstHour, nightDay, ATTEND_CLOSE_HOUR,
+  ruleV2, attendRule, kstHour, nightDay, ATTEND_CLOSE_HOUR,
 } from './_lib.js';
 import { syncSeason } from './_season.js';
 
@@ -25,14 +25,17 @@ const KST = 9 * 60 * 60 * 1000;
 /**
  * 접속 예상 시간이 초기화되는 시각 (한국 시각).
  *
- * 11월부터 **0시**다. 그전에는 아침 7시였다 — 새벽까지 놀고 자는 사람이
+ * 11월 2일부터 **0시**다. 그전에는 아침 7시였다 — 새벽까지 놀고 자는 사람이
  * 전날 체크를 그대로 보게 하려던 것인데, 이제 출석이 0시~18시에만 받는
  * '그날의 신고'가 되었으므로 날짜와 함께 넘어가야 한다.
+ *
+ * 점수 규칙(11월 1일)이 아니라 출석 규칙(11월 2일)을 따른다. 출석 화면과
+ * 출석을 보는 리폿이 하루 동안 서로 다른 날짜를 보면 안 되기 때문이다.
  */
 export const RESET_HOUR_V1 = 7;
 export const RESET_HOUR_V2 = 0;
 export function resetHourAt(ms = Date.now()) {
-  return ruleV2(ms) ? RESET_HOUR_V2 : RESET_HOUR_V1;
+  return attendRule(ms) ? RESET_HOUR_V2 : RESET_HOUR_V1;
 }
 /** 지금 쓰이는 초기화 시각. 화면에 적어 보내는 값이다. */
 export const RESET_HOUR = RESET_HOUR_V1;
@@ -49,13 +52,13 @@ export function playDay(ms = Date.now()) {
 }
 
 /**
- * 지금 출석 체크를 받을 수 있는지. 11월부터 **0시~18시**만 받는다.
+ * 지금 출석 체크를 받을 수 있는지. 11월 2일부터 **0시~18시**만 받는다.
  *
  * 18시면 그날 밤이 시작되므로, 그 뒤에 체크를 받으면 "경기 끝나고
  * 점수 받으러 체크"가 되어 규칙이 뜻을 잃는다.
  */
 export function attendOpen(ms = Date.now()) {
-  return !ruleV2(ms) || kstHour(ms) < ATTEND_CLOSE_HOUR;
+  return !attendRule(ms) || kstHour(ms) < ATTEND_CLOSE_HOUR;
 }
 
 /**
@@ -151,6 +154,7 @@ export default async function handler(req, res) {
         closeHour: ATTEND_CLOSE_HOUR,
         open: attendOpen(),
         ruleV2: ruleV2(Date.now()),
+        attendRule: attendRule(Date.now()),
         schedule: picks.map(r => ({ handle: r.handle, slot: r.slot })),
         night: {
           day: night,
