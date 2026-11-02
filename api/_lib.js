@@ -344,11 +344,17 @@ export function lossGain(ts) {
 const STREAK_BONUS = { 3: 1, 5: 2, 7: 3, 10: 5 };
 
 /**
+ * 11월 규칙에서 한 판 이겼을 때 받는 점수.
+ * 처음에는 1 이었다가 2026-11-02 에 2 로 올렸다 (아래 SCORE_RULE_VERSION 참고).
+ */
+export const WIN_GAIN_V2 = 2;
+
+/**
  * 승리 시 획득 점수.
- * 11월부터는 연승과 상관없이 **+1**. 그전에는 기본 +3 에 연승 보너스를 더했다.
+ * 11월부터는 연승과 상관없이 **+2**. 그전에는 기본 +3 에 연승 보너스를 더했다.
  */
 export function winGain(newStreak, ts) {
-  return ruleV2(ts) ? 1 : 3 + (STREAK_BONUS[newStreak] || 0);
+  return ruleV2(ts) ? WIN_GAIN_V2 : 3 + (STREAK_BONUS[newStreak] || 0);
 }
 
 /* ---------- 하룻밤의 경계 ---------- */

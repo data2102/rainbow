@@ -4,7 +4,7 @@ import {
   winGain, lossGain, cleanReason, ensureMatchVoid, noScoreFor,
   ensureHostDraws, rowToDraw, TEAM_NAMES, replay, nightStart,
 } from './_lib.js';
-import { ensureSeason } from './_season.js';
+import { ensureSeason, ensureRescore } from './_season.js';
 
 /**
  * GET  /api/match?host=1&page=N        호스트 뽑기 기록 (누구나 볼 수 있다)
@@ -59,6 +59,9 @@ async function record(req, res, b) {
   try {
     // 늦은 참석자 칸이 아직 없는 데이터베이스일 수 있다
     await ensureMatchVoid();
+    // 점수 규칙이 바뀐 채로 배포됐으면 먼저 그 달을 다시 센다.
+    // 트랜잭션 **바깥**이라야 한다 — 안에서 부르면 같은 잠금을 두고 서로 기다린다.
+    await ensureRescore();
     const result = await tx((c) => recordCore(c, me, winners, losers));
 
     await audit(me, 'record_match', { winners, losers });
@@ -569,6 +572,7 @@ async function hostResult(req, res, b) {
   try {
     await ensureHostDraws();
     await ensureMatchVoid();
+    await ensureRescore();
     const out = await tx(async (c) => {
       const { rows } = await c.query(`SELECT * FROM host_draws WHERE id = $1 FOR UPDATE`, [id]);
       if (!rows.length) throw new Error('없는 판입니다.');

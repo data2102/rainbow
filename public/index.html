@@ -3264,7 +3264,7 @@ if (/[?&]room=\d+/.test(location.search)) {
       <div class="panel hud-corner">
         <h2>득점 규칙 · Rule</h2>
         <div class="rules">
-          · 개인 승리 시 <b>+1점</b><br>
+          · 개인 승리 시 <b>+2점</b><br>
           · 개인 패배 시 <b>0점</b> — 져도 깎이지 않습니다<br>
           · <b>연승 보너스는 없습니다</b><br>
           · <b class="rule-new">2026년 11월 2일부터</b> ·
@@ -3300,7 +3300,7 @@ if (/[?&]room=\d+/.test(location.search)) {
         <b>18시까지 체크하지 않으면 그날 밤 경기는 리폿에 올라가도 점수가 반영되지 않습니다</b>
         (룰렛은 그대로 돌릴 수 있습니다).
         <br>
-        점수 규칙(승 +1 · 패 0)은 <b>11월 1일부터</b>입니다 — 10월 31일 밤 경기가
+        점수 규칙(승 +2 · 패 0)은 <b>11월 1일부터</b>입니다 — 10월 31일 밤 경기가
         자정을 넘겨도 그날 밤은 출석과 상관없이 점수가 들어갑니다.
       </div>
       <div class="mine" id="slotMine"></div>
@@ -4397,7 +4397,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 106;
+const APP_VERSION = 107;
 let toldToRefresh = false;
 
 /**

@@ -41,6 +41,14 @@ CREATE INDEX IF NOT EXISTS idx_matches_season ON matches (season, ts DESC);
 
 -- 시즌(월간 리셋). 한국 시각 매월 1일 00시에 넘어가며,
 -- 첫 시즌만 예외로 2026-08-27 ~ 2026-09-30 이다. 규칙은 api/_season.js 에 있다.
+-- 사이트가 스스로 기억해야 하는 자잘한 값. 지금은 점수 규칙 판 하나뿐이다.
+-- 이 값이 코드의 SCORE_RULE_VERSION 보다 낮으면, 배포 뒤 첫 요청이
+-- 열려 있는 시즌을 다시 세어 점수를 맞춘다 (api/_season.js 의 ensureRescore).
+CREATE TABLE IF NOT EXISTS app_meta (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS seasons (
   id         TEXT PRIMARY KEY,   -- '2026-09', '2026-10' ...
   label      TEXT NOT NULL,
