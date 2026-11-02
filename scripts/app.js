@@ -296,7 +296,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 108;
+const APP_VERSION = 109;
 let toldToRefresh = false;
 
 /**
@@ -774,8 +774,7 @@ function renderTop5() {
   document.getElementById('topPointBody').innerHTML = byPoint.map((p, i) => `
     <tr><td class="rank-cell ${medalClass(i + 1)}">${i + 1}</td><td>${whoName(p.handle)}</td>
     <td class="clan-tag">${esc(p.clan)}</td><td>${p.point}</td>
-    <td>${p.wins + p.losses}</td>
-    <td class="win-txt">${p.wins}</td><td class="loss-txt">${p.losses}</td></tr>`).join('');
+    <td class="win-txt">${p.wins}</td></tr>`).join('');
 
   const streakBody = document.getElementById('topStreakBody');
   if (streakBody) {
@@ -783,9 +782,8 @@ function renderTop5() {
       <tr><td class="rank-cell ${medalClass(i + 1)}">${i + 1}</td><td>${whoName(p.handle)}</td>
       <td class="clan-tag">${esc(p.clan)}</td>
       <td><span class="streak-pos">${p.best}연승</span></td>
-      <td>${p.wins + p.losses}</td>
-      <td class="win-txt">${p.wins}</td><td class="loss-txt">${p.losses}</td></tr>`).join('')
-      || '<tr><td colspan="7" class="log-empty">아직 연승 기록이 없습니다.</td></tr>';
+      <td class="win-txt">${p.wins}</td></tr>`).join('')
+      || '<tr><td colspan="5" class="log-empty">아직 연승 기록이 없습니다.</td></tr>';
   }
 
   // 승률은 경기를 치른 선수만 대상으로 한다. 0전 0승이 100%로 잡히거나
@@ -803,9 +801,8 @@ function renderTop5() {
       <tr><td class="rank-cell ${medalClass(i + 1)}">${i + 1}</td><td>${whoName(p.handle)}</td>
       <td class="clan-tag">${esc(p.clan)}</td>
       <td>${ratio(p)}%</td>
-      <td>${p.wins + p.losses}</td>
-      <td class="win-txt">${p.wins}</td><td class="loss-txt">${p.losses}</td></tr>`).join('')
-      || '<tr><td colspan="7" class="log-empty">아직 경기 기록이 없습니다.</td></tr>';
+      <td class="win-txt">${p.wins}</td></tr>`).join('')
+      || '<tr><td colspan="5" class="log-empty">아직 경기 기록이 없습니다.</td></tr>';
   }
 }
 
@@ -851,15 +848,14 @@ function renderClanTop() {
       <td class="clan-tag" style="font-size:15px;">${esc(c.clan)}</td>
       <td>${c.members}명</td>
       <td>${c.point}</td>
-      <td>${total}</td>
       <td class="win-txt">${c.wins}</td>
-      <td class="loss-txt">${c.losses}</td>
       <td>${rate}%</td>
     </tr>`;
-  }).join('') || '<tr><td colspan="8" class="log-empty">클랜에 소속된 선수가 없습니다.</td></tr>';
+  }).join('') || '<tr><td colspan="6" class="log-empty">클랜에 소속된 선수가 없습니다.</td></tr>';
 
   const tied = list.some(c => c.tied);
-  note.innerHTML = '소속 선수들의 포인트·승·패를 합산했습니다 · 포인트 합계가 높은 순 · 클랜이 없는 선수(<b>-</b>)는 제외'
+  // 패수 칸은 뺐지만 등수를 가릴 때는 여전히 본다 — 같은 승수면 덜 진 쪽이 위다
+  note.innerHTML = '소속 선수들의 포인트와 승수를 합산했습니다 · 포인트 합계가 높은 순 · 클랜이 없는 선수(<b>-</b>)는 제외'
     + (tied ? ' · <b style="color:var(--amber);">전적이 같은 클랜은 같은 등수로 함께 표시됩니다.</b>' : '');
 }
 
