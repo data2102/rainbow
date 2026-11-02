@@ -296,7 +296,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 107;
+const APP_VERSION = 108;
 let toldToRefresh = false;
 
 /**
@@ -689,8 +689,9 @@ function sortedPlayers() {
 /* ---------- 렌더 ---------- */
 
 function renderStanding() {
-  // 11월부터 Loss·Ratio·Streak 칸을 걷어낸다. 칸을 지우지 않고 감추는 까닭은
-  // 10월까지는 그대로 보여야 하기 때문이다 — 머리글과 칸이 한 스위치로 같이 움직인다.
+  // 11월부터 Game·Loss·Ratio·Streak 칸을 걷어낸다. 칸을 지우지 않고 감추는
+  // 까닭은 10월까지는 그대로 보여야 하기 때문이다 — 머리글과 칸이 한 스위치로
+  // 같이 움직인다.
   document.body.classList.toggle('rule-v2', ruleNow());
   const q = document.getElementById('searchInput').value.trim().toLowerCase();
   const tbody = document.querySelector('#standingTable tbody');
@@ -715,7 +716,7 @@ function renderStanding() {
       <td>${whoName(p.handle)}</td>
       <td class="clan-tag">${esc(p.clan)}</td>
       <td>${p.point}</td>
-      <td>${p.wins + p.losses}</td>
+      <td class="game-txt">${p.wins + p.losses}</td>
       <td class="win-txt">${p.wins}</td>
       <td class="loss-txt">${p.losses}</td>
       <td class="ratio-txt">${ratio(p)}%</td>

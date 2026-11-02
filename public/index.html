@@ -1148,12 +1148,15 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 }
 
 /* ===== 2026-11 규칙 =====
-   승리 +1 / 패배 0 이 되면서 Loss·Ratio·Streak 는 순위표에서 뜻을 잃었다.
+   승리 +2 / 패배 0 이 되면서 Game·Loss·Ratio·Streak 는 순위표에서 뜻을 잃었다.
+   남는 것은 Rank · ID · Clan · Point · Win 다섯 칸이다.
    지우지 않고 감추는 까닭은 10월까지의 화면은 그대로여야 하기 때문이다 —
    body.rule-v2 하나로 머리글과 칸이 같이 움직인다. */
+body.rule-v2 #standingTable th[data-key="game"],
 body.rule-v2 #standingTable th[data-key="loss"],
 body.rule-v2 #standingTable th[data-key="ratio"],
 body.rule-v2 #standingTable th[data-key="streak"],
+body.rule-v2 #standingTable .game-txt,
 body.rule-v2 #standingTable .loss-txt,
 body.rule-v2 #standingTable .ratio-txt,
 body.rule-v2 #standingTable .streak-txt{ display:none; }
@@ -4397,7 +4400,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 107;
+const APP_VERSION = 108;
 let toldToRefresh = false;
 
 /**
@@ -4790,8 +4793,9 @@ function sortedPlayers() {
 /* ---------- 렌더 ---------- */
 
 function renderStanding() {
-  // 11월부터 Loss·Ratio·Streak 칸을 걷어낸다. 칸을 지우지 않고 감추는 까닭은
-  // 10월까지는 그대로 보여야 하기 때문이다 — 머리글과 칸이 한 스위치로 같이 움직인다.
+  // 11월부터 Game·Loss·Ratio·Streak 칸을 걷어낸다. 칸을 지우지 않고 감추는
+  // 까닭은 10월까지는 그대로 보여야 하기 때문이다 — 머리글과 칸이 한 스위치로
+  // 같이 움직인다.
   document.body.classList.toggle('rule-v2', ruleNow());
   const q = document.getElementById('searchInput').value.trim().toLowerCase();
   const tbody = document.querySelector('#standingTable tbody');
@@ -4816,7 +4820,7 @@ function renderStanding() {
       <td>${whoName(p.handle)}</td>
       <td class="clan-tag">${esc(p.clan)}</td>
       <td>${p.point}</td>
-      <td>${p.wins + p.losses}</td>
+      <td class="game-txt">${p.wins + p.losses}</td>
       <td class="win-txt">${p.wins}</td>
       <td class="loss-txt">${p.losses}</td>
       <td class="ratio-txt">${ratio(p)}%</td>
