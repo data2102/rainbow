@@ -1149,76 +1149,87 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   .kakao-go{ display:none; }
 }
 
-/* ===== 2회차 대회 대진표 =====
-   가로 대진표(1회차) 대신 치르는 차례대로 위에서 아래로 쌓는다. 여섯 판뿐이고
+/* 아직 내용이 없는 회차 */
+.ed-blank{
+  padding:var(--sp-8) var(--sp-4); text-align:center;
+  border:1px dashed var(--border-strong); border-radius:var(--radius-md);
+  background:var(--surface-sunken);
+}
+.ed-blank-t{
+  font-size:var(--fs-title); font-weight:var(--fw-bold); color:var(--text-tertiary);
+}
+.ed-blank-s{ margin-top:var(--sp-2); font-size:var(--fs-caption); color:var(--text-tertiary); }
+
+/* ===== 토너먼트 대진표 (4팀 2패 탈락 여섯 판) =====
+   1회차의 가로 대진표 대신 치르는 차례대로 위에서 아래로 쌓는다. 여섯 판뿐이고
    자리가 고정돼 있어 선을 긋지 않아도 흐름이 읽히고, 좁은 화면에서도 안 깨진다. */
-.t2-bracket{ display:flex; flex-direction:column; gap:var(--sp-3); }
-.t2-row{
+.ko-bracket{ display:flex; flex-direction:column; gap:var(--sp-3); }
+.ko-row{
   border:1px solid var(--border); border-left:3px solid var(--border-strong);
   border-radius:var(--radius-md); background:var(--surface);
   padding:var(--sp-3) var(--sp-4);
 }
 /* 아직 두 팀이 안 정해진 판은 눌러둔다 — 할 수 있는 일이 없는 칸이다 */
-.t2-row.wait{ opacity:.6; }
-.t2-row.ready{ border-left-color:var(--accent); }
-.t2-row.done{ border-left-color:var(--success-strong); }
+.ko-row.wait{ opacity:.6; }
+.ko-row.ready{ border-left-color:var(--accent); }
+.ko-row.done{ border-left-color:var(--success-strong); }
 
-.t2-head{ display:flex; align-items:center; gap:var(--sp-2); flex-wrap:wrap; margin-bottom:var(--sp-3); }
-.t2-stage{ font-size:var(--fs-caption); font-weight:var(--fw-bold); color:var(--text-primary); }
-.t2-tag{
+.ko-head{ display:flex; align-items:center; gap:var(--sp-2); flex-wrap:wrap; margin-bottom:var(--sp-3); }
+.ko-stage{ font-size:var(--fs-caption); font-weight:var(--fw-bold); color:var(--text-primary); }
+.ko-tag{
   font-size:var(--fs-footnote); font-weight:var(--fw-bold);
   padding:1px var(--sp-2); border-radius:var(--radius-pill);
   background:var(--surface-sunken); color:var(--text-tertiary); border:1px solid var(--border);
 }
-.t2-tag.ready{ background:var(--accent-bg); color:var(--accent); border-color:transparent; }
-.t2-win{
+.ko-tag.ready{ background:var(--accent-bg); color:var(--accent); border-color:transparent; }
+.ko-win{
   font-size:var(--fs-footnote); font-weight:var(--fw-bold);
   color:var(--success-strong); background:var(--success-bg);
   padding:1px var(--sp-2); border-radius:var(--radius-pill);
 }
-.t2-head .btn-mini{ margin-left:auto; }
+.ko-head .btn-mini{ margin-left:auto; }
 
-.t2-pair{ display:flex; align-items:stretch; gap:var(--sp-2); }
-.t2-side{
+.ko-pair{ display:flex; align-items:stretch; gap:var(--sp-2); }
+.ko-side{
   flex:1 1 0; min-width:0; display:flex; align-items:center; gap:var(--sp-2);
   padding:var(--sp-2) var(--sp-3); border-radius:var(--radius-sm);
   border:1px solid var(--border); background:var(--surface-sunken);
   font-size:var(--fs-caption); font-weight:var(--fw-bold); color:var(--text-primary);
 }
-.t2-side .t2-nm{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ko-side .ko-nm{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 /* 아직 누가 올라올지 모르는 자리. 팀 이름이 아니라 '자리 이름'이라 흐리게 적는다 */
-.t2-side.wait{ color:var(--text-tertiary); font-weight:var(--fw-medium); border-style:dashed; }
-.t2-side.won{ border-color:var(--success-strong); background:var(--success-bg); color:var(--success-strong); }
-.t2-side.lost{ color:var(--text-tertiary); }
-.t2-sc{
+.ko-side.wait{ color:var(--text-tertiary); font-weight:var(--fw-medium); border-style:dashed; }
+.ko-side.won{ border-color:var(--success-strong); background:var(--success-bg); color:var(--success-strong); }
+.ko-side.lost{ color:var(--text-tertiary); }
+.ko-sc{
   margin-left:auto; flex:none; font-variant-numeric:tabular-nums;
   font-size:var(--fs-body); font-weight:var(--fw-bold);
 }
-.t2-vs{
+.ko-vs{
   flex:none; align-self:center; font-size:var(--fs-footnote);
   font-weight:var(--fw-bold); color:var(--text-tertiary);
 }
-.t2-note{ margin-top:var(--sp-2); font-size:var(--fs-footnote); color:var(--text-tertiary); }
-.t2-btns{ display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-top:var(--sp-3); }
+.ko-note{ margin-top:var(--sp-2); font-size:var(--fs-footnote); color:var(--text-tertiary); }
+.ko-btns{ display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-top:var(--sp-3); }
 
 /* 최종 순위 */
-.t2-places{ display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-top:var(--sp-3); }
-.t2-place{
+.ko-places{ display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-top:var(--sp-3); }
+.ko-place{
   display:flex; align-items:center; gap:var(--sp-2);
   padding:var(--sp-2) var(--sp-4); border-radius:var(--radius-pill);
   border:1px solid var(--border); background:var(--surface);
   font-size:var(--fs-caption);
 }
-.t2-place .t2-pn{ font-weight:var(--fw-bold); color:var(--text-tertiary); }
-.t2-place .t2-pt{ font-weight:var(--fw-bold); color:var(--text-primary); }
-.t2-place.p1{ background:var(--warning-bg); border-color:transparent; }
-.t2-place.p1 .t2-pn, .t2-place.p1 .t2-pt{ color:var(--warning-strong); }
+.ko-place .ko-pn{ font-weight:var(--fw-bold); color:var(--text-tertiary); }
+.ko-place .ko-pt{ font-weight:var(--fw-bold); color:var(--text-primary); }
+.ko-place.p1{ background:var(--warning-bg); border-color:transparent; }
+.ko-place.p1 .ko-pn, .ko-place.p1 .ko-pt{ color:var(--warning-strong); }
 
 @media (max-width:560px){
   /* 좁으면 두 팀을 위아래로 둔다. 가로로 욱여넣으면 이름이 잘린다. */
-  .t2-pair{ flex-direction:column; }
-  .t2-vs{ align-self:flex-start; }
-  .t2-btns .btn-mini{ flex:1 1 calc(50% - var(--sp-2)); }
+  .ko-pair{ flex-direction:column; }
+  .ko-vs{ align-self:flex-start; }
+  .ko-btns .btn-mini{ flex:1 1 calc(50% - var(--sp-2)); }
 }
 
 /* ===== 2026-11 규칙 =====
@@ -3473,21 +3484,33 @@ if (/[?&]room=\d+/.test(location.search)) {
     <div class="month-bar">
       <span class="month-bar-k">대회 회차</span>
       <select class="ed-select" id="tourEdSelect" aria-label="볼 대회 회차 선택">
-        <option value="2">2회차 (진행 중)</option>
+        <option value="3">3회차 (진행 중)</option>
+        <option value="2">2회차 (작성중)</option>
         <option value="1">1회차 (종료)</option>
       </select>
       <span class="ed-past" id="tourEdNote"></span>
     </div>
 
-    <!-- ── 2회차 ── -->
-    <div id="tourEd2">
+    <!-- ── 2회차 · 아직 정리되지 않은 회차 ── -->
+    <div id="tourEd2" style="display:none;">
       <div class="panel hud-corner">
         <h2>2회차 대회 · Tournament</h2>
+        <div class="ed-blank">
+          <div class="ed-blank-t">작성중</div>
+          <div class="ed-blank-s">2회차 기록은 아직 정리되지 않았습니다.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 3회차 (진행 중) ── -->
+    <div id="tourEd3">
+      <div class="panel hud-corner">
+        <h2>3회차 대회 · Tournament</h2>
 
         <div class="tsec">
           <div class="tsec-h">■ 조편성</div>
           <div class="tsec-sub">4개 팀 · 팀당 5명</div>
-          <div class="team-cards" id="t2Teams"></div>
+          <div class="team-cards" id="koTeams"></div>
         </div>
 
         <div class="tsec">
@@ -3504,18 +3527,18 @@ if (/[?&]room=\d+/.test(location.search)) {
 
         <div class="tsec">
           <div class="tsec-h">■ 대진표 · 결과 등록</div>
-          <div class="tsec-sub" id="t2Hint">두 팀이 정해진 경기부터 차례로 기록합니다 · 등록은 관리자만 할 수 있습니다</div>
-          <div class="t2-bracket" id="t2Bracket"></div>
+          <div class="tsec-sub" id="koHint">두 팀이 정해진 경기부터 차례로 기록합니다 · 등록은 관리자만 할 수 있습니다</div>
+          <div class="ko-board" id="koBoard"></div>
         </div>
 
         <div class="tsec">
           <div class="tsec-h">■ 최종 순위</div>
-          <div id="t2Result"></div>
+          <div id="koResult"></div>
         </div>
 
         <div class="tsec">
           <div class="tsec-h">■ 경기 기록</div>
-          <div id="t2Log"></div>
+          <div id="koLog"></div>
         </div>
       </div>
     </div>

@@ -5,18 +5,19 @@ import { q, body, methodGuard, requireAdmin, audit } from './_lib.js';
  * 같아야 한다.
  *
  *   1회차 — 5팀. 예선 풀리그(group) 뒤 상위 4팀이 본선(final) 2패 탈락.
- *   2회차 — 4팀. 자리가 정해진 2패 탈락 여섯 판. 모두 3판 2선승.
+ *   2회차 — 아직 정리되지 않았다. 기록을 받지 않는다.
+ *   3회차 — 4팀. 자리가 정해진 2패 탈락 여섯 판. 모두 3판 2선승.
  */
 const TEAMS_BY_EDITION = {
   1: ['A', 'B', 'C', 'D', 'E'],
-  2: ['A', 'B', 'C', 'D'],
+  3: ['A', 'B', 'C', 'D'],
 };
 const STAGES_BY_EDITION = {
   1: ['group', 'final'],
-  2: ['q1', 'q2', 'wf', 'lf', 'ff', 'gf'],
+  3: ['q1', 'q2', 'wf', 'lf', 'ff', 'gf'],
 };
 /** 지금 진행 중인 회차 */
-const LATEST_EDITION = 2;
+const LATEST_EDITION = 3;
 
 /**
  * 구분만 보고 몇 회차인지 안다.
@@ -32,8 +33,8 @@ function editionOf(stage) {
   return null;
 }
 
-/** 2회차 대진. 앞선 판이 정해지면 다음 판에 누가 오는지도 정해진다. */
-function bracket2(rows) {
+/** 토너먼트 대진. 앞선 판이 정해지면 다음 판에 누가 오는지도 정해진다. */
+function bracketKo(rows) {
   const by = {};
   for (const m of rows) by[m.stage] = m;
   const won = (m) => (m ? m.winner : null);
@@ -61,7 +62,7 @@ const DEPENDENTS = {
 /** 3판 2선승. 이긴 쪽은 반드시 2승, 진 쪽은 0 또는 1승이다. */
 const WIN_GAMES = 2;
 
-/** 2회차 자리 이름. 오류 문구에 그대로 쓴다. */
+/** 자리 이름. 오류 문구에 그대로 쓴다. */
 const STAGE_LABEL = {
   group: '예선', final: '본선',
   q1: '예선 1경기', q2: '예선 2경기',
@@ -96,6 +97,13 @@ async function ensureTable() {
   // stage 에 'group','final' 만 허용하던 검사를 푼다. 2회차는 자리 이름을 쓴다.
   // 어떤 말이 올 수 있는지는 STAGES_BY_EDITION 이 코드에서 지킨다.
   await q(`ALTER TABLE tournament_matches DROP CONSTRAINT IF EXISTS tournament_matches_stage_check`);
+  // 이 대회를 2회차로 열었다가 3회차로 고쳤다. 그 사이에 들어간 기록이 있으면
+  // 옮겨준다 — 자리 이름이 이 방식의 것이므로 어느 회차인지 헷갈릴 일이 없다.
+  await q(
+    `UPDATE tournament_matches SET edition = $1
+      WHERE edition = 2 AND stage = ANY($2)`,
+    [LATEST_EDITION, STAGES_BY_EDITION[LATEST_EDITION]]
+  );
   ensured = true;
 }
 
@@ -161,7 +169,7 @@ async function record(req, res) {
 
   // 3판 2선승. 이긴 쪽은 2승 고정이고, 진 쪽이 0승인지 1승인지만 받는다.
   let lost = null;
-  if (edition === 2) {
+  if (edition === LATEST_EDITION) {
     lost = Number(loserGames);
     if (!Number.isInteger(lost) || lost < 0 || lost >= WIN_GAMES) {
       return res.status(400).json({ error: '3판 2선승이므로 2:0 또는 2:1 로만 기록할 수 있습니다.' });
@@ -183,17 +191,17 @@ async function record(req, res) {
     }
   }
 
-  // 2회차는 자리마다 한 판뿐이고, 붙을 두 팀도 앞선 결과가 정한다.
+  // 토너먼트는 자리마다 한 판뿐이고, 붙을 두 팀도 앞선 결과가 정한다.
   // 화면에서도 그 두 팀만 누를 수 있지만, 여기서도 막는다 — 어긋난 기록
   // 하나가 대진표 전체를 엉뚱하게 만들기 때문이다.
-  if (edition === 2) {
-    const rows2 = await q(`SELECT * FROM tournament_matches WHERE edition = 2`);
+  if (edition === LATEST_EDITION) {
+    const rows2 = await q(`SELECT * FROM tournament_matches WHERE edition = $1`, [edition]);
     if (rows2.some(m => m.stage === stage)) {
       return res.status(400).json({
         error: `${STAGE_LABEL[stage]} 결과는 이미 기록되어 있습니다. 다시 기록하려면 먼저 지워주세요.`,
       });
     }
-    const want = bracket2(rows2)[stage];
+    const want = bracketKo(rows2)[stage];
     if (!want[0] || !want[1]) {
       return res.status(400).json({
         error: `${STAGE_LABEL[stage]}에 오를 팀이 아직 정해지지 않았습니다. 앞 경기부터 기록해주세요.`,
@@ -207,8 +215,8 @@ async function record(req, res) {
     }
   }
 
-  const scoreA = edition === 2 ? (winner === teamA ? WIN_GAMES : lost) : null;
-  const scoreB = edition === 2 ? (winner === teamB ? WIN_GAMES : lost) : null;
+  const scoreA = edition === LATEST_EDITION ? (winner === teamA ? WIN_GAMES : lost) : null;
+  const scoreB = edition === LATEST_EDITION ? (winner === teamB ? WIN_GAMES : lost) : null;
 
   const rows = await q(
     `INSERT INTO tournament_matches
@@ -229,15 +237,15 @@ async function remove(req, res) {
   if (!Number.isInteger(Number(id))) {
     return res.status(400).json({ error: '삭제할 기록을 찾을 수 없습니다.' });
   }
-  // 2회차는 앞 판이 뒷 판의 두 팀을 정한다. 가운데를 먼저 지우면 뒤가 뜬금없어지므로
+  // 토너먼트는 앞 판이 뒷 판의 두 팀을 정한다. 가운데를 먼저 지우면 뒤가 뜬금없어지므로
   // 뒤에서부터 지우게 한다. 조용히 따라 지우지 않는 까닭은, 한 번 누른 것으로
   // 결승 기록까지 사라지면 되돌릴 길이 없기 때문이다.
   const [target] = await q(`SELECT * FROM tournament_matches WHERE id = $1`, [Number(id)]);
   if (!target) return res.status(404).json({ error: '이미 삭제된 기록입니다.' });
-  if (Number(target.edition) === 2) {
+  if (Number(target.edition) === LATEST_EDITION) {
     const after = await q(
-      `SELECT stage FROM tournament_matches WHERE edition = 2 AND stage = ANY($1)`,
-      [DEPENDENTS[target.stage] || []]
+      `SELECT stage FROM tournament_matches WHERE edition = $1 AND stage = ANY($2)`,
+      [target.edition, DEPENDENTS[target.stage] || []]
     );
     if (after.length) {
       const names = after.map(r => STAGE_LABEL[r.stage]).join(' · ');
