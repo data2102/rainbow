@@ -8,7 +8,9 @@ let requests = [];
 let me = null;              // 로그인한 계정 { handle, role }
 let accounts = [];          // 계정 권한 목록 (관리자 이상)
 let acctLogs = [];          // 계정 로그
-let tMatches = [];          // 대회 경기 기록
+let tMatches = [];          // 1회차 대회 경기 기록
+let tMatches3 = [];         // 3회차 대회 경기 기록
+let tEdition = 3;           // 대회 탭에서 보고 있는 회차
 let posts = [];             // 게시판 글
 let files = [];             // 자료실 · 중요글 먼저, 그 다음 최신순 (서버가 맞춰 준다)
 let fileKinds = ['설치', '패치', '스킨', '타겟', '이미지', '기타'];
@@ -62,6 +64,22 @@ const TOURNAMENT_TEAMS_FINAL = [
 ];
 
 const MERCENARIES = ['RID_HoSiN', 'oK_LuCkY', 'SiLJanG', 'LOTUS_NaiLaRt'];
+
+/* 3회차 대회. api/tournament.js 의 T3_TEAMS · T3_SLOTS 와 맞아야 한다. */
+const T3_TEAMS = [
+  { id: 'A', label: 'A팀', members: ['SNC_LeNa', 'PAC_Plus', 'PSN_JOKER', 'NE_Valley', 'LOTUS_MEGA'] },
+  { id: 'B', label: 'B팀', members: ['oK_mEntAl', 'oK_LuCkY', 'lmaril', 'SNC_Ranbo_zzang', 'LOTUS_NaiLaRt'] },
+  { id: 'C', label: 'C팀', members: ['Rambo702', 'SNC_GJplayer', 'SNC_HoSiN', 'oK_HyunJung', 'oK_SkyLacK'] },
+  { id: 'D', label: 'D팀', members: ['LOTUS_JINWON2', 'LOTUS_TeaRs', 'soso', 'oK_CarloS', 'SNC_NEo'] },
+];
+/** 판 이름과 순서. 결과 등록 목록도 이 순서로 선다. */
+const T3_SLOTS = [
+  { id: 'q1', label: '예선 1경기' },
+  { id: 'q2', label: '예선 2경기' },
+  { id: 'wb', label: '승자전' },
+  { id: 'lb', label: '패자전' },
+  { id: 'gf', label: '결승' },
+];
 const ADVANCING = 4;        // 예선 통과 팀 수
 const CLAN_TOP = 5;         // 클랜 순위에 보여줄 등수
 const TOP_N = 5;            // 개인 순위 표에 보여줄 인원
@@ -180,8 +198,11 @@ async function loadState() {
 async function loadTournament() {
   try {
     const d = await apiGet('/api/tournament');
-    tMatches = d.matches || [];
-  } catch { tMatches = []; }
+    const all = d.matches || [];
+    // 예전 서버는 회차를 안 보낸다 — 그 기록은 모두 1회차다.
+    tMatches = all.filter(m => (m.edition || 1) === 1);
+    tMatches3 = all.filter(m => m.edition === 3);
+  } catch { tMatches = []; tMatches3 = []; }
 }
 
 async function loadSeasons() {
@@ -296,7 +317,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 109;
+const APP_VERSION = 110;
 let toldToRefresh = false;
 
 /**
@@ -3006,7 +3027,168 @@ function renderTournamentLog() {
   }).join('');
 }
 
+/* ---------- 3회차 ---------- */
+
+const t3Won = m => (m ? m.winner : null);
+const t3Lost = m => (m ? (m.winner === m.teamA ? m.teamB : m.teamA) : null);
+
+/** 판마다 기록과, 지금 누가 붙는지(앞 판이 아직이면 null) */
+function t3Bracket() {
+  const by = Object.fromEntries(tMatches3.map(m => [m.stage, m]));
+  const pair = (a, b) => (a && b ? [a, b] : null);
+  const pairs = {
+    q1: ['A', 'B'],
+    q2: ['C', 'D'],
+    wb: pair(t3Won(by.q1), t3Won(by.q2)),
+    lb: pair(t3Lost(by.q1), t3Lost(by.q2)),
+    gf: pair(t3Won(by.wb), t3Won(by.lb)),
+  };
+  return { by, pairs };
+}
+
+/** 세트 점수에서 이 팀이 딴 세트 수. 이긴 팀 기준 '2:1' 로 저장된다. */
+function t3Sets(m, team) {
+  if (!m || !m.score) return '';
+  const [w, l] = m.score.split(':');
+  return m.winner === team ? w : l;
+}
+
+/** 대진표 한 판. 팀이 안 정해진 자리는 어디서 올라오는지를 적는다. */
+function t3Match(slot, b, cls, waitA, waitB) {
+  const m = b.by[slot];
+  const p = b.pairs[slot];
+  const team = (id, wait) => {
+    if (!id) return `<div class="br-team wait">${esc(wait)}</div>`;
+    const mark = m ? (m.winner === id ? ' won' : ' lost') : '';
+    const sets = m ? `<span class="t3-sets">${t3Sets(m, id)}</span>` : '';
+    return `<div class="br-team ${cls}${mark}">${esc(teamLabel3(id))}${sets}</div>`;
+  };
+  return `<div class="br-match">
+    ${team(p && p[0], waitA)}
+    ${m ? '' : '<div class="br-vs">vs</div>'}
+    ${team(p && p[1], waitB)}
+  </div>`;
+}
+
+function teamLabel3(id) {
+  const t = T3_TEAMS.find(t => t.id === id);
+  return t ? t.label : id;
+}
+
+function renderT3() {
+  const cards = document.getElementById('t3Cards');
+  if (cards) cards.innerHTML = T3_TEAMS.map(t => `
+    <div class="team-card">
+      <div class="tc-name">${esc(t.label)}</div>
+      <div class="tc-list">${t.members.map(h => `<div>${esc(h)}</div>`).join('')}</div>
+    </div>`).join('');
+
+  const b = t3Bracket();
+  const br = document.getElementById('t3Bracket');
+  if (br) br.innerHTML = `
+    <div class="br-col">
+      <div class="br-col-h">예선</div>
+      ${t3Match('q1', b, 'seed', '', '')}
+      ${t3Match('q2', b, 'seed', '', '')}
+    </div>
+    <div class="br-col">
+      <div class="br-col-h">승자전</div>
+      ${t3Match('wb', b, 'adv', '예선1 승자', '예선2 승자')}
+      <div class="br-col-h t3-lb-h">패자전</div>
+      ${t3Match('lb', b, 'drop', '예선1 패자', '예선2 패자')}
+    </div>
+    <div class="br-col">
+      <div class="br-col-h">결승</div>
+      ${t3Match('gf', b, 'gold', '승자전 승자', '패자전 승자')}
+    </div>`;
+
+  const fin = document.getElementById('t3Final');
+  if (fin) {
+    const gf = b.by.gf;
+    const p = b.pairs.gf;
+    fin.innerHTML = gf
+      ? `<div class="final-box done">
+           <div class="final-label">★ 우승 ★</div>
+           <div class="final-vs">${esc(teamLabel3(gf.winner))}</div>
+           <div class="final-note">결승 ${esc(gf.score)} · 준우승 ${esc(teamLabel3(t3Lost(gf)))}</div>
+         </div>`
+      : `<div class="final-box">
+           <div class="final-label">★ 결승 · 3판 2선승 ★</div>
+           <div class="final-vs">${esc(p ? teamLabel3(p[0]) : '승자전 승자')}
+             <span>VS</span> ${esc(p ? teamLabel3(p[1]) : '패자전 승자')}</div>
+           <div class="final-note">승자전을 이긴 팀과 패자전에서 살아남은 팀의 대결</div>
+         </div>`;
+  }
+
+  const note = document.getElementById('t3FxNote');
+  const done = T3_SLOTS.filter(s => b.by[s.id]).length;
+  if (note) note.textContent = isAdmin()
+    ? `${T3_SLOTS.length}경기 중 ${done}경기 완료 · 이긴 팀의 세트 점수를 누르면 바로 기록되고 대진표에 반영됩니다.`
+    : `${T3_SLOTS.length}경기 중 ${done}경기 완료 · 결과 등록은 관리자만 할 수 있습니다.`;
+
+  const fx = document.getElementById('t3Fixtures');
+  if (fx) fx.innerHTML = T3_SLOTS.map(s => {
+    const m = b.by[s.id];
+    const p = b.pairs[s.id];
+    const head = `<span class="t3-slot">${esc(s.label)}</span>`;
+    if (m) {
+      return `<div class="fx done">
+        <span class="fx-pair">${head}
+          <b class="win-txt">${esc(teamLabel3(m.winner))}</b>
+          <span class="fx-vs">${esc(m.score || '승')}</span>
+          <span class="loss-txt">${esc(teamLabel3(t3Lost(m)))}</span>
+        </span>
+        ${isAdmin() ? `<button class="btn-mini btn-reject" data-t3del="${m.id}">삭제</button>` : ''}
+      </div>`;
+    }
+    if (!p) {
+      return `<div class="fx">
+        <span class="fx-pair">${head}<span class="fx-todo">앞 경기 결과를 기다리는 중</span></span>
+      </div>`;
+    }
+    const btns = p.flatMap(id => ['2:0', '2:1'].map(sc =>
+      `<button class="btn-mini btn-approve" data-t3="${s.id}|${id}|${sc}">${esc(teamLabel3(id))} ${sc}</button>`)).join('');
+    return `<div class="fx">
+      <span class="fx-pair">${head}${esc(teamLabel3(p[0]))}<span class="fx-vs">vs</span>${esc(teamLabel3(p[1]))}</span>
+      ${isAdmin() ? `<span class="fx-actions">${btns}</span>` : '<span class="fx-todo">미진행</span>'}
+    </div>`;
+  }).join('');
+}
+
+async function recordT3(stage, winner, score) {
+  try {
+    await apiPost('/api/tournament', { action: 'record', edition: 3, stage, winner, score });
+    await loadTournament();
+    renderTournament();
+    showToast(`${teamLabel3(winner)} ${score} 승리로 기록했습니다.`);
+  } catch (e) { showToast(e.message); }
+}
+
+async function deleteT3(id) {
+  if (!confirm('이 경기 기록을 삭제할까요? 대진표에서도 함께 빠집니다.')) return;
+  try {
+    await apiPost('/api/tournament', { action: 'delete', id: Number(id) });
+    await loadTournament();
+    renderTournament();
+    showToast('기록을 삭제했습니다.');
+  } catch (e) { showToast(e.message); }
+}
+
+/** 회차 탭. 고른 회차의 내용만 보인다. */
+function renderEditionTabs() {
+  document.querySelectorAll('#tab-tournament .ed-btn').forEach(btn => {
+    const on = Number(btn.dataset.ed) === tEdition;
+    btn.classList.toggle('on', on);
+    btn.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  document.querySelectorAll('#tab-tournament .ed-panel').forEach(p => {
+    p.hidden = Number(p.dataset.ed) !== tEdition;
+  });
+}
+
 function renderTournament() {
+  renderEditionTabs();
+  renderT3();
   renderTeamCards();
   renderFinalTeamCards();
   renderFinalBracket();
@@ -3067,6 +3249,23 @@ function initTournamentEvents() {
   if (log) log.addEventListener('click', e => {
     const id = e.target.dataset && e.target.dataset.tdel;
     if (id) deleteTournamentMatch(id);
+  });
+
+  document.querySelectorAll('#tab-tournament .ed-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      tEdition = Number(btn.dataset.ed);
+      renderEditionTabs();
+    });
+  });
+
+  const fx3 = document.getElementById('t3Fixtures');
+  if (fx3) fx3.addEventListener('click', e => {
+    const d = e.target.dataset || {};
+    if (d.t3del) return deleteT3(d.t3del);
+    if (d.t3) {
+      const [stage, winner, score] = d.t3.split('|');
+      recordT3(stage, winner, score);
+    }
   });
 
   const fx = document.getElementById('groupFixtures');

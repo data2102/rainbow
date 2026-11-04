@@ -131,11 +131,13 @@ CREATE TABLE IF NOT EXISTS audit_log (
 -- 대회(토너먼트) 경기 기록. 개인 래더 점수와는 완전히 분리된 팀 단위 기록이다.
 CREATE TABLE IF NOT EXISTS tournament_matches (
   id          BIGSERIAL PRIMARY KEY,
-  stage       TEXT NOT NULL CHECK (stage IN ('group','final')),  -- 예선 / 본선
+  edition     INT  NOT NULL DEFAULT 1,  -- 대회 회차
+  stage       TEXT NOT NULL,   -- 1회차: group/final · 3회차: q1/q2/wb/lb/gf (api/tournament.js)
   team_a      TEXT NOT NULL,
   team_b      TEXT NOT NULL,
   winner      TEXT NOT NULL,   -- team_a 또는 team_b 와 같아야 한다
   note        TEXT,            -- 본선 라운드 메모 (예: 승자조 1차전)
+  score       TEXT,            -- 3판 2선승 세트 점수(이긴 팀 기준, 2:0 / 2:1)
   ts          BIGINT NOT NULL,
   recorded_by TEXT
 );

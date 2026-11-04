@@ -1574,6 +1574,27 @@ body.rule-v2 #standingTable .streak-txt{ display:none; }
 }
 
 /* ---------- 대회 ---------- */
+/* 회차 탭 — 자료실 분류 버튼과 같은 알약 모양 */
+.ed-tabs{ display:flex; gap:var(--sp-2); flex-wrap:wrap; margin-bottom:var(--sp-6); }
+.ed-btn{
+  font-size:var(--fs-caption); font-weight:var(--fw-medium); font-family:inherit;
+  padding:var(--sp-2) var(--sp-5); border-radius:var(--radius-pill); cursor:pointer;
+  border:1px solid var(--border-strong); background:var(--surface); color:var(--text-secondary);
+}
+.ed-btn:hover{ border-color:var(--accent); color:var(--accent); }
+.ed-btn.on{ background:var(--accent); border-color:transparent; color:var(--on-accent); font-weight:var(--fw-bold); }
+.ed-btn:focus-visible{ outline:none; box-shadow:var(--shadow-focus); }
+.ed-panel[hidden]{ display:none; }
+/* 판마다 딴 세트 수. 팀 이름 옆에 붙인다 */
+.t3-sets{ margin-left:var(--sp-2); font-variant-numeric:tabular-nums; font-weight:var(--fw-bold); }
+/* 승자전 아래 패자전 머리글. 한 칸에 두 판이 서므로 띄워 구분한다 */
+.t3-lb-h{ margin-top:var(--sp-3); color:var(--danger-strong); }
+.t3-slot{
+  display:inline-block; font-size:var(--fs-footnote); font-weight:var(--fw-medium);
+  color:var(--text-tertiary); margin-right:var(--sp-2); min-width:64px;
+}
+/* 버튼이 넷이라 한 줄에 다 놓이게 넓게 잡는다 */
+.fixtures.t3-fixtures{ grid-template-columns:1fr; }
 .tsec{ margin-bottom:var(--sp-8); }
 .tsec:last-child{ margin-bottom:0; }
 .tsec-h{
@@ -3398,6 +3419,51 @@ if (/[?&]room=\d+/.test(location.search)) {
     <div class="panel hud-corner">
       <h2>대회 안내 · Tournament</h2>
 
+      <!-- 회차마다 따로 본다. 진행 중인 회차를 맨 앞에 둔다. -->
+      <div class="ed-tabs" role="tablist" aria-label="대회 회차">
+        <button type="button" class="ed-btn on" role="tab" data-ed="3" aria-selected="true">3회차</button>
+        <button type="button" class="ed-btn" role="tab" data-ed="2" aria-selected="false">2회차</button>
+        <button type="button" class="ed-btn" role="tab" data-ed="1" aria-selected="false">1회차</button>
+      </div>
+
+      <!-- 3회차 -->
+      <div class="ed-panel" data-ed="3">
+        <div class="tsec">
+          <div class="tsec-h">■ 조편성</div>
+          <div class="tsec-sub">4개 팀 · 팀당 5명</div>
+          <div class="team-cards" id="t3Cards"></div>
+        </div>
+
+        <div class="tsec">
+          <div class="tsec-h">■ 경기 방식</div>
+          <div class="tsec-sub">모든 경기 3판 2선승</div>
+          <ul class="rule-list">
+            <li><b>예선</b> — A팀 vs B팀, C팀 vs D팀</li>
+            <li>예선에서 이긴 두 팀은 <b>승자전</b>, 진 두 팀은 <b>패자전</b>에서 붙습니다.</li>
+            <li><b>결승</b> — 승자전 승자와 패자전 승자가 우승을 가립니다.</li>
+          </ul>
+        </div>
+
+        <div class="tsec">
+          <div class="tsec-h">■ 대진표</div>
+          <div class="bracket-wrap"><div class="bracket" id="t3Bracket"></div></div>
+          <div id="t3Final"></div>
+        </div>
+
+        <div class="tsec">
+          <div class="tsec-h">■ 경기 결과 등록</div>
+          <div class="foot-note" id="t3FxNote" style="margin-top:0;margin-bottom:8px;"></div>
+          <div class="fixtures t3-fixtures" id="t3Fixtures"></div>
+        </div>
+      </div>
+
+      <!-- 2회차 -->
+      <div class="ed-panel" data-ed="2" hidden>
+        <div class="log-empty">2회차 대회 내용은 작성중입니다.</div>
+      </div>
+
+      <!-- 1회차 (끝난 대회) -->
+      <div class="ed-panel" data-ed="1" hidden>
       <div class="tsec">
         <div class="tsec-h">■ 조편성 (예선)</div>
         <div class="tsec-sub">5개 팀 · 팀당 4명</div>
@@ -3499,6 +3565,7 @@ if (/[?&]room=\d+/.test(location.search)) {
 
         <div id="tMatchLog" style="margin-top:14px;"></div>
       </div>
+      </div><!-- /1회차 -->
 
     </div>
   </div>
