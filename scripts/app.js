@@ -122,7 +122,7 @@ const KO_STAGES = [
   { id: 'ff', label: '최종전', wait: ['승자전 패자', '패자전 승자'],
     note: '이긴 팀은 결승으로 · 진 팀은 2패로 탈락 (3위)' },
   { id: 'gf', label: '결승전', wait: ['승자전 승자', '최종전 승자'],
-    note: '무패로 올라온 팀과 살아남은 팀의 대결' },
+    note: '무패로 올라온 팀과 살아남은 팀의 대결 · 떨어진 팀에서 한 명씩 더 뽑아 6:6 으로 치릅니다' },
 ];
 
 /** 토너먼트 팀 이름표 */
@@ -414,7 +414,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 116;
+const APP_VERSION = 117;
 let toldToRefresh = false;
 
 /**

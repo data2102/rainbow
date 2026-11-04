@@ -1231,6 +1231,15 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   align-self:center; font-size:var(--fs-footnote); font-weight:var(--fw-bold);
   color:var(--text-tertiary); margin-right:var(--sp-1);
 }
+/* 상품 밑에 붙는 협찬 표시 */
+.prize-by{
+  display:inline-block; margin-left:var(--sp-2);
+  font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+  padding:1px var(--sp-2); border-radius:var(--radius-pill);
+  background:var(--surface); color:var(--text-tertiary);
+  border:1px solid var(--border);
+}
+
 .ko-bo{
   font-size:var(--fs-footnote); font-weight:var(--fw-medium);
   color:var(--text-tertiary); letter-spacing:0;
@@ -3548,8 +3557,28 @@ if (/[?&]room=\d+/.test(location.search)) {
             <li><b>승자전</b> — 이긴 팀은 1패도 없이 <b>결승에 직행</b>합니다.</li>
             <li><b>패자전</b> — 진 팀은 2패로 <b>탈락(4위)</b>입니다.</li>
             <li><b>최종전</b> — 승자전에서 진 팀과 패자전에서 이긴 팀이 붙어, 이긴 팀이 결승에 오릅니다 (진 팀 3위).</li>
-            <li><b>결승전</b> — 무패로 올라온 팀과 살아남은 팀의 대결입니다.</li>
+            <li><b>결승전</b> — 무패로 올라온 팀과 살아남은 팀의 대결입니다.
+              <b>떨어진 팀에서 한 명씩 더 뽑아 6:6</b> 으로 치릅니다.</li>
           </ul>
+        </div>
+
+        <div class="tsec">
+          <div class="tsec-h">■ 상품</div>
+          <div class="tsec-sub">팀원 각자 지급</div>
+          <div class="prize">
+            <div class="prize-card p1">
+              <div class="prize-rank">1위</div>
+              <div class="prize-body">
+                1인 <b>치킨 1마리</b><br>
+                1인 <b>문화상품권 2만원</b>
+                <span class="prize-by">람보 협찬</span>
+              </div>
+            </div>
+            <div class="prize-card p2">
+              <div class="prize-rank">2위</div>
+              <div class="prize-body">1인 <b>아메리카노 2잔</b> 쿠폰</div>
+            </div>
+          </div>
         </div>
 
         <div class="tsec">
