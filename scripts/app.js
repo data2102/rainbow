@@ -140,27 +140,40 @@ function tOf(edition) {
  * 진행 중인 회차의 대진. 앞선 판이 끝나면 다음 판에 누가 오는지도 따라서 정해진다.
  * api/tournament.js 의 bracketKo() 와 계산이 같아야 한다.
  */
+/** 3판 2선승 — 먼저 두 판을 가져간 팀이 그 경기의 승자다 */
+const KO_WIN_GAMES = 2;
+const KO_MAX_GAMES = 3;
+
+/** 한 경기(한 자리)의 판들을 모아 승패를 센다 */
+function koSeries(stage) {
+  const games = tOf(TOURNAMENT_LATEST)
+    .filter(m => m.stage === stage)
+    .slice().sort((a, b) => (a.game || 0) - (b.game || 0));
+  const wins = {};
+  for (const g of games) wins[g.winner] = (wins[g.winner] || 0) + 1;
+  const winner = Object.keys(wins).find(t => wins[t] >= KO_WIN_GAMES) || null;
+  return { games, wins, winner };
+}
+
 function koBracket() {
-  const by = {};
-  for (const m of tOf(TOURNAMENT_LATEST)) by[m.stage] = m;
-  const won = (m) => (m ? m.winner : null);
-  const lost = (m) => (m ? (m.winner === m.teamA ? m.teamB : m.teamA) : null);
-  const pair = {
-    q1: [...KO_SEEDS.q1],
-    q2: [...KO_SEEDS.q2],
-    wf: [won(by.q1), won(by.q2)],
-    lf: [lost(by.q1), lost(by.q2)],
-    ff: [lost(by.wf), won(by.lf)],
-    gf: [won(by.wf), won(by.ff)],
+  const ser = {};
+  for (const st of KO_STAGES) ser[st.id] = koSeries(st.id);
+  const pair = { q1: [...KO_SEEDS.q1], q2: [...KO_SEEDS.q2] };
+  const won = (st) => ser[st].winner;
+  // 진 팀은 '그 자리의 두 팀 중 이기지 않은 쪽'이다
+  const lost = (st) => {
+    const w = won(st);
+    if (!w) return null;
+    return (pair[st] || []).find(t => t && t !== w) || null;
   };
+  pair.wf = [won('q1'), won('q2')];
+  pair.lf = [lost('q1'), lost('q2')];
+  pair.ff = [lost('wf'), won('lf')];
+  pair.gf = [won('wf'), won('ff')];
+
   // 최종 순위. 결승까지 끝나야 1·2위가 갈린다.
-  const place = {
-    1: won(by.gf),
-    2: lost(by.gf),
-    3: lost(by.ff),
-    4: lost(by.lf),
-  };
-  return { by, pair, place, won, lost };
+  const place = { 1: won('gf'), 2: lost('gf'), 3: lost('ff'), 4: lost('lf') };
+  return { ser, pair, place, won, lost };
 }
 
 /** 지금 보고 있는 회차가 진행 중인 대회인가 (끝난 회차는 손대지 않는다) */
@@ -401,7 +414,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 113;
+const APP_VERSION = 114;
 let toldToRefresh = false;
 
 /**
@@ -3127,58 +3140,74 @@ function renderKoTeams() {
     </div>`).join('');
 }
 
-/** 한 판의 양쪽 이름칸 */
-function koSide(id, waitText, m, big) {
+/**
+ * 한 경기의 양쪽 이름칸. 숫자는 그 경기에서 가져간 판 수다 (3판 2선승).
+ * `ser` 가 없으면 아직 한 판도 안 치른 것이다.
+ */
+function koSide(id, waitText, ser) {
   const known = !!id;
   const text = known ? koLabel(id) : waitText;
-  const win = m && m.winner === id;
-  const lose = m && known && m.winner !== id;
-  const score = m ? (id === m.teamA ? m.scoreA : m.scoreB) : null;
+  const n = known && ser ? (ser.wins[id] || 0) : null;
+  const win = ser && ser.winner === id;
+  const lose = ser && ser.winner && known && ser.winner !== id;
   return `<div class="ko-side${known ? '' : ' wait'}${win ? ' won' : ''}${lose ? ' lost' : ''}">
     <span class="ko-nm">${esc(text)}</span>
-    ${m && score != null ? `<span class="ko-sc">${score}</span>` : ''}
+    ${n != null ? `<span class="ko-sc">${n}</span>` : ''}
   </div>`;
 }
 
 /** 대진표 — 여섯 판을 치르는 차례대로 */
 function renderKoBoard() {
-  const el = document.getElementById('koBracket');
+  const el = document.getElementById('koBoard');
   if (!el) return;
   const b = koBracket();
 
   el.innerHTML = KO_STAGES.map(st => {
-    const m = b.by[st.id] || null;
+    const ser = b.ser[st.id];
     const [a, c] = b.pair[st.id];
     const ready = !!a && !!c;
-    const state = m ? 'done' : (ready ? 'ready' : 'wait');
-    const stateTag = m ? '' : ready
-      ? '<span class="ko-tag ready">진행 예정</span>'
+    const started = ser.games.length > 0;
+    const state = ser.winner ? 'done' : (started ? 'live' : (ready ? 'ready' : 'wait'));
+    const stateTag = ser.winner ? ''
+      : started ? '<span class="ko-tag live">진행 중</span>'
+      : ready ? '<span class="ko-tag ready">진행 예정</span>'
       : '<span class="ko-tag">앞 경기 대기</span>';
 
-    // 관리자는 두 팀이 정해진 판에서 바로 결과를 누른다. 3판 2선승이므로
-    // 이긴 쪽은 2승 고정이고 진 쪽이 0승인지 1승인지만 고르면 된다.
-    const buttons = (tourEditable() && !m && ready)
+    // 치른 판을 하나씩 적는다. 지우는 것은 마지막 판부터만 된다 —
+    // 가운데를 지우면 몇 번째 판인지가 어긋난다.
+    const last = ser.games[ser.games.length - 1];
+    const games = ser.games.length
+      ? `<div class="ko-games">${ser.games.map(g => `
+          <span class="ko-game">
+            <b>${g.game}차전</b> ${esc(koLabel(g.winner))} 승
+            ${tourEditable() && last && g.id === last.id
+              ? `<button class="ko-gx" data-tdel="${g.id}" title="이 판 지우기">×</button>` : ''}
+          </span>`).join('')}</div>`
+      : '';
+
+    // 관리자는 다음 판의 이긴 팀을 누른다. 먼저 2승하면 그 경기는 끝난다.
+    const next = ser.games.length + 1;
+    const buttons = (tourEditable() && ready && !ser.winner && next <= KO_MAX_GAMES)
       ? `<div class="ko-btns">
-           ${[a, c].map(side => [0, 1].map(l =>
-             `<button class="btn-mini btn-approve" data-ko="${st.id}:${a}:${c}:${side}:${l}">${esc(koLabel(side))} 2:${l}</button>`
-           ).join('')).join('')}
+           <span class="ko-btns-k">${next}차전 승리</span>
+           ${[a, c].map(side =>
+             `<button class="btn-mini btn-approve" data-ko="${st.id}:${a}:${c}:${side}">${esc(koLabel(side))}</button>`
+           ).join('')}
          </div>`
       : '';
-    const del = (tourEditable() && m)
-      ? `<button class="btn-mini btn-reject" data-tdel="${m.id}">삭제</button>` : '';
 
     return `<div class="ko-row ${state}">
       <div class="ko-head">
         <span class="ko-stage">${esc(st.label)}</span>
         ${stateTag}
-        ${m ? `<span class="ko-win">${esc(koLabel(m.winner))} 승</span>` : ''}
-        ${del}
+        ${ser.winner ? `<span class="ko-win">${esc(koLabel(ser.winner))} 승</span>` : ''}
       </div>
       <div class="ko-pair">
-        ${koSide(a, st.wait[0], m)}
-        <span class="ko-vs">${m ? ':' : 'vs'}</span>
-        ${koSide(c, st.wait[1], m)}
+        ${koSide(a, st.wait[0], started ? ser : null)}
+        <span class="ko-vs">${started ? ':' : 'vs'}</span>
+        ${koSide(c, st.wait[1], started ? ser : null)}
       </div>
+      ${games}
       <div class="ko-note">${esc(st.note)}</div>
       ${buttons}
     </div>`;
@@ -3194,7 +3223,7 @@ function renderKoBoard() {
         + `<span class="ko-pt">${esc(koLabel(b.place[n]))}</span></div>`).join('');
     // 순위는 뒤에서부터 정해진다 — 패자전이 끝나야 4위가, 결승이 끝나야 1·2위가 나온다.
     // "경기가 없다"고 적으면 두 판을 치르고도 아무 일도 없는 것처럼 보인다.
-    const left = KO_STAGES.filter(st => !b.by[st.id]).map(st => st.label);
+    const left = KO_STAGES.filter(st => !b.ser[st.id].winner).map(st => st.label);
     box.innerHTML = champ
       ? `<div class="final-box done">
            <div class="final-label">★ 우승 ★</div>
@@ -3219,19 +3248,16 @@ function renderKoLog() {
     return;
   }
   const name = (id) => (KO_STAGES.find(s => s.id === id) || {}).label || id;
-  el.innerHTML = [...rows].reverse().map(m => {
+  el.innerHTML = [...rows].sort((a, b) => b.ts - a.ts).map(m => {
     const loser = m.winner === m.teamA ? m.teamB : m.teamA;
-    const ws = m.winner === m.teamA ? m.scoreA : m.scoreB;
-    const ls = m.winner === m.teamA ? m.scoreB : m.scoreA;
     return `<div class="tlog">
       <div class="tlog-top">
-        <span class="stage-tag final">${esc(name(m.stage))}</span>
+        <span class="stage-tag final">${esc(name(m.stage))}${m.game ? ` ${m.game}차전` : ''}</span>
         <span class="tlog-teams">
           <b class="win-txt">${esc(koLabel(m.winner))}</b>
-          <span class="tlog-vs">${ws != null ? `${ws} : ${ls}` : '승'}</span>
+          <span class="tlog-vs">승</span>
           <span class="loss-txt">${esc(koLabel(loser))}</span>
         </span>
-        ${tourEditable() ? `<button class="btn-mini btn-reject" data-tdel="${m.id}">삭제</button>` : ''}
       </div>
       <div class="tlog-meta">등록자 : ${esc(m.recordedBy || '-')} · ${formatDateTime(m.ts)}</div>
     </div>`;
@@ -3352,25 +3378,27 @@ function initTournamentEvents() {
       const d = e.target.dataset || {};
       if (d.tdel) return deleteTournamentMatch(d.tdel);
       if (d.ko) {
-        const [stage, a, b, winner, lost] = d.ko.split(':');
-        recordKo(stage, a, b, winner, Number(lost));
+        const [stage, a, b, winner] = d.ko.split(':');
+        recordKo(stage, a, b, winner);
       }
     });
   }
 }
 
-/** 한 판의 결과를 올린다 (3판 2선승) */
-async function recordKo(stage, teamA, teamB, winner, loserGames) {
+/** 한 판의 결과를 올린다. 몇 번째 판인지는 서버가 센다. */
+async function recordKo(stage, teamA, teamB, winner) {
   const name = (KO_STAGES.find(x => x.id === stage) || {}).label || stage;
+  const game = koSeries(stage).games.length + 1;
   const loser = winner === teamA ? teamB : teamA;
-  if (!confirm(`${name} · ${koLabel(winner)} 승 (2:${loserGames} ${koLabel(loser)})\n이대로 기록할까요?`)) return;
+  if (!confirm(`${name} ${game}차전 · ${koLabel(winner)} 승 (${koLabel(loser)} 패)\n이대로 기록할까요?`)) return;
   try {
-    await apiPost('/api/tournament', {
-      action: 'record', stage, teamA, teamB, winner, loserGames,
-    });
+    await apiPost('/api/tournament', { action: 'record', stage, teamA, teamB, winner });
     await loadTournament();
     renderTournament();
-    showToast(`${name} · ${koLabel(winner)} 2:${loserGames} 승리로 기록했습니다.`);
+    const ser = koSeries(stage);
+    showToast(ser.winner
+      ? `${name} 종료 · ${koLabel(ser.winner)} ${ser.wins[ser.winner]}:${ser.wins[loser] || 0} 승리`
+      : `${name} ${game}차전 · ${koLabel(winner)} 승리로 기록했습니다.`);
   } catch (e) { showToast(e.message); }
 }
 
