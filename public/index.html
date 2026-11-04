@@ -3517,7 +3517,7 @@ if (/[?&]room=\d+/.test(location.search)) {
           <div class="tsec-h">■ 경기 방식</div>
           <div class="tsec-sub">모든 경기 3판 2선승 · 2패 탈락</div>
           <ul class="rule-list">
-            <li><b>예선</b> — A vs B, C vs D. 이긴 팀은 승자전, 진 팀은 패자전으로 갑니다.</li>
+            <li><b>예선</b> — <b>A vs C</b>, <b>B vs D</b>. 이긴 팀은 승자전, 진 팀은 패자전으로 갑니다.</li>
             <li><b>승자전</b> — 이긴 팀은 1패도 없이 <b>결승에 직행</b>합니다.</li>
             <li><b>패자전</b> — 진 팀은 2패로 <b>탈락(4위)</b>입니다.</li>
             <li><b>최종전</b> — 승자전에서 진 팀과 패자전에서 이긴 팀이 붙어, 이긴 팀이 결승에 오릅니다 (진 팀 3위).</li>
@@ -4349,7 +4349,7 @@ let tourEdition = TOURNAMENT_LATEST;
 const KO_TEAMS = [
   { id: 'A', label: 'A팀', members: ['SNC_LeNa', 'PAC_Plus', 'PSN_JOKER', 'NE_Valley', 'LOTUS_MEGA'] },
   { id: 'B', label: 'B팀', members: ['oK_mEntAl', 'oK_SkyLacK', 'lmaril', 'Ranbo_zzang', 'LOTUS_NaiLaRt'] },
-  { id: 'C', label: 'C팀', members: ['Rambo702', 'SNC_Gjplayer', 'RID_HoSiN', 'oK_Carlos', 'oK_LuCkY'] },
+  { id: 'C', label: 'C팀', members: ['Rambo702', 'SNC_Gjplayer', 'SNC_HoSiN', 'oK_Carlos', 'oK_LuCkY'] },
   { id: 'D', label: 'D팀', members: ['LOTUS_JINWON2', 'LOTUS_TeaRs', 'soso', 'oK_hyunjung', 'SNC_NEo'] },
 ];
 
@@ -4359,10 +4359,16 @@ const KO_TEAMS = [
  * `wait` 는 앞 경기가 안 끝나 팀이 정해지지 않았을 때 그 자리에 적을 말이다.
  * 빈칸으로 두면 "아직 안 정해진 것"과 "아무도 없는 것"이 구분되지 않는다.
  */
+/**
+ * 첫 대진. 여기만 고치면 대진표 전체가 따라 흐른다.
+ * api/tournament.js 의 KO_SEEDS 와 같아야 한다.
+ */
+const KO_SEEDS = { q1: ['A', 'C'], q2: ['B', 'D'] };
+
 const KO_STAGES = [
-  { id: 'q1', label: '예선 1경기', wait: ['A팀', 'B팀'],
+  { id: 'q1', label: '예선 1경기', wait: KO_SEEDS.q1.map(id => id + '팀'),
     note: '진 팀은 패자전으로' },
-  { id: 'q2', label: '예선 2경기', wait: ['C팀', 'D팀'],
+  { id: 'q2', label: '예선 2경기', wait: KO_SEEDS.q2.map(id => id + '팀'),
     note: '진 팀은 패자전으로' },
   { id: 'wf', label: '승자전', wait: ['1경기 승자', '2경기 승자'],
     note: '이긴 팀은 결승 직행 · 진 팀은 최종전으로' },
@@ -4395,8 +4401,8 @@ function koBracket() {
   const won = (m) => (m ? m.winner : null);
   const lost = (m) => (m ? (m.winner === m.teamA ? m.teamB : m.teamA) : null);
   const pair = {
-    q1: ['A', 'B'],
-    q2: ['C', 'D'],
+    q1: [...KO_SEEDS.q1],
+    q2: [...KO_SEEDS.q2],
     wf: [won(by.q1), won(by.q2)],
     lf: [lost(by.q1), lost(by.q2)],
     ff: [lost(by.wf), won(by.lf)],
@@ -4650,7 +4656,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 112;
+const APP_VERSION = 113;
 let toldToRefresh = false;
 
 /**

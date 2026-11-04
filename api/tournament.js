@@ -33,6 +33,11 @@ function editionOf(stage) {
   return null;
 }
 
+/**
+ * 첫 대진. 화면(app.js)의 KO_SEEDS 와 같아야 한다.
+ */
+const KO_SEEDS = { q1: ['A', 'C'], q2: ['B', 'D'] };
+
 /** 토너먼트 대진. 앞선 판이 정해지면 다음 판에 누가 오는지도 정해진다. */
 function bracketKo(rows) {
   const by = {};
@@ -40,8 +45,8 @@ function bracketKo(rows) {
   const won = (m) => (m ? m.winner : null);
   const lost = (m) => (m ? (m.winner === m.team_a ? m.team_b : m.team_a) : null);
   return {
-    q1: ['A', 'B'],
-    q2: ['C', 'D'],
+    q1: [...KO_SEEDS.q1],
+    q2: [...KO_SEEDS.q2],
     wf: [won(by.q1), won(by.q2)],
     lf: [lost(by.q1), lost(by.q2)],
     ff: [lost(by.wf), won(by.lf)],
