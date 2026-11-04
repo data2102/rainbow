@@ -414,7 +414,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 114;
+const APP_VERSION = 115;
 let toldToRefresh = false;
 
 /**
@@ -3199,6 +3199,9 @@ function renderKoBoard() {
     return `<div class="ko-row ${state}">
       <div class="ko-head">
         <span class="ko-stage">${esc(st.label)}</span>
+        <!-- 한 판도 안 치른 칸에는 차전 목록이 없어, 여기가 3판 2선승이라는
+             것이 보이지 않는다. 칸마다 적어둔다. -->
+        <span class="ko-bo">${KO_MAX_GAMES}판 ${KO_WIN_GAMES}선승</span>
         ${stateTag}
         ${ser.winner ? `<span class="ko-win">${esc(koLabel(ser.winner))} 승</span>` : ''}
       </div>

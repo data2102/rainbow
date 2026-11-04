@@ -1231,6 +1231,10 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   align-self:center; font-size:var(--fs-footnote); font-weight:var(--fw-bold);
   color:var(--text-tertiary); margin-right:var(--sp-1);
 }
+.ko-bo{
+  font-size:var(--fs-footnote); font-weight:var(--fw-medium);
+  color:var(--text-tertiary); letter-spacing:0;
+}
 .ko-tag.live{ background:var(--accent); color:var(--on-accent); border-color:transparent; }
 .ko-row.live{ border-left-color:var(--accent); }
 .ko-btns{ display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-top:var(--sp-3); }
@@ -4692,7 +4696,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 114;
+const APP_VERSION = 115;
 let toldToRefresh = false;
 
 /**
@@ -7477,6 +7481,9 @@ function renderKoBoard() {
     return `<div class="ko-row ${state}">
       <div class="ko-head">
         <span class="ko-stage">${esc(st.label)}</span>
+        <!-- 한 판도 안 치른 칸에는 차전 목록이 없어, 여기가 3판 2선승이라는
+             것이 보이지 않는다. 칸마다 적어둔다. -->
+        <span class="ko-bo">${KO_MAX_GAMES}판 ${KO_WIN_GAMES}선승</span>
         ${stateTag}
         ${ser.winner ? `<span class="ko-win">${esc(koLabel(ser.winner))} 승</span>` : ''}
       </div>
