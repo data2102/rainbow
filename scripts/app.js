@@ -93,7 +93,7 @@ let tourEdition = TOURNAMENT_LATEST;
  */
 const KO_TEAMS = [
   { id: 'A', label: 'A팀', members: ['SNC_LeNa', 'PAC_Plus', 'PSN_JOKER', 'NE_Valley', 'LOTUS_MEGA'] },
-  { id: 'B', label: 'B팀', members: ['oK_mEntAl', 'oK_SkyLacK', 'lmaril', 'Ranbo_zzang', 'LOTUS_NaiLaRt'] },
+  { id: 'B', label: 'B팀', members: ['oK_mEntAl', 'oK_SkyLacK', 'zypsy_mari', 'Ranbo_zzang', 'LOTUS_NaiLaRt'] },
   { id: 'C', label: 'C팀', members: ['Rambo702', 'SNC_Gjplayer', 'SNC_HoSiN', 'oK_Carlos', 'oK_LuCkY'] },
   { id: 'D', label: 'D팀', members: ['LOTUS_JINWON2', 'LOTUS_TeaRs', 'soso', 'oK_hyunjung', 'SNC_NEo'] },
 ];
@@ -414,7 +414,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 115;
+const APP_VERSION = 116;
 let toldToRefresh = false;
 
 /**

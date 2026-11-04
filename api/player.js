@@ -37,19 +37,91 @@ function readEmail(req, res, out) {
   }
 }
 
-/** 이름이 바뀌면 함께 따라가야 하는 표들. 나중에 생긴 표가 있으므로 있을 때만 손댄다. */
+/**
+ * 이름이 바뀌면 함께 따라가야 하는 칸들. 나중에 생긴 표가 있으므로 있을 때만 손댄다.
+ *
+ * 빠진 칸이 하나라도 있으면 그 화면에서만 옛 이름이 남는다. 그냥 보기 나쁜
+ * 정도가 아니라 뜻이 달라지는 곳도 있다 — matches.noscore 가 안 따라가면
+ * 관리자가 경기를 하나 취소해 그 달을 다시 셀 때, 출석을 안 해 점수를 못
+ * 받았던 사람이 조용히 점수를 받는다.
+ */
 const RENAME_TABLES = [
   ['sessions', 'admin_id'],
   ['attendance', 'handle'],
   ['play_schedule', 'handle'],
   ['season_standings', 'handle'],
+  ['matches', 'recorded_by'],
+  ['posts', 'author'],
+  ['post_comments', 'author'],
+  ['room_members', 'handle'],
+  ['room_messages', 'handle'],
+  ['host_draws', 'host_a'],
+  ['host_draws', 'host_b'],
+  ['host_draws', 'drawn_by'],
+  ['host_draws', 'result_by'],
 ];
+
+/**
+ * 이름이 JSON 안에 들어 있는 칸들. 통째로 글자를 바꾸면 'oK_Lu' 가 'oK_LuCkY'
+ * 안에서도 바뀌므로, 문자열 하나하나를 견줘 **똑같을 때만** 갈아끼운다.
+ */
+const RENAME_JSON = [
+  ['matches', 'noscore'],
+  // winners·losers 는 위에서 한 번 더 손보지만 여기에도 둔다. 두 번 해도
+  // 탈이 없고, 저쪽이 놓치는 모양이 있어도 여기서 걸린다.
+  ['matches', 'winners'],
+  ['matches', 'losers'],
+  ['host_draws', 'team_a'],
+  ['host_draws', 'team_b'],
+  ['host_draws', 'teams'],
+  ['host_draws', 'pairs'],
+];
+
+/** JSON 안에 박힌 아이디를 모두 갈아끼운다 (키가 아니라 값만) */
+function swapInJson(v, oldHandle, newHandle) {
+  if (typeof v === 'string') return v === oldHandle ? newHandle : v;
+  if (Array.isArray(v)) return v.map(x => swapInJson(x, oldHandle, newHandle));
+  if (v && typeof v === 'object') {
+    const out = {};
+    for (const [k, x] of Object.entries(v)) out[k] = swapInJson(x, oldHandle, newHandle);
+    return out;
+  }
+  return v;
+}
+
+async function hasTable(c, table) {
+  const { rows } = await c.query(`SELECT to_regclass($1) AS t`, ['public.' + table]);
+  return !!rows[0].t;
+}
+
+async function hasColumn(c, table, col) {
+  const { rows } = await c.query(
+    `SELECT 1 FROM information_schema.columns WHERE table_name = $1 AND column_name = $2`,
+    [table, col]
+  );
+  return !!rows.length;
+}
 
 async function renameEverywhere(c, oldHandle, newHandle) {
   for (const [table, col] of RENAME_TABLES) {
-    const { rows } = await c.query(`SELECT to_regclass($1) AS t`, ['public.' + table]);
-    if (!rows[0].t) continue;
+    if (!await hasTable(c, table)) continue;
+    if (!await hasColumn(c, table, col)) continue;
     await c.query(`UPDATE ${table} SET ${col} = $1 WHERE ${col} = $2`, [newHandle, oldHandle]);
+  }
+
+  for (const [table, col] of RENAME_JSON) {
+    if (!await hasTable(c, table)) continue;
+    if (!await hasColumn(c, table, col)) continue;
+    // 그 이름이 어딘가 박혀 있는 줄만 읽어 고쳐 쓴다. 건수가 적어 이 편이 안전하다.
+    const { rows } = await c.query(
+      `SELECT id, ${col} AS v FROM ${table} WHERE ${col}::text LIKE '%' || $1 || '%'`,
+      [oldHandle]
+    );
+    for (const r of rows) {
+      const next = swapInJson(r.v, oldHandle, newHandle);
+      if (JSON.stringify(next) === JSON.stringify(r.v)) continue;
+      await c.query(`UPDATE ${table} SET ${col} = $1 WHERE id = $2`, [JSON.stringify(next), r.id]);
+    }
   }
 }
 
