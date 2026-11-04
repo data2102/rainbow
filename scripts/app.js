@@ -62,6 +62,91 @@ const TOURNAMENT_TEAMS_FINAL = [
 ];
 
 const MERCENARIES = ['RID_HoSiN', 'oK_LuCkY', 'SiLJanG', 'LOTUS_NaiLaRt'];
+
+/* ---------- 2회차 대회 ----------
+
+   1회차와 방식이 다르다. 5팀 풀리그 예선이 아니라, 네 팀이 자리가 정해진
+   2패 탈락 여섯 판을 치른다. 모두 3판 2선승이다.
+
+   한 화면에 두 방식을 섞지 않고 회차를 골라 보게 했다 — 순위 메뉴에서
+   지난 달을 고르는 것과 같다. 1회차는 끝난 대회라 보기만 한다. */
+
+/** 지금 진행 중인 회차. api/tournament.js 의 LATEST_EDITION 과 같아야 한다. */
+const TOURNAMENT_LATEST = 2;
+
+/** 지금 화면에서 보고 있는 회차 */
+let tourEdition = TOURNAMENT_LATEST;
+
+const TOURNAMENT_TEAMS_2 = [
+  { id: 'A', label: 'A팀', members: ['SNC_LeNa', 'PAC_Plus', 'PSN_JOKER', 'NE_Valley', 'LOTUS_MEGA'] },
+  { id: 'B', label: 'B팀', members: ['oK_mEntAl', 'oK_LuCkY', 'lmaril', 'SNC_ranbo_zzang', 'LOTUS_NaiLaRt'] },
+  { id: 'C', label: 'C팀', members: ['Rambo702', 'SNC_GJplayer', 'SNC_HoSiN', 'oK_HyunJung', 'oK_SkyLacK'] },
+  { id: 'D', label: 'D팀', members: ['LOTUS_JINWON2', 'LOTUS_TeaRs', 'soso', 'oK_CarloS', 'SNC_NEo'] },
+];
+
+/**
+ * 2회차 여섯 판. 차례대로 치른다.
+ *
+ * `wait` 는 앞 경기가 안 끝나 팀이 정해지지 않았을 때 그 자리에 적을 말이다.
+ * 빈칸으로 두면 "아직 안 정해진 것"과 "아무도 없는 것"이 구분되지 않는다.
+ */
+const T2_STAGES = [
+  { id: 'q1', label: '예선 1경기', wait: ['A팀', 'B팀'],
+    note: '진 팀은 패자전으로' },
+  { id: 'q2', label: '예선 2경기', wait: ['C팀', 'D팀'],
+    note: '진 팀은 패자전으로' },
+  { id: 'wf', label: '승자전', wait: ['1경기 승자', '2경기 승자'],
+    note: '이긴 팀은 결승 직행 · 진 팀은 최종전으로' },
+  { id: 'lf', label: '패자전', wait: ['1경기 패자', '2경기 패자'],
+    note: '이긴 팀은 최종전으로 · 진 팀은 2패로 탈락 (4위)' },
+  { id: 'ff', label: '최종전', wait: ['승자전 패자', '패자전 승자'],
+    note: '이긴 팀은 결승으로 · 진 팀은 2패로 탈락 (3위)' },
+  { id: 'gf', label: '결승전', wait: ['승자전 승자', '최종전 승자'],
+    note: '무패로 올라온 팀과 살아남은 팀의 대결' },
+];
+
+/** 2회차 팀 이름표 */
+function t2Label(id) {
+  const t = TOURNAMENT_TEAMS_2.find(x => x.id === id);
+  return t ? t.label : (id || '');
+}
+
+/** 그 회차의 경기만 추린다. edition 이 없는 옛 기록은 1회차다. */
+function tOf(edition) {
+  return tMatches.filter(m => Number(m.edition || 1) === edition);
+}
+
+/**
+ * 2회차 대진. 앞선 판이 끝나면 다음 판에 누가 오는지도 따라서 정해진다.
+ * api/tournament.js 의 bracket2() 와 계산이 같아야 한다.
+ */
+function t2Bracket() {
+  const by = {};
+  for (const m of tOf(2)) by[m.stage] = m;
+  const won = (m) => (m ? m.winner : null);
+  const lost = (m) => (m ? (m.winner === m.teamA ? m.teamB : m.teamA) : null);
+  const pair = {
+    q1: ['A', 'B'],
+    q2: ['C', 'D'],
+    wf: [won(by.q1), won(by.q2)],
+    lf: [lost(by.q1), lost(by.q2)],
+    ff: [lost(by.wf), won(by.lf)],
+    gf: [won(by.wf), won(by.ff)],
+  };
+  // 최종 순위. 결승까지 끝나야 1·2위가 갈린다.
+  const place = {
+    1: won(by.gf),
+    2: lost(by.gf),
+    3: lost(by.ff),
+    4: lost(by.lf),
+  };
+  return { by, pair, place, won, lost };
+}
+
+/** 지금 보고 있는 회차가 진행 중인 대회인가 (끝난 회차는 손대지 않는다) */
+function tourLive() { return tourEdition === TOURNAMENT_LATEST; }
+/** 지금 화면에서 결과를 등록·삭제할 수 있는가 */
+function tourEditable() { return isAdmin() && tourLive(); }
 const ADVANCING = 4;        // 예선 통과 팀 수
 const CLAN_TOP = 5;         // 클랜 순위에 보여줄 등수
 const TOP_N = 5;            // 개인 순위 표에 보여줄 인원
@@ -296,7 +381,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 109;
+const APP_VERSION = 110;
 let toldToRefresh = false;
 
 /**
@@ -2641,7 +2726,7 @@ function groupStandings() {
   const rows = TOURNAMENT_TEAMS.map(t => ({ ...t, played: 0, wins: 0, losses: 0 }));
   const byId = Object.fromEntries(rows.map(r => [r.id, r]));
 
-  for (const m of tMatches) {
+  for (const m of tOf(1)) {
     if (m.stage !== 'group') continue;
     const a = byId[m.teamA];
     const b = byId[m.teamB];
@@ -2712,7 +2797,7 @@ const FINAL_SEEDS = [['C', 'E'], ['A', 'D']];
  * 다시 쓰지 않는다.
  */
 function finalBracket() {
-  const pool = tMatches
+  const pool = tOf(1)
     .filter(m => m.stage === 'final')
     .slice()
     .sort((a, b) => a.ts - b.ts);
@@ -2885,7 +2970,7 @@ function renderGroupTable() {
 
   const note = document.getElementById('groupNote');
   if (note) {
-    const played = tMatches.filter(m => m.stage === 'group').length;
+    const played = tOf(1).filter(m => m.stage === 'group').length;
     const hasTie = anyPlayed && rows.some(r =>
       r.rank <= ADVANCING && rows.filter(o => o.rank <= r.rank).length > ADVANCING);
     note.innerHTML = anyPlayed
@@ -2902,7 +2987,7 @@ function groupFixtures() {
     for (let j = i + 1; j < TOURNAMENT_TEAMS.length; j++) {
       const a = TOURNAMENT_TEAMS[i].id;
       const b = TOURNAMENT_TEAMS[j].id;
-      const match = tMatches.find(m => m.stage === 'group'
+      const match = tOf(1).find(m => m.stage === 'group'
         && ((m.teamA === a && m.teamB === b) || (m.teamA === b && m.teamB === a)));
       list.push({ a, b, match: match || null });
     }
@@ -2918,9 +3003,9 @@ function renderGroupFixtures() {
   const list = groupFixtures();
   const done = list.filter(f => f.match).length;
 
-  note.textContent = isAdmin()
+  note.textContent = tourEditable()
     ? `${list.length}경기 중 ${done}경기 완료 · 이긴 팀을 누르면 바로 기록되고 위 순위표에 반영됩니다.`
-    : `${list.length}경기 중 ${done}경기 완료 · 결과 등록은 관리자만 할 수 있습니다.`;
+    : `${list.length}경기 중 ${done}경기 완료.`;
 
   box.innerHTML = list.map(f => {
     if (f.match) {
@@ -2931,12 +3016,12 @@ function renderGroupFixtures() {
           <span class="fx-vs">승</span>
           <span class="loss-txt">${esc(teamLabel(loser))}</span>
         </span>
-        ${isAdmin() ? `<button class="btn-mini btn-reject" data-tdel="${f.match.id}">삭제</button>` : ''}
+        ${tourEditable() ? `<button class="btn-mini btn-reject" data-tdel="${f.match.id}">삭제</button>` : ''}
       </div>`;
     }
     return `<div class="fx">
       <span class="fx-pair">${esc(teamLabel(f.a))}<span class="fx-vs">vs</span>${esc(teamLabel(f.b))}</span>
-      ${isAdmin()
+      ${tourEditable()
         ? `<span class="fx-actions">
              <button class="btn-mini btn-approve" data-fx="${f.a}:${f.b}:${f.a}">${esc(teamLabel(f.a))} 승</button>
              <button class="btn-mini btn-approve" data-fx="${f.a}:${f.b}:${f.b}">${esc(teamLabel(f.b))} 승</button>
@@ -2951,9 +3036,11 @@ function renderTournamentForm() {
   const hint = document.getElementById('tFormHint');
   if (!form || !hint) return;
 
-  form.style.display = isAdmin() ? 'block' : 'none';
-  hint.style.display = isAdmin() ? 'none' : 'block';
-  if (!isAdmin()) return;
+  // 1회차는 끝난 대회다. 고칠 일이 없으므로 입력칸도, 안내도 띄우지 않는다.
+  const on = tourEditable();
+  form.style.display = on ? 'block' : 'none';
+  hint.style.display = 'none';
+  if (!on) return;
 
   // 팀 선택지는 한 번만 채운다
   const selA = document.getElementById('tTeamA');
@@ -2983,12 +3070,13 @@ function syncWinnerOptions() {
 function renderTournamentLog() {
   const el = document.getElementById('tMatchLog');
   if (!el) return;
-  if (!tMatches.length) {
+  const rows = tOf(1);
+  if (!rows.length) {
     el.innerHTML = '<div class="log-empty">아직 기록된 대회 경기가 없습니다.</div>';
     return;
   }
 
-  el.innerHTML = [...tMatches].reverse().map(m => {
+  el.innerHTML = [...rows].reverse().map(m => {
     const loser = m.winner === m.teamA ? m.teamB : m.teamA;
     return `<div class="tlog">
       <div class="tlog-top">
@@ -2999,14 +3087,161 @@ function renderTournamentLog() {
           <span class="loss-txt">${esc(teamLabel(loser))}</span>
         </span>
         ${m.note ? `<span class="tlog-note">${esc(m.note)}</span>` : ''}
-        ${isAdmin() ? `<button class="btn-mini btn-reject" data-tdel="${m.id}">삭제</button>` : ''}
+        ${tourEditable() ? `<button class="btn-mini btn-reject" data-tdel="${m.id}">삭제</button>` : ''}
       </div>
       <div class="tlog-meta">등록자 : ${esc(m.recordedBy || '-')} · ${formatDateTime(m.ts)}</div>
     </div>`;
   }).join('');
 }
 
+/* ---------- 2회차 화면 ---------- */
+
+/** 2회차 조편성 */
+function renderT2Teams() {
+  const el = document.getElementById('t2Teams');
+  if (!el) return;
+  el.innerHTML = TOURNAMENT_TEAMS_2.map(t => `
+    <div class="team-card">
+      <div class="tc-name">${esc(t.label)}</div>
+      <div class="tc-list">${t.members.map(h => `<div>${esc(h)}</div>`).join('')}</div>
+    </div>`).join('');
+}
+
+/** 한 판의 양쪽 이름칸 */
+function t2Side(id, waitText, m, big) {
+  const known = !!id;
+  const text = known ? t2Label(id) : waitText;
+  const win = m && m.winner === id;
+  const lose = m && known && m.winner !== id;
+  const score = m ? (id === m.teamA ? m.scoreA : m.scoreB) : null;
+  return `<div class="t2-side${known ? '' : ' wait'}${win ? ' won' : ''}${lose ? ' lost' : ''}">
+    <span class="t2-nm">${esc(text)}</span>
+    ${m && score != null ? `<span class="t2-sc">${score}</span>` : ''}
+  </div>`;
+}
+
+/** 2회차 대진표 — 여섯 판을 치르는 차례대로 */
+function renderT2Bracket() {
+  const el = document.getElementById('t2Bracket');
+  if (!el) return;
+  const b = t2Bracket();
+
+  el.innerHTML = T2_STAGES.map(st => {
+    const m = b.by[st.id] || null;
+    const [a, c] = b.pair[st.id];
+    const ready = !!a && !!c;
+    const state = m ? 'done' : (ready ? 'ready' : 'wait');
+    const stateTag = m ? '' : ready
+      ? '<span class="t2-tag ready">진행 예정</span>'
+      : '<span class="t2-tag">앞 경기 대기</span>';
+
+    // 관리자는 두 팀이 정해진 판에서 바로 결과를 누른다. 3판 2선승이므로
+    // 이긴 쪽은 2승 고정이고 진 쪽이 0승인지 1승인지만 고르면 된다.
+    const buttons = (tourEditable() && !m && ready)
+      ? `<div class="t2-btns">
+           ${[a, c].map(side => [0, 1].map(l =>
+             `<button class="btn-mini btn-approve" data-t2="${st.id}:${a}:${c}:${side}:${l}">${esc(t2Label(side))} 2:${l}</button>`
+           ).join('')).join('')}
+         </div>`
+      : '';
+    const del = (tourEditable() && m)
+      ? `<button class="btn-mini btn-reject" data-tdel="${m.id}">삭제</button>` : '';
+
+    return `<div class="t2-row ${state}">
+      <div class="t2-head">
+        <span class="t2-stage">${esc(st.label)}</span>
+        ${stateTag}
+        ${m ? `<span class="t2-win">${esc(t2Label(m.winner))} 승</span>` : ''}
+        ${del}
+      </div>
+      <div class="t2-pair">
+        ${t2Side(a, st.wait[0], m)}
+        <span class="t2-vs">${m ? ':' : 'vs'}</span>
+        ${t2Side(c, st.wait[1], m)}
+      </div>
+      <div class="t2-note">${esc(st.note)}</div>
+      ${buttons}
+    </div>`;
+  }).join('');
+
+  // 최종 순위
+  const box = document.getElementById('t2Result');
+  if (box) {
+    const champ = b.place[1];
+    const rows = [1, 2, 3, 4]
+      .filter(n => b.place[n])
+      .map(n => `<div class="t2-place p${n}"><span class="t2-pn">${n}위</span>`
+        + `<span class="t2-pt">${esc(t2Label(b.place[n]))}</span></div>`).join('');
+    // 순위는 뒤에서부터 정해진다 — 패자전이 끝나야 4위가, 결승이 끝나야 1·2위가 나온다.
+    // "경기가 없다"고 적으면 두 판을 치르고도 아무 일도 없는 것처럼 보인다.
+    const left = T2_STAGES.filter(st => !b.by[st.id]).map(st => st.label);
+    box.innerHTML = champ
+      ? `<div class="final-box done">
+           <div class="final-label">★ 우승 ★</div>
+           <div class="final-vs">${esc(t2Label(champ))}</div>
+         </div>
+         <div class="t2-places">${rows}</div>`
+      : `${rows ? `<div class="t2-places">${rows}</div>` : ''}
+         <div class="foot-note"${rows ? '' : ' style="margin-top:0;"'}>
+           아직 ${esc(left.join(' · '))} 이(가) 남았습니다 ·
+           패자전이 끝나면 4위부터 차례로 정해집니다.
+         </div>`;
+  }
+}
+
+/** 2회차 경기 기록 */
+function renderT2Log() {
+  const el = document.getElementById('t2Log');
+  if (!el) return;
+  const rows = tOf(2);
+  if (!rows.length) {
+    el.innerHTML = '<div class="log-empty">아직 기록된 경기가 없습니다.</div>';
+    return;
+  }
+  const name = (id) => (T2_STAGES.find(s => s.id === id) || {}).label || id;
+  el.innerHTML = [...rows].reverse().map(m => {
+    const loser = m.winner === m.teamA ? m.teamB : m.teamA;
+    const ws = m.winner === m.teamA ? m.scoreA : m.scoreB;
+    const ls = m.winner === m.teamA ? m.scoreB : m.scoreA;
+    return `<div class="tlog">
+      <div class="tlog-top">
+        <span class="stage-tag final">${esc(name(m.stage))}</span>
+        <span class="tlog-teams">
+          <b class="win-txt">${esc(t2Label(m.winner))}</b>
+          <span class="tlog-vs">${ws != null ? `${ws} : ${ls}` : '승'}</span>
+          <span class="loss-txt">${esc(t2Label(loser))}</span>
+        </span>
+        ${tourEditable() ? `<button class="btn-mini btn-reject" data-tdel="${m.id}">삭제</button>` : ''}
+      </div>
+      <div class="tlog-meta">등록자 : ${esc(m.recordedBy || '-')} · ${formatDateTime(m.ts)}</div>
+    </div>`;
+  }).join('');
+}
+
+/** 회차 고르는 줄 */
+function renderTourEdition() {
+  const sel = document.getElementById('tourEdSelect');
+  if (sel && sel.value !== String(tourEdition)) sel.value = String(tourEdition);
+  const note = document.getElementById('tourEdNote');
+  if (note) {
+    note.textContent = tourLive() ? '' : '끝난 대회입니다 · 보기만 할 수 있습니다';
+  }
+  const one = document.getElementById('tourEd1');
+  const two = document.getElementById('tourEd2');
+  if (one) one.style.display = tourEdition === 1 ? '' : 'none';
+  if (two) two.style.display = tourEdition === 2 ? '' : 'none';
+}
+
+function selectTourEdition(v) {
+  const n = Number(v);
+  if (n !== 1 && n !== 2) return;
+  tourEdition = n;
+  renderTournament();
+}
+
 function renderTournament() {
+  renderTourEdition();
+  // 1회차 (끝난 대회)
   renderTeamCards();
   renderFinalTeamCards();
   renderFinalBracket();
@@ -3014,6 +3249,10 @@ function renderTournament() {
   renderGroupFixtures();
   renderTournamentForm();
   renderTournamentLog();
+  // 2회차 (진행 중)
+  renderT2Teams();
+  renderT2Bracket();
+  renderT2Log();
 }
 
 async function recordTournamentMatch() {
@@ -3078,6 +3317,38 @@ function initTournamentEvents() {
       recordFixture(a, b, winner);
     }
   });
+
+  const sel = document.getElementById('tourEdSelect');
+  if (sel) sel.addEventListener('change', () => selectTourEdition(sel.value));
+
+  // 2회차 대진표와 기록. 두 군데 모두 삭제 단추가 있다.
+  for (const id of ['t2Bracket', 't2Log']) {
+    const box = document.getElementById(id);
+    if (!box) continue;
+    box.addEventListener('click', e => {
+      const d = e.target.dataset || {};
+      if (d.tdel) return deleteTournamentMatch(d.tdel);
+      if (d.t2) {
+        const [stage, a, b, winner, lost] = d.t2.split(':');
+        recordT2(stage, a, b, winner, Number(lost));
+      }
+    });
+  }
+}
+
+/** 2회차 한 판의 결과를 올린다 (3판 2선승) */
+async function recordT2(stage, teamA, teamB, winner, loserGames) {
+  const name = (T2_STAGES.find(x => x.id === stage) || {}).label || stage;
+  const loser = winner === teamA ? teamB : teamA;
+  if (!confirm(`${name} · ${t2Label(winner)} 승 (2:${loserGames} ${t2Label(loser)})\n이대로 기록할까요?`)) return;
+  try {
+    await apiPost('/api/tournament', {
+      action: 'record', stage, teamA, teamB, winner, loserGames,
+    });
+    await loadTournament();
+    renderTournament();
+    showToast(`${name} · ${t2Label(winner)} 2:${loserGames} 승리로 기록했습니다.`);
+  } catch (e) { showToast(e.message); }
 }
 
 /* ---------- 게시판 ---------- */
