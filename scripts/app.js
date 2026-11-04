@@ -414,7 +414,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 118;
+const APP_VERSION = 119;
 let toldToRefresh = false;
 
 /**
@@ -3269,6 +3269,11 @@ function renderKoLog() {
 
 /** 회차 고르는 줄 */
 function renderTourEdition() {
+  // 메뉴 이름 옆에 지금 몇 회차가 도는지 적는다. 글자를 박아두면 다음 회차에
+  // 바꾸는 것을 잊으므로 TOURNAMENT_LATEST 에서 만들어 쓴다.
+  const sub = document.getElementById('tourTabSub');
+  if (sub) sub.textContent = `(${TOURNAMENT_LATEST}회차 진행중)`;
+
   const sel = document.getElementById('tourEdSelect');
   if (sel && sel.value !== String(tourEdition)) sel.value = String(tourEdition);
 
