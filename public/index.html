@@ -1152,17 +1152,6 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   .kakao-go{ display:none; }
 }
 
-/* 아직 내용이 없는 회차 */
-.ed-blank{
-  padding:var(--sp-8) var(--sp-4); text-align:center;
-  border:1px dashed var(--border-strong); border-radius:var(--radius-md);
-  background:var(--surface-sunken);
-}
-.ed-blank-t{
-  font-size:var(--fs-title); font-weight:var(--fw-bold); color:var(--text-tertiary);
-}
-.ed-blank-s{ margin-top:var(--sp-2); font-size:var(--fs-caption); color:var(--text-tertiary); }
-
 /* ===== 토너먼트 대진표 (4팀 2패 탈락 여섯 판) =====
    1회차의 가로 대진표 대신 치르는 차례대로 위에서 아래로 쌓는다. 여섯 판뿐이고
    자리가 고정돼 있어 선을 긋지 않아도 흐름이 읽히고, 좁은 화면에서도 안 깨진다. */
@@ -1172,6 +1161,12 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   border-radius:var(--radius-md); background:var(--surface);
   padding:var(--sp-3) var(--sp-4);
 }
+/* 팀 이름 옆 인원. 2회차는 두 팀 인원이 10명·11명으로 달라 적어둔다. */
+.tc-n{
+  float:right; font-size:var(--fs-footnote); font-weight:var(--fw-medium);
+  color:var(--text-tertiary);
+}
+
 /* 아직 두 팀이 안 정해진 판은 눌러둔다 — 할 수 있는 일이 없는 칸이다 */
 .ko-row.wait{ opacity:.6; }
 .ko-row.ready{ border-left-color:var(--accent); }
@@ -3534,9 +3529,77 @@ if (/[?&]room=\d+/.test(location.search)) {
     <div id="tourEd2" style="display:none;">
       <div class="panel hud-corner">
         <h2>2회차 대회 · Tournament</h2>
-        <div class="ed-blank">
-          <div class="ed-blank-t">종료</div>
-          <div class="ed-blank-s">2회차 기록은 따로 남아 있지 않습니다.</div>
+        <div class="tsec">
+          <div class="tsec-h">■ 팀 구성</div>
+          <div class="team-cards">
+            <div class="team-card">
+              <div class="tc-name">CarloS 팀<span class="tc-n">10명</span></div>
+              <div class="tc-list">
+              <div>oK_Carlos</div>
+              <div>oK_hyunjung</div>
+              <div>oK_LuCkY</div>
+              <div>SNC_LeNa</div>
+              <div>SNC_Gjplayer</div>
+              <div>PAC_Plus</div>
+              <div>soso</div>
+              <div>SNC_BlueBerry</div>
+              <div>SNC_HoSiN</div>
+              <div>SNC_NEo</div>
+              </div>
+            </div>
+            <div class="team-card">
+              <div class="tc-name">Rambo 팀<span class="tc-n">11명</span></div>
+              <div class="tc-list">
+              <div>Rambo702</div>
+              <div>LOTUS_JINWON2</div>
+              <div>LOTUS_TeaRs</div>
+              <div>LOTUS_MEGA</div>
+              <div>LOTUS_NaiLaRt</div>
+              <div>oK_mEntAl</div>
+              <div>NE_Valley</div>
+              <div>PSN_JOKER</div>
+              <div>zypsy_mari</div>
+              <div>oK_SkyLacK</div>
+              <div>KIMPO_BORY</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tsec">
+          <div class="tsec-h">■ 결과</div>
+          <!-- 끝난 대회라 적어둔 그대로다. 3회차처럼 기록해서 쌓은 것이 아니다. -->
+          <div class="ko-row done">
+            <div class="ko-head">
+              <span class="ko-stage">6경기</span>
+              <span class="ko-win">Rambo 팀 승</span>
+            </div>
+            <div class="ko-pair">
+              <div class="ko-side won"><span class="ko-nm">Rambo 팀</span><span class="ko-sc">5</span></div>
+              <span class="ko-vs">:</span>
+              <div class="ko-side lost"><span class="ko-nm">CarloS 팀</span><span class="ko-sc">1</span></div>
+            </div>
+            <div class="ko-games">
+              <span class="ko-game"><b>1경기</b> Rambo 팀 승</span>
+              <span class="ko-game"><b>2경기</b> Rambo 팀 승</span>
+              <span class="ko-game"><b>3경기</b> Rambo 팀 승</span>
+              <span class="ko-game"><b>4경기</b> Rambo 팀 승</span>
+              <span class="ko-game"><b>5경기</b> CarloS 팀 승</span>
+              <span class="ko-game"><b>6경기</b> Rambo 팀 승</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="tsec">
+          <div class="tsec-h">■ 상품</div>
+          <div class="prize">
+            <div class="prize-card p1">
+              <div class="prize-rank">우승 · Rambo 팀</div>
+              <div class="prize-body">
+                <div class="prize-line"><b>메가커피 아메리카노</b></div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -4383,7 +4446,8 @@ const MERCENARIES = ['RID_HoSiN', 'oK_LuCkY', 'SiLJanG', 'LOTUS_NaiLaRt'];
    순위 메뉴에서 지난 달을 고르는 것과 같다.
 
      1회차 — 5팀. 예선 풀리그 뒤 상위 4팀이 본선 2패 탈락. 끝난 대회라 보기만 한다.
-     2회차 — 끝난 대회지만 기록이 따로 남아 있지 않아 자리만 잡아두었다.
+     2회차 — 두 팀이 6경기를 치른 대회. 끝난 뒤에 적은 것이라 화면에 그대로
+            박아두었다 (대진을 계산할 것이 없다).
      3회차 — 4팀. 자리가 정해진 2패 탈락 여섯 판. 모두 3판 2선승. */
 
 /** 지금 진행 중인 회차. api/tournament.js 의 LATEST_EDITION 과 같아야 한다. */
@@ -4731,7 +4795,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 121;
+const APP_VERSION = 122;
 let toldToRefresh = false;
 
 /**

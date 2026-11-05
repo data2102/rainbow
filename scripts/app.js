@@ -69,7 +69,8 @@ const MERCENARIES = ['RID_HoSiN', 'oK_LuCkY', 'SiLJanG', 'LOTUS_NaiLaRt'];
    순위 메뉴에서 지난 달을 고르는 것과 같다.
 
      1회차 — 5팀. 예선 풀리그 뒤 상위 4팀이 본선 2패 탈락. 끝난 대회라 보기만 한다.
-     2회차 — 끝난 대회지만 기록이 따로 남아 있지 않아 자리만 잡아두었다.
+     2회차 — 두 팀이 6경기를 치른 대회. 끝난 뒤에 적은 것이라 화면에 그대로
+            박아두었다 (대진을 계산할 것이 없다).
      3회차 — 4팀. 자리가 정해진 2패 탈락 여섯 판. 모두 3판 2선승. */
 
 /** 지금 진행 중인 회차. api/tournament.js 의 LATEST_EDITION 과 같아야 한다. */
@@ -417,7 +418,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 121;
+const APP_VERSION = 122;
 let toldToRefresh = false;
 
 /**
