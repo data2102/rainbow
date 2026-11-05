@@ -11,38 +11,65 @@ Radmin 없이 게임에 들어가게 해 주는 서버입니다.
 - **방장 공유기·CGNAT 와 상관없습니다.** 방장 PC 가 중계 서버로 *먼저 나가서* 연결해 두기 때문입니다.
 - 방장의 다른 인터넷(웹, 디스코드 등)은 터널을 타지 않습니다. 중계 서버 대역(`10.66.0.0/24`)만 보냅니다.
 
-## 1. 서버 만들기 (한 번)
+## 1. 서버 만들기 (AWS Lightsail, 휴대폰으로 가능)
 
-서울·춘천 리전의 **Ubuntu 22.04 / 24.04** 가장 작은 서버면 충분합니다.
+**만들면서 설치까지 끝냅니다** — 시작 스크립트를 넣어 두면 서버가 처음 켜질 때 알아서 설치합니다.
 
-| 서버 | 월 비용(대략) |
-|---|---|
-| Oracle Cloud 무료 등급 | 0원 (오래 놀리면 회수될 수 있음) |
-| AWS Lightsail 서울 | 약 $5 |
+1. AWS 콘솔 → 검색창에 **Lightsail** → **Create instance**
+2. **Instance location**: **Seoul** (아니면 *Change AWS Region* 으로 바꾼다)
+3. **Select a platform**: **Linux/Unix**
+4. **Select a blueprint**: **Operating System (OS) only** → **Ubuntu 24.04 LTS** (없으면 22.04)
+5. **+ Add launch script** 를 눌러 아래 세 줄을 그대로 붙여 넣는다
 
-**클라우드 방화벽에서 두 가지를 열어 주세요.** 서버 안에서 열어도 여기가 막혀 있으면 안 들어옵니다.
+   ```
+   #!/bin/bash
+   curl -fsSLo /root/r6relay.sh https://raw.githubusercontent.com/data2102/rainbow/main/relay/r6relay.sh
+   bash /root/r6relay.sh setup > /root/r6relay-setup.log 2>&1
+   ```
+6. **Choose your instance plan**: 위 탭이 **Dual-stack**(IPv4 포함)인지 보고 **가장 싼 것** ($5 또는 $7).
+   *IPv6-only 는 안 된다* — 유저들이 IPv4 로 들어온다.
+7. 이름 `r6-relay` → **맨 아래까지 내려서** 주황 **Create instance**
+8. 목록에 `r6-relay` 가 **Running** 이 되면 성공.
 
-| 프로토콜 | 포트 | 무엇 |
-|---|---|---|
-| UDP | 51820 | 방장 터널 |
-| UDP | 2346-2348 | 게임 (JOIN / ANNOUNCE / INFO) |
+> **"Request a service quota increase" 창이 뜨면** 그 계정의 서울 Lightsail 한도가 0 인 것이다.
+> *Adjust quota* → **계정 수준에서 증가 요청** → 화면이 허용하는 최소값으로 요청 → 승인 메일이 오면 다시 1번부터.
+> 한도는 상한일 뿐이라 올려도 요금은 안 나온다.
 
-- Oracle: 네트워킹 → VCN → 보안 목록 → 수신 규칙 추가 (소스 `0.0.0.0/0`)
-- Lightsail: 인스턴스 → 네트워킹 → IPv4 방화벽 → 규칙 추가
+### 고정 IP
 
-> **고정 IP 를 붙이세요.** 서버를 다시 켤 때 주소가 바뀌면 방장 터널 파일과 유저 접속 주소를 전부 다시 돌려야 합니다.
-> (Oracle: 예약된 공인 IP, Lightsail: 고정 IP — 인스턴스에 붙어 있으면 무료)
+1. **☰ → Networking → Create static IP** → 리전 **Seoul** → *Attach to an instance* 에서 `r6-relay` → **Create**
+2. 나온 숫자 주소가 **유저들이 들어올 주소**다. 서버를 껐다 켜도 안 바뀐다.
 
-## 2. 설치 (한 번)
+> 고정 IP 는 **서버에 붙어 있으면 무료, 떨어져 있으면 유료**다. 서버를 지우면 IP 도 같이 지운다.
 
-서버에 접속해서:
+### 방화벽 (클라우드 쪽)
+
+인스턴스 `r6-relay` → 위 탭 줄을 옆으로 밀어 **Networking** → **IPv4 Firewall** → **+ Add rule** 두 번.
+원래 있던 SSH(22) 는 지우지 않는다 — 지우면 접속 창이 안 열린다.
+
+| Application | Protocol | Port | 무엇 |
+|---|---|---|---|
+| Custom | **UDP** | 51820 | 방장 터널 |
+| Custom | **UDP** | 2346-2348 | 게임 (JOIN / ANNOUNCE / INFO) |
+
+**TCP 가 아니라 UDP** 인지 꼭 본다. 제일 흔한 실수다.
+
+## 2. 설치 확인
+
+인스턴스 화면의 **Connect using SSH** 로 검은 창을 열고:
+
+```bash
+sudo cat /root/r6relay-setup.log
+```
+
+`[O] 중계 시작` 이 보이면 끝. 시작 스크립트를 안 넣었다면 여기서 직접 설치한다:
 
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/data2102/rainbow/main/relay/r6relay.sh
+```
+```bash
 sudo bash r6relay.sh setup
 ```
-
-`[O] 중계 시작` 이 나오면 끝입니다. 서버를 재부팅해도 자동으로 켜집니다.
 
 ## 3. 방장 등록 (방장마다 한 번)
 
@@ -56,10 +83,14 @@ sudo r6relay add lena
 
 ### 방장 PC 에서 (한 번)
 
+**이 단계는 방장의 게임 PC 에서 한다.** 서버 접속 창도 그 PC 브라우저로 열면 복사·붙여넣기가 한 번에 끝난다.
+
 1. <https://www.wireguard.com/install/> 에서 Windows 용 WireGuard 를 설치합니다.
-2. 받은 내용을 메모장에 붙여 `r6relay-lena.conf` 로 저장합니다.
-3. WireGuard → **파일에서 터널 가져오기** → 그 파일 → **활성화**.
-4. 확인: 명령 프롬프트에서 `ping 10.66.0.1` 이 답하면 연결된 것입니다.
+2. WireGuard → 왼쪽 아래 **터널 추가 ▾ → 빈 터널 추가**.
+3. 칸에 미리 적혀 있는 내용을 **전부 지우고**, 서버에서 받은 내용을 붙여 넣습니다.
+4. 이름 `r6relay` → **저장** → **활성화**.
+5. 확인: 명령 프롬프트에서 `ping 10.66.0.1` 이 답하면 연결된 것입니다.
+6. 사이트 자료실의 `r6firewall.bat` 을 아직 안 돌렸다면 돌립니다 (게임 포트 허용).
 
 방을 열 때만 활성화해 두면 됩니다. 게임은 평소처럼 런쳐로 **방 만들기**.
 
@@ -77,7 +108,12 @@ sudo r6relay remove lena   # 방장 지우기
 
 ## 5. 유저 접속
 
-중계 서버의 공인 IP 로 들어갑니다.
+**사이트 런쳐로 (고칠 것 없음)** — 방장이 런쳐에서 자기 **접속 주소(Radmin 주소 칸)** 에
+`26.x.x.x` 대신 **중계 서버 고정 IP** 를 적고 게임을 실행합니다. 사이트는 IPv4 면 무엇이든 받으므로
+유저들은 평소처럼 **참가** 만 누르면 중계 서버로 갑니다. 유저는 Radmin 을 켤 필요가 없습니다.
+시험이 끝나면 방장은 그 칸을 원래 Radmin 주소로 되돌립니다.
+
+**직접 실행으로** — 중계 서버의 공인 IP 로 들어갑니다.
 
 ```
 "C:\Program Files (x86)\Red Storm Entertainment\Tom Clancy's Rainbow Six\RainbowSix.exe" -client <중계서버IP> 2346
