@@ -132,6 +132,16 @@ function idleAway()    { return Date.now() - lastTouchAt > IDLE_STOP_MS; }
 - 되돌릴 일에 대비한 백업 브랜치가 있다: `backup/font-before-logo`, `backup/garo-menu`,
   `backup/radmin-launcher`. **지우지 말 것.**
 
+## 중계 서버 (`relay/`)
+
+Radmin 없이 접속하려고 만든 UDP 중계. Vercel 은 UDP 를 못 받으므로 **별도 VPS** 에서 돈다.
+방장만 WireGuard 로 중계 서버에 붙고, 유저는 중계 서버 공인 IP:2346 으로 들어온다.
+서버가 2346~2348 을 DNAT 로 방장 터널 주소에 넘기고 MASQUERADE 로 답을 되돌린다.
+
+- 규칙은 `R6_*` 체인 안에만 둔다. INPUT·FORWARD **맨 앞**에 끼우는 건 Oracle 기본 이미지의
+  끝 REJECT 때문이다.
+- 지금은 방 하나만 중계한다. 실제 게임으로는 아직 시험하지 않았다(`relay/README.md` 의 "시험할 것").
+
 ## 남은 일
 
 - **Neon DB 비밀번호 교체** — 연결 문자열이 노출된 적이 있다. 아직 안 했다.
