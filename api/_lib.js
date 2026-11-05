@@ -580,6 +580,9 @@ export function rowToDraw(r) {
     ],
     pairs: [{
       a: 'A', b: 'B', first: r.first_team,
+      // teams 칸이 생기기 전의 줄이라도 '수기작성' 표시는 pairs 에 적힌다.
+      // 여기서 집어오지 않으면 적어놓고도 사라진 것처럼 보인다.
+      manual: (r.pairs && r.pairs[0] && r.pairs[0].manual) || null,
       result: r.result || null,
       matchId: r.match_id == null ? null : Number(r.match_id),
       by: r.result_by || null,

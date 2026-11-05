@@ -1,6 +1,6 @@
 import { randomInt } from 'node:crypto';
 import {
-  q, tx, body, methodGuard, requireUser, requireAdmin, audit,
+  q, tx, body, methodGuard, requireUser, requireAdmin, currentAdmin, audit,
   winGain, lossGain, cleanReason, ensureMatchVoid, noScoreFor,
   ensureHostDraws, rowToDraw, TEAM_NAMES, replay, nightStart,
 } from './_lib.js';
@@ -13,6 +13,7 @@ import { ensureSeason, ensureRescore } from './_season.js';
  * POST /api/match {action:'restore'}   취소 되돌리기 (관리자 이상)
  * POST /api/match {action:'host'}      팀 나누기 + 팀별 호스트 뽑기
  * POST /api/match {action:'hostResult'} 그 판의 승패 등록
+ * POST /api/match {action:'hostManual'}  그 판은 리폿에서 손으로 썼다고 표시
  * POST /api/match {action:'hostClear'}  뽑기 기록 비우기 (관리자 이상)
  *
  * 호스트 뽑기가 여기 얹혀 있는 까닭: Vercel Hobby 는 서버리스 함수가 12개까지다.
@@ -26,6 +27,7 @@ export default async function handler(req, res) {
   if (b.action === 'restore') return restoreMatch(req, res, b);
   if (b.action === 'host') return hostDraw(req, res, b);
   if (b.action === 'hostResult') return hostResult(req, res, b);
+  if (b.action === 'hostManual') return hostManual(req, res, b);
   if (b.action === 'hostClear') return hostClear(req, res, b);
   return record(req, res, b);
 }
@@ -581,6 +583,10 @@ async function hostResult(req, res, b) {
       const pair = d.pairs[at];
       if (!pair) throw new Error('없는 경기입니다.');
       if (pair.result) throw new Error('이미 결과를 올린 경기입니다.');
+      // 리폿에서 손으로 쓴 판이다. 여기서 또 올리면 점수가 두 번 들어간다.
+      if (pair.manual) {
+        throw new Error('수기작성으로 표시된 경기입니다. 표시를 지운 뒤 올려주세요.');
+      }
       if (winner !== pair.a && winner !== pair.b) {
         throw new Error('이긴 팀을 골라주세요.');
       }
@@ -607,6 +613,80 @@ async function hostResult(req, res, b) {
     await audit(me, 'host_result', { id, pair: at, winner, winners: out.winners, losers: out.losers });
     res.status(200).json({ ok: true, winnerResults: out.winnerResults, noScore: out.noScore || [],
       ts: out.ts, pairs: out.pairs });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+}
+
+/** 수기작성 사유 최대 길이 */
+const MAX_MANUAL = 100;
+
+/**
+ * POST {action:'hostManual', id, pair, reason}            수기작성으로 표시
+ * POST {action:'hostManual', id, pair, clear:true}        그 표시를 지움
+ *
+ * 중간에 사람이 바뀌면 나눠준 팀과 실제로 뛴 팀이 달라서, 리폿 탭에서 손으로
+ * 쓴다. 그런데 뽑기 기록에는 '결과 미등록' 으로 남아 있으니 아무도 안 쓴 줄
+ * 알고 여기서 또 올려 **점수가 두 번 들어가는 일**이 잦았다. 그래서 '여기선
+ * 올리지 마라' 는 표시를 남긴다.
+ *
+ * **점수는 건드리지 않는다.** 경기도 만들지 않는다. 표시일 뿐이다.
+ * 잘못 눌렀으면 적은 사람이나 관리자가 지울 수 있다 — 점수가 걸려 있지 않으니
+ * 되돌리는 데 관리자를 기다릴 까닭이 없다.
+ */
+async function hostManual(req, res, b) {
+  const me = await requireUser(req, res);
+  if (!me) return;
+
+  const id = Number(b.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: '어떤 판인지 알 수 없습니다.' });
+  }
+  const at = b.pair == null ? 0 : Number(b.pair);
+  const clear = b.clear === true;
+
+  let reason = '';
+  if (!clear) {
+    reason = String(b.reason == null ? '' : b.reason).trim().replace(/\s+/g, ' ');
+    if (!reason) return res.status(400).json({ error: '수기작성 사유를 적어주세요.' });
+    if (reason.length > MAX_MANUAL) {
+      return res.status(400).json({ error: `사유는 ${MAX_MANUAL}자까지 쓸 수 있습니다.` });
+    }
+  }
+
+  try {
+    await ensureHostDraws();
+    const admin = await currentAdmin(req);
+    const out = await tx(async (c) => {
+      const { rows } = await c.query(`SELECT * FROM host_draws WHERE id = $1 FOR UPDATE`, [id]);
+      if (!rows.length) throw new Error('없는 판입니다.');
+      const d = rowToDraw(rows[0]);
+
+      const pair = d.pairs[at];
+      if (!pair) throw new Error('없는 경기입니다.');
+      if (pair.result) throw new Error('이미 결과를 올린 경기입니다.');
+
+      if (clear) {
+        if (!pair.manual) throw new Error('수기작성으로 표시된 경기가 아닙니다.');
+        if (pair.manual.by !== me && !admin) {
+          throw new Error('적은 사람이나 관리자만 지울 수 있습니다.');
+        }
+      } else if (pair.manual) {
+        throw new Error('이미 수기작성으로 표시된 경기입니다.');
+      }
+
+      const mark = clear ? null : { reason, by: me, at: Date.now() };
+      const next = d.pairs.map((p, i) => {
+        if (i !== at) return p;
+        const { manual, ...rest } = p;
+        return mark ? { ...rest, manual: mark } : rest;
+      });
+      await c.query(`UPDATE host_draws SET pairs = $1 WHERE id = $2`, [JSON.stringify(next), id]);
+      return { pairs: next, manual: mark };
+    });
+
+    await audit(me, clear ? 'host_manual_clear' : 'host_manual', { id, pair: at, reason });
+    res.status(200).json({ ok: true, pairs: out.pairs, manual: out.manual });
   } catch (e) {
     res.status(400).json({ error: e.message });
   }

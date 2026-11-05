@@ -418,7 +418,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 131;
+const APP_VERSION = 132;
 let toldToRefresh = false;
 
 /**
@@ -6478,11 +6478,13 @@ function rlStagePre(draw) {
       <div class="rl-finish" data-pair="${i}" hidden>
         <div class="side-label">경기 결과 · Report</div>
         <div class="foot-note" style="margin-top:0;margin-bottom:10px;">
-          나눠준 팀 그대로 점수가 들어갑니다 · 리폿 탭에 쓰는 것과 같은 기록이라 <b>두 번 쓰지 마세요</b>.
+          나눠준 팀 그대로 점수가 들어갑니다 · 리폿 탭에 쓰는 것과 같은 기록이라 <b>두 번 쓰지 마세요</b>.<br>
+          중간에 사람이 바뀌어 리폿 탭에 손으로 썼다면 <b>수기작성</b> 을 눌러 표시해두세요 · 점수는 건드리지 않습니다.
         </div>
         <div class="rl-win-btns">
           <button type="button" class="btn-mini rl-win" data-win="${p.a}">${p.a} Team 승리</button>
           <button type="button" class="btn-mini rl-win" data-win="${p.b}">${p.b} Team 승리</button>
+          <button type="button" class="btn-mini rl-win rl-manual" data-manual="1">수기작성</button>
         </div>
       </div>
       <div class="rl-done" id="rlDone${i}" hidden></div>
@@ -6582,9 +6584,38 @@ function rlShowResult(i) {
       + (p.at ? ` · ${esc(formatDateTime(p.at))}` : '');
     return;
   }
+  if (p.manual) {
+    fin.hidden = true;
+    done.hidden = false;
+    done.innerHTML = `경기 결과: <b>수기작성</b> · 리폿 탭에 손으로 쓴 판입니다`
+      + ` · 사유: ${esc(p.manual.reason || '')}`
+      + ` · ${esc(p.manual.by || '')} 님이 표시`
+      + (p.manual.at ? ` · ${esc(formatDateTime(p.manual.at))}` : '')
+      + (rlCanUnmark(p) ? ` <button type="button" class="rl-log-undo" data-unmark="${i}">표시 지우기</button>` : '');
+    return;
+  }
   done.hidden = true;
   fin.hidden = false;
   fin.querySelectorAll('.rl-win').forEach(b => { b.disabled = !me || rlBusy; });
+}
+
+/** 수기작성 표시는 적은 사람이나 관리자가 지울 수 있다 (서버도 같은 자리에서 본다) */
+function rlCanUnmark(p) {
+  if (!me || !p.manual) return false;
+  return p.manual.by === me.handle || isAdmin();
+}
+
+/** 수기작성 사유를 묻는다. 비우면 그만둔다. */
+function rlAskReason(which) {
+  const v = prompt(
+    `${which}이 판은 리폿 탭에 손으로 썼다고 표시합니다.\n`
+    + `점수는 건드리지 않습니다 — 여기서 또 올려 두 번 들어가는 것을 막는 표시입니다.\n\n`
+    + `사유를 적어주세요 (예: 중간에 인원 변경)`, '중간에 인원 변경');
+  if (v == null) return null;
+  const s = v.trim().replace(/\s+/g, ' ');
+  if (!s) { showToast('사유를 적어주세요'); return null; }
+  if (s.length > 100) { showToast('사유는 100자까지 쓸 수 있습니다'); return null; }
+  return s;
 }
 
 /* ---- 서버에 묻기 ---- */
@@ -6681,11 +6712,22 @@ function rlLogResult(r, p, i, many) {
     return `<span class="rl-log-res">${head}${esc(p.result)} Team 승리`
       + `${p.by ? ` · ${esc(p.by)}` : ''}</span>`;
   }
+  if (p.manual) {
+    return `<span class="rl-log-res manual">${head}수기작성`
+      + ` · ${esc(p.manual.reason || '')}`
+      + `${p.manual.by ? ` · ${esc(p.manual.by)}` : ''}</span>`
+      + (rlCanUnmark(p)
+          ? `<button type="button" class="rl-log-undo" data-draw="${r.id}" data-pair="${i}"
+               data-unmark="1">표시 지우기</button>`
+          : '');
+  }
   if (!me) return `<span class="rl-log-res wait">${head}결과 미등록</span>`;
   return `<span class="rl-log-res wait">${head}결과 미등록</span>`
     + [p.a, p.b].map(name =>
         `<button type="button" class="rl-log-win" data-draw="${r.id}" data-pair="${i}"
-           data-win="${esc(name)}">${esc(name)} Team 승리</button>`).join('');
+           data-win="${esc(name)}">${esc(name)} Team 승리</button>`).join('')
+    + `<button type="button" class="rl-log-win rl-log-manual" data-draw="${r.id}" data-pair="${i}"
+         data-manual="1">수기작성</button>`;
 }
 
 function renderRlLog() {
@@ -6769,6 +6811,72 @@ async function rlReportFromLog(btn) {
   } catch (e) {
     btn.disabled = false;
     showToast('기록 실패: ' + e.message);
+  }
+}
+
+/**
+ * 기록 줄에서 '수기작성' 으로 표시하거나, 그 표시를 지운다.
+ *
+ * 점수가 걸려 있지 않아 되돌리기가 싸다 — 잘못 눌렀으면 적은 사람이 바로 지운다.
+ */
+async function rlManualFromLog(btn, clear) {
+  const id = Number(btn.dataset.draw);
+  const pair = Number(btn.dataset.pair);
+  const row = (rlLogData && rlLogData.draws || []).find(d => d.id === id);
+  if (!row) return;
+  const p = row.pairs[pair];
+  if (!p || p.result) return;
+
+  const which = row.pairs.length > 1 ? `${pair + 1}경기 · ` : '';
+  let reason = '';
+  if (clear) {
+    if (!confirm(`${which}수기작성 표시를 지웁니다.\n다시 '결과 미등록' 으로 돌아갑니다. 계속할까요?`)) return;
+  } else {
+    reason = rlAskReason(which ? `${which}\n` : '');
+    if (!reason) return;
+  }
+
+  btn.disabled = true;
+  try {
+    await apiPost('/api/match', { action: 'hostManual', id, pair, reason, clear: !!clear });
+    await loadRlLog();
+    showToast(clear ? '수기작성 표시를 지웠습니다' : `${which}수기작성으로 표시했습니다`);
+  } catch (e) {
+    btn.disabled = false;
+    showToast('실패: ' + e.message);
+  }
+}
+
+/** '이번 판' 화면에서 수기작성 표시를 달거나 지운다 */
+async function rlManual(i, clear) {
+  if (!rlDraw || rlBusy) return;
+  const p = rlDraw.pairs[i];
+  if (!p || p.result) return;
+
+  const which = rlDraw.pairs.length > 1 ? `${i + 1}경기 · ` : '';
+  let reason = '';
+  if (clear) {
+    if (!confirm(`${which}수기작성 표시를 지웁니다.\n다시 '결과 미등록' 으로 돌아갑니다. 계속할까요?`)) return;
+  } else {
+    reason = rlAskReason(which ? `${which}\n` : '');
+    if (!reason) return;
+  }
+
+  rlBusy = true;
+  rlShowResult(i);
+  try {
+    const r = await apiPost('/api/match', {
+      action: 'hostManual', id: rlDraw.id, pair: i, reason, clear: !!clear,
+    });
+    rlDraw = { ...rlDraw, pairs: r.pairs };
+    rlBusy = false;
+    rlShowResult(i);
+    showToast(clear ? '수기작성 표시를 지웠습니다' : `${which}수기작성으로 표시했습니다`);
+    loadRlLog(1);
+  } catch (e) {
+    rlBusy = false;
+    rlShowResult(i);
+    showToast('실패: ' + e.message);
   }
 }
 
@@ -6862,9 +6970,12 @@ function initRouletteEvents() {
   const stage = document.getElementById('rlMatches');
   if (stage) {
     stage.addEventListener('click', (e) => {
+      const un = e.target.closest('.rl-log-undo');
+      if (un && !un.disabled) return rlManual(Number(un.dataset.unmark), true);
       const btn = e.target.closest('.rl-win');
       if (!btn || btn.disabled) return;
       const box = btn.closest('.rl-finish');
+      if (btn.dataset.manual) return rlManual(Number(box.dataset.pair), false);
       rlReport(Number(box.dataset.pair), btn.dataset.win);
     });
     // 판이 멈추면 이름을 적는다. 모두 같이 출발했으므로 처음 끝나는 하나면 된다.
@@ -6878,8 +6989,12 @@ function initRouletteEvents() {
 
   const log = document.getElementById('rlLog');
   if (log) log.addEventListener('click', (e) => {
+    const un = e.target.closest('.rl-log-undo');
+    if (un && !un.disabled) return rlManualFromLog(un, true);
     const btn = e.target.closest('.rl-log-win');
-    if (btn && !btn.disabled) rlReportFromLog(btn);
+    if (!btn || btn.disabled) return;
+    if (btn.dataset.manual) return rlManualFromLog(btn, false);
+    rlReportFromLog(btn);
   });
 
   const wipe = document.getElementById('rlLogWipe');
