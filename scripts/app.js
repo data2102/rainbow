@@ -418,7 +418,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 125;
+const APP_VERSION = 126;
 let toldToRefresh = false;
 
 /**
@@ -5037,7 +5037,7 @@ function applyConnMode() {
   const sub = document.getElementById('dlSub');
   if (sub) {
     sub.innerHTML = mode === 'radmin'
-      ? '※ <b>①~③에 대해 최초 1회만 실행</b>하면 그 다음부터는 게임만 접속하시면 됩니다.'
+      ? '※ <b>1~3 은 처음 한 번만</b> 하면 그 다음부터는 방에 들어가 버튼만 누르면 됩니다.'
       : '※ <b>①~③ 은 모두</b> 하고, <b>＋ 는 방장을 할 사람만</b> 하면 됩니다 ·'
         + ' 최초 1회만 실행하면 그 다음부터는 게임만 접속하시면 됩니다.';
   }
