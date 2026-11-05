@@ -1776,6 +1776,62 @@ body.rule-v2 #standingTable .streak-txt{ display:none; }
   font-size:var(--fs-caption); font-weight:var(--fw-bold);
 }
 .rcard-b{ padding:var(--sp-5); }
+/* 시간대별 규칙 — 나란히 놓아야 '이전/이후' 가 한눈에 갈린다 */
+.rsec-lead{
+  margin:0 0 var(--sp-4); font-size:var(--fs-body);
+  line-height:var(--lh-body); color:var(--text-secondary);
+}
+.rsec-lead b{ color:var(--text-primary); font-weight:var(--fw-bold); }
+.rtime{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--sp-3); }
+.rtime .rcard{ margin-bottom:0; }
+.rclock{
+  display:inline-flex; align-items:center; flex:none;
+  padding:2px var(--sp-3); border-radius:var(--radius-pill);
+  background:var(--text-secondary); color:var(--surface);
+  font-size:var(--fs-caption); font-weight:var(--fw-bold);
+  letter-spacing:0; font-variant-numeric:tabular-nums;
+}
+.rclock-late{ background:var(--warm); color:var(--bg); }
+/* 번호를 글머리로 쓰는 차림표. 1·2·3 이 곧 사람들이 묻는 순서다. */
+.rsteps{
+  margin:0; padding:0; list-style:none; counter-reset:rs;
+  display:flex; flex-direction:column; gap:var(--sp-2);
+}
+.rsteps li{
+  counter-increment:rs;
+  display:flex; align-items:flex-start; gap:var(--sp-3);
+  padding:var(--sp-3); border-radius:var(--radius-md);
+  background:var(--surface-sunken);
+}
+.rsteps li::before{
+  content:counter(rs);
+  display:inline-flex; align-items:center; justify-content:center; flex:none;
+  width:22px; height:22px; border-radius:var(--radius-sm);
+  background:var(--border-strong); color:var(--surface);
+  font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+}
+.rsteps .s{ min-width:0; }
+.rsteps .k{
+  display:block; color:var(--text-primary);
+  font-size:var(--fs-caption); font-weight:var(--fw-bold);
+}
+.rsteps .v{
+  display:block; margin-top:2px;
+  font-size:var(--fs-body); line-height:var(--lh-body); color:var(--text-secondary);
+}
+.rsteps b{ color:var(--text-primary); font-weight:var(--fw-bold); }
+.rsteps .n{
+  display:block; margin-top:var(--sp-2);
+  font-size:var(--fs-caption); line-height:var(--lh-body); color:var(--text-tertiary);
+}
+/* 가장 많이 틀리는 줄. 흐린 회색 칸에 섞여 있으면 읽고도 지나친다. */
+.rsteps li.hot{ background:var(--accent-bg); box-shadow:inset 3px 0 0 var(--accent); }
+.rsteps li.hot::before{ background:var(--accent); color:var(--on-accent); }
+.rsteps li.hot .k{ color:var(--accent-strong); }
+.rsteps li.hot .n{ color:var(--accent-strong); }
+@media (max-width:860px){
+  .rtime{ grid-template-columns:minmax(0,1fr); }
+}
 .rtext{
   margin:0; font-size:var(--fs-body); line-height:var(--lh-body);
   color:var(--text-secondary);
@@ -1811,7 +1867,6 @@ body.rule-v2 #standingTable .streak-txt{ display:none; }
 }
 .ch-link:hover{ background:var(--kakao-hover); }
 .ch-link:focus-visible{ outline:none; box-shadow:var(--shadow-focus); }
-.rcard-note .rnum{ background:var(--warm); color:var(--bg); }
 
 /* 예시 — 숫자가 눈에 먼저 들어와야 한다 */
 .rex{
@@ -1854,22 +1909,6 @@ body.rule-v2 #standingTable .streak-txt{ display:none; }
 .val{ color:var(--text-primary); font-weight:var(--fw-medium); }
 .val.bad{ color:var(--text-tertiary); text-decoration:line-through; }
 
-/* 리폿 쓰는 법 — 규칙과 색을 달리해 "적는 방법"임을 드러낸다 */
-.rrep{
-  margin-top:var(--sp-3); padding:var(--sp-4);
-  border-radius:var(--radius-md); background:var(--warm-bg);
-  border-left:3px solid var(--warm);
-}
-.rrep-h{ color:var(--warm); font-weight:var(--fw-bold); }
-.rrep-row .w{ color:var(--success-strong); font-weight:var(--fw-bold); }
-.rrep-row .l{ color:var(--danger-strong); font-weight:var(--fw-bold); }
-.rrep-row .x{ color:var(--warm); font-weight:var(--fw-bold); }
-.rrep-note{
-  margin-top:var(--sp-2); font-size:var(--fs-caption);
-  color:var(--text-secondary); line-height:var(--lh-body);
-}
-.rrep-note b{ color:var(--text-primary); font-weight:var(--fw-bold); }
-
 /* 호스트가 바뀔 때 어디로 가는지 */
 .rflow{
   margin-top:var(--sp-4); padding:var(--sp-4);
@@ -1885,11 +1924,6 @@ body.rule-v2 #standingTable .streak-txt{ display:none; }
   line-height:var(--lh-body);
 }
 .rflow-note b{ color:var(--text-secondary); font-weight:var(--fw-bold); }
-.rnote{
-  margin-top:var(--sp-3); font-size:var(--fs-caption);
-  color:var(--text-tertiary); line-height:var(--lh-body);
-}
-.rnote b{ color:var(--text-secondary); font-weight:var(--fw-bold); }
 .rwarn{
   margin-top:var(--sp-3); font-size:var(--fs-caption);
   color:var(--warm); line-height:var(--lh-body);
@@ -3829,90 +3863,56 @@ if (/[?&]room=\d+/.test(location.search)) {
       <h2>규정 · Rule</h2>
 
       <!-- ── 팀 구성 ── -->
+      <!-- 밤 11시를 경계로 합류 방법이 갈린다. 한 장에 섞어 적으면 어느 쪽 규칙인지
+           헷갈려서, 두 칸으로 갈라 나란히 둔다. 사람들이 가장 많이 틀리는 3번은
+           두 쪽 모두 색을 넣어 띄운다. -->
       <section class="rsec">
         <div class="rsec-h">팀 구성</div>
+        <p class="rsec-lead"><b>밤 11시(23:00)</b>를 경계로 합류하는 방법이 달라집니다.</p>
 
-        <article class="rcard">
-          <div class="rcard-h"><span class="rnum">1</span>인원이 짝수일 경우</div>
-          <div class="rcard-b">
-            <p class="rtext">그대로 <b>반씩 나눠</b> 진행합니다.</p>
-            <div class="rex">
-              <div class="rex-h">예시</div>
-              <div class="rex-row"><b class="n">6명</b><span class="ar">→</span><b class="sc">3 : 3</b></div>
-              <div class="rex-row"><b class="n">10명</b><span class="ar">→</span><b class="sc">5 : 5</b></div>
-              <div class="rex-row"><b class="n">14명</b><span class="ar">→</span><b class="sc">7 : 7</b></div>
+        <div class="rtime">
+          <article class="rcard rcard-t">
+            <div class="rcard-h"><span class="rclock">~ 23:00</span>밤 11시 이전</div>
+            <div class="rcard-b">
+              <ol class="rsteps">
+                <li><div class="s">
+                  <b class="k">짝수일 경우</b>
+                  <span class="v"><b>룰렛</b>을 돌려 경기를 진행합니다.</span>
+                </div></li>
+                <li><div class="s">
+                  <b class="k">홀수일 경우</b>
+                  <span class="v">가장 늦게 들어온 <b>1명</b>이 기다렸다가 접속합니다.</span>
+                </div></li>
+                <li class="hot"><div class="s">
+                  <b class="k">경기 중일 경우</b>
+                  <span class="v"><b>짝을 맞춰</b> 접속해야 하며, 짝이 맞지 않으면 <b>대기</b>합니다.</span>
+                </div></li>
+              </ol>
             </div>
-          </div>
-        </article>
+          </article>
 
-        <article class="rcard">
-          <div class="rcard-h"><span class="rnum">2</span>인원이 홀수일 경우</div>
-          <div class="rcard-b">
-            <p class="rtext">한 명 많은 쪽이 생길 경우
-              <b>제일 마지막에 접속한 1명</b>은 무조건 <b>호스트 반대편</b>에서 플레이합니다.</p>
-            <p class="rnote"><b>JOIN GAME</b>에 가장 늦게 접속한 사람이
-              <b>늦은 참석자</b>가 됩니다.</p>
-            <div class="rwarn">※ 제일 먼저 왔더라도 <b>게임 조인이 가장 늦은 사람</b>,
-              흡연으로 인해 <b>조인이 늦을 경우</b> 모두 해당됩니다.</div>
-            <div class="rex">
-              <div class="rex-h">예시</div>
-              <div class="rex-row"><b class="n">7명</b><span class="ar">→</span><b class="sc">4 : 3</b></div>
-              <div class="rex-row"><b class="n">11명</b><span class="ar">→</span><b class="sc">6 : 5</b></div>
-              <div class="rex-row"><b class="n">15명</b><span class="ar">→</span><b class="sc">8 : 7</b></div>
+          <article class="rcard rcard-t">
+            <div class="rcard-h"><span class="rclock rclock-late">23:00 ~</span>밤 11시 이후</div>
+            <div class="rcard-b">
+              <ol class="rsteps">
+                <li><div class="s">
+                  <b class="k">짝수일 경우</b>
+                  <span class="v"><b>룰렛</b>을 돌려 경기를 진행합니다.</span>
+                </div></li>
+                <li><div class="s">
+                  <b class="k">홀수일 경우</b>
+                  <span class="v">가장 늦게 접속한 사람이 <b>호스트 반대편</b>에서 진행합니다.</span>
+                </div></li>
+                <li class="hot"><div class="s">
+                  <b class="k">경기 중일 경우</b>
+                  <span class="v"><b>호스트 반대편</b>으로 접속하여 진행합니다.</span>
+                  <span class="n">디스코드에 접속해 경기 상황을 확인한 뒤,
+                    <b>막수 이전</b>일 때만 합류할 수 있습니다.</span>
+                </div></li>
+              </ol>
             </div>
-            <div class="rrep">
-              <div class="rrep-h">리폿 쓰는 법</div>
-              <div class="rrep-row"><b class="sc">4 : 3</b> 진행 →
-                <span class="w">승리팀 전원</span> · <span class="l">패배팀 전원</span></div>
-              <div class="rrep-note">늦게 온 사람도 <b>뛴 팀에 그대로</b> 체크합니다 · 인원이 달라도(4:3) 그대로 기록됩니다.</div>
-            </div>
-          </div>
-        </article>
-
-        <article class="rcard">
-          <div class="rcard-h"><span class="rnum">3</span>홀수인데 한 명이 더 들어올 경우</div>
-          <div class="rcard-b">
-            <p class="rtext">늦게 온 분은 <b>사람이 적은 팀</b>에 합류합니다.</p>
-            <div class="rex">
-              <div class="rex-h">예시</div>
-              <div class="rex-row"><b class="sc">5 : 6</b><span class="ar">→</span><b class="sc">6 : 6</b>
-                <span class="memo">늦은 참석자가 5명 팀으로</span></div>
-            </div>
-            <div class="rrep">
-              <div class="rrep-h">리폿 쓰는 법</div>
-              <div class="rrep-row"><b class="sc">6 : 6</b> 진행 →
-                <span class="w">승리팀 6명</span> · <span class="l">패배팀 6명</span></div>
-              <div class="rrep-note">늦게 합류한 사람도 <b>들어간 팀에 함께</b> 체크합니다.</div>
-            </div>
-          </div>
-        </article>
-
-        <article class="rcard">
-          <div class="rcard-h"><span class="rnum">4</span>짝수인데 한 명이 더 들어올 경우</div>
-          <div class="rcard-b">
-            <p class="rtext">늦게 온 분은 <b>무조건 호스트 반대편</b>으로 갑니다.
-              <b>호스트가 바뀌면 그때마다</b> 새 호스트의 반대편으로 옮깁니다.</p>
-            <div class="rrep">
-              <div class="rrep-h">리폿 쓰는 법</div>
-              <div class="rrep-row">들어간 팀에 <span class="w">그대로</span> 체크합니다</div>
-              <div class="rrep-note">따로 빼지 않습니다 · 그 팀이 이기면 승, 지면 패가 됩니다.</div>
-            </div>
-          </div>
-        </article>
-
-        <article class="rcard rcard-note">
-          <div class="rcard-h"><span class="rnum">5</span>참고사항</div>
-          <div class="rcard-b">
-            <p class="rtext">인원이 홀수일 경우 늦은 참석자는 <b>스코어와 관계없이</b>
-              언제나 호스트 반대편에서 플레이합니다.</p>
-            <div class="rflow">
-              <div class="rflow-h">경기 시작 시 <b>A팀</b>이 호스트라면</div>
-              <div class="rflow-row"><span class="t">경기 시작</span><span class="ar">→</span><b class="team">B팀</b></div>
-              <div class="rflow-row"><span class="t">중수 이후</span><span class="ar">→</span><b class="team">A팀</b></div>
-              <div class="rflow-row"><span class="t">막수</span><span class="ar">→</span><b class="team">B팀</b></div>
-            </div>
-          </div>
-        </article>
+          </article>
+        </div>
       </section>
 
       <!-- ── 랜덤팀 구성 ── -->
@@ -4793,7 +4793,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 132;
+const APP_VERSION = 133;
 let toldToRefresh = false;
 
 /**
