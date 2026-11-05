@@ -73,6 +73,24 @@ EC2 는 한도가 따로라 바로 만들어지는 일이 많다. 설치 스크�
 7. 고정 IP: **탄력적 IP → 할당 → 작업 → 연결** (인스턴스 `r6-relay`)
 8. 접속 창: 인스턴스 선택 → **연결 → EC2 Instance Connect → 연결**
 
+### Vultr 로 (AWS 계정이 막혔을 때 · 바로 됨)
+
+1. <https://www.vultr.com> 가입 → 결제 수단 등록
+2. **Deploy +** → **Deploy New Server**
+3. 종류 **Shared CPU**(Cloud Compute) · 위치 **Seoul**
+4. 이미지 **Ubuntu 24.04 LTS x64**
+5. 요금제: **IPv4 가 들어 있는 가장 싼 것**($5~6). *IPv6 only* 는 고르지 않는다
+6. **Automatic Backups 끄기** (켜 두면 요금이 20% 더 붙는다. 이 서버엔 지킬 데이터가 없다)
+7. **Additional Features → Cloud-Init User-Data** 를 켜고 위 1번의 세 줄을 붙여 넣는다
+   (항목이 안 보이면 건너뛰고 아래 *설치 확인* 에서 직접 설치한다)
+8. 호스트 이름 `r6-relay` → **Deploy Now**
+9. 서버 목록에서 **Running** 이 되면 그 화면의 **IP Address** 가 유저들이 들어올 주소다.
+   Vultr 는 서버를 지우지 않는 한 이 주소가 바뀌지 않아 고정 IP 를 따로 만들 필요가 없다.
+
+- 방화벽: Vultr 는 따로 만들지 않으면 클라우드 방화벽이 없다. 서버 안의 ufw 는 설치 스크립트가 연다.
+- 접속 창: Windows PC 의 명령 프롬프트에서 `ssh root@<서버IP>` → 서버 화면의 **Password** 를 붙여 넣는다
+  (붙여 넣어도 글자가 안 보이는 게 정상이다).
+
 ## 2. 설치 확인
 
 인스턴스 화면의 **Connect using SSH** 로 검은 창을 열고:
