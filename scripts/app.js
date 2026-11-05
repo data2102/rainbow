@@ -418,7 +418,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 123;
+const APP_VERSION = 124;
 let toldToRefresh = false;
 
 /**
@@ -3385,7 +3385,7 @@ function initTournamentEvents() {
   if (sel) sel.addEventListener('change', () => selectTourEdition(sel.value));
 
   // 대진표와 기록. 두 군데 모두 삭제 단추가 있다.
-  for (const id of ['koBracket', 'koLog']) {
+  for (const id of ['koBoard', 'koLog']) {
     const box = document.getElementById(id);
     if (!box) continue;
     box.addEventListener('click', e => {
