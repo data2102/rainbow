@@ -3525,11 +3525,8 @@ if (/[?&]room=\d+/.test(location.search)) {
     <!-- 회차 고르기. 순위 메뉴에서 지난 달을 고르는 것과 같은 자리다. -->
     <div class="month-bar">
       <span class="month-bar-k">대회 회차</span>
-      <select class="ed-select" id="tourEdSelect" aria-label="볼 대회 회차 선택">
-        <option value="3">3회차 (진행 중)</option>
-        <option value="2">2회차 (작성중)</option>
-        <option value="1">1회차 (종료)</option>
-      </select>
+      <!-- 선택지는 app.js 의 TOURNAMENT_EDITIONS 에서 만들어 넣는다 -->
+      <select class="ed-select" id="tourEdSelect" aria-label="볼 대회 회차 선택"></select>
       <span class="ed-past" id="tourEdNote"></span>
     </div>
 
@@ -3538,8 +3535,8 @@ if (/[?&]room=\d+/.test(location.search)) {
       <div class="panel hud-corner">
         <h2>2회차 대회 · Tournament</h2>
         <div class="ed-blank">
-          <div class="ed-blank-t">작성중</div>
-          <div class="ed-blank-s">2회차 기록은 아직 정리되지 않았습니다.</div>
+          <div class="ed-blank-t">종료</div>
+          <div class="ed-blank-s">2회차 기록은 따로 남아 있지 않습니다.</div>
         </div>
       </div>
     </div>

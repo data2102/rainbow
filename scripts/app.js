@@ -69,16 +69,19 @@ const MERCENARIES = ['RID_HoSiN', 'oK_LuCkY', 'SiLJanG', 'LOTUS_NaiLaRt'];
    순위 메뉴에서 지난 달을 고르는 것과 같다.
 
      1회차 — 5팀. 예선 풀리그 뒤 상위 4팀이 본선 2패 탈락. 끝난 대회라 보기만 한다.
-     2회차 — 아직 정리되지 않았다. 자리만 잡아두고 '작성중'으로 둔다.
+     2회차 — 끝난 대회지만 기록이 따로 남아 있지 않아 자리만 잡아두었다.
      3회차 — 4팀. 자리가 정해진 2패 탈락 여섯 판. 모두 3판 2선승. */
 
 /** 지금 진행 중인 회차. api/tournament.js 의 LATEST_EDITION 과 같아야 한다. */
 const TOURNAMENT_LATEST = 3;
 
-/** 회차 목록. 고르는 칸에 이 차례대로 들어간다 (최근 회차가 위). */
+/**
+ * 회차 목록. 고르는 칸에 이 차례대로 들어간다 (최근 회차가 위).
+ * 선택지도 여기서 만들어 쓴다 — 화면에 따로 적어두면 둘이 어긋난다.
+ */
 const TOURNAMENT_EDITIONS = [
   { id: 3, label: '3회차', state: '진행 중' },
-  { id: 2, label: '2회차', state: '작성중' },
+  { id: 2, label: '2회차', state: '종료' },
   { id: 1, label: '1회차', state: '종료' },
 ];
 
@@ -414,7 +417,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 120;
+const APP_VERSION = 121;
 let toldToRefresh = false;
 
 /**
@@ -3275,14 +3278,16 @@ function renderTourEdition() {
   if (sub) sub.textContent = `(${TOURNAMENT_LATEST}회차 진행중)`;
 
   const sel = document.getElementById('tourEdSelect');
-  if (sel && sel.value !== String(tourEdition)) sel.value = String(tourEdition);
+  if (sel) {
+    if (!sel.options.length) {
+      sel.innerHTML = TOURNAMENT_EDITIONS
+        .map(e => `<option value="${e.id}">${esc(e.label)} (${esc(e.state)})</option>`).join('');
+    }
+    if (sel.value !== String(tourEdition)) sel.value = String(tourEdition);
+  }
 
   const note = document.getElementById('tourEdNote');
-  if (note) {
-    note.textContent = tourEdition === 1 ? '끝난 대회입니다 · 보기만 할 수 있습니다'
-      : tourEdition === 2 ? '아직 정리되지 않은 회차입니다'
-      : '';
-  }
+  if (note) note.textContent = tourLive() ? '' : '끝난 대회입니다 · 보기만 할 수 있습니다';
   for (const ed of TOURNAMENT_EDITIONS) {
     const box = document.getElementById('tourEd' + ed.id);
     if (box) box.style.display = tourEdition === ed.id ? '' : 'none';
