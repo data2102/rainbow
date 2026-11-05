@@ -75,6 +75,14 @@ cmd_setup() {
   # 받은 스크립트를 명령으로 설치해 두면 PostUp 과 사람이 같은 것을 부른다
   [ "$(readlink -f "$0")" = "$SELF" ] || install -m 755 "$0" "$SELF"
 
+  # Vultr 등 일부 이미지는 ufw 가 켜져 있다. 우리 규칙이 앞에 서지만, ufw 를 다시 읽을 때도
+  # 막히지 않도록 ufw 에도 같은 구멍을 적어 둔다
+  if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q '^Status: active'; then
+    ufw allow "$WG_PORT/udp" >/dev/null
+    ufw allow 2346:2348/udp >/dev/null
+    ok "ufw 에 UDP $WG_PORT · 2346-2348 허용"
+  fi
+
   echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/99-r6relay.conf
   sysctl -q -p /etc/sysctl.d/99-r6relay.conf
   ok "패킷 전달 켜기"
