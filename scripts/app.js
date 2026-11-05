@@ -418,7 +418,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 124;
+const APP_VERSION = 125;
 let toldToRefresh = false;
 
 /**
@@ -5444,7 +5444,7 @@ function renderRoomView(r) {
   const actions = document.getElementById('roomActions');
   if (actions) {
     actions.innerHTML = host
-      ? `<button class="btn" id="roomStart">${r.running ? '주소 바꾸고 다시 실행' : '실행하기'}</button>
+      ? `<button class="btn" id="roomStart">${r.running ? '다시 실행' : '실행하기'}</button>
          <button class="btn-ghost" id="roomLeave">나가기</button>`
       : `<button class="btn" id="roomJoin" ${r.running ? '' : 'disabled'}>조인하기</button>
          <button class="btn-ghost" id="roomLeave">나가기</button>`;
@@ -5460,7 +5460,7 @@ function renderRoomView(r) {
   const note = document.getElementById('roomNote');
   if (note) {
     note.innerHTML = host
-      ? '실행하기에 내 접속 주소가 필요합니다.'
+      ? '방장 PC 에서 <b>WireGuard 가 활성</b> 상태여야 합니다 · 중계 서버에 등록된 방장만 열 수 있습니다.'
         + ' 방에 있는 모두가 함께 카운트다운을 보고 게임이 켜집니다.'
       : (r.running
         ? '게임이 안 켜졌다면 조인하기를 눌러주세요.'
@@ -5474,10 +5474,8 @@ function renderRoomView(r) {
  * 아직 없으면 그때 한 번 받는다 — 사람들이 찾아올 주소이므로 꼭 있어야 한다.
  */
 function startFlow() {
-  // 공인 IP 방식은 서버가 알아서 읽으므로 물어볼 것이 없다.
-  if (connMode !== 'radmin') { startRoom(''); return; }
-  if (savedAddress) { startRoom(savedAddress); return; }
-  showStartModal();
+  // 접속 주소는 서버가 정한다(중계 서버). 물어볼 것이 없다.
+  startRoom('');
 }
 
 /** 방장이 자기 Radmin 주소를 적는 창 */
@@ -5906,15 +5904,9 @@ async function startRoom(known) {
   const err = document.getElementById('startErr');
   const address = known !== undefined ? known : (input ? input.value.trim() : '');
   if (err) err.textContent = '';
-  if (connMode === 'radmin' && !address) {
-    const msg = '접속 주소를 적지 않으면 사람들이 찾아올 수 없습니다.';
-    if (err) err.textContent = msg; else showToast(msg);
-    return;
-  }
   try {
     const d = await apiPost('/api/room', { action: 'start', address });
     closeModal();
-    if (connMode === 'radmin') savedAddress = address || savedAddress;
     // 3·2·1 을 세고 게임을 띄운다. 방에 있는 사람들도 같은 시각에 맞춰 함께 센다.
     // 서버가 정한 주소를 그대로 쓴다 (공인 IP 방식이면 서버만 알고 있다).
     // 목록 새로고침을 기다리고 나서 세면 그만큼 3초가 깎인다. 먼저 세고,

@@ -29,7 +29,7 @@ export const MAX_TITLE = 24;
 export const PING_VERSION = 3;
 
 /** 사이트가 바뀌었는지 브라우저가 알아채는 표. 배포할 때마다 올린다. */
-export const APP_VERSION = 124;
+export const APP_VERSION = 125;
 
 /** 이 시간 동안 아무 신호가 없으면 나간 것으로 본다 (브라우저를 그냥 닫는 경우) */
 const IDLE_MS = 3 * 60 * 1000;
@@ -55,6 +55,13 @@ export const VPN_PASSWORD = '987654';
  * 참가자는 방에 걸린 주소로 붙기만 하므로 방 안에서 서로 달라도 상관없다.
  */
 export const CONN_MODES = ['auto', 'radmin'];
+
+/**
+ * 중계 서버(Vultr 서울). 모든 방의 접속 주소가 이것이다.
+ * 어느 방장에게 넘길지는 중계 서버 쪽에서 정한다(r6relay use <아이디>).
+ * 주소를 바꾸면 app.js 의 RELAY_ADDRESS 도 같이 바꾼다.
+ */
+export const RELAY_ADDRESS = '158.247.243.55';
 const DEFAULT_MODE = 'radmin';
 
 const MAX_MSG = 200;
@@ -769,32 +776,11 @@ async function start(req, res) {
   if (!rows.length) return res.status(400).json({ error: '먼저 방에 들어가주세요.' });
   const room = rows[0].room;
 
-  // 사람들이 찾아올 주소를 정한다. 방식은 각자 계정에 적혀 있다.
-  const who = await q(`SELECT radmin_ip, conn_mode FROM players WHERE handle = $1`, [me]);
-  const mode = (who.length && who[0].conn_mode) || DEFAULT_MODE;
-  let address;
-
-  if (mode === 'radmin') {
-    // 창에서 새로 적어 보냈으면 그것으로 갈아끼운다
-    address = cleanAddress(body(req).address) || (who.length ? who[0].radmin_ip : null);
-    if (!address) {
-      return res.status(400).json({ error: '접속 주소를 적어야 사람들이 찾아올 수 있습니다.' });
-    }
-    await q(`UPDATE players SET radmin_ip = $1 WHERE handle = $2`, [address, me]);
-  } else {
-    address = clientIp(req);
-    if (!address) {
-      return res.status(400).json({
-        error: '접속 주소를 읽지 못했습니다. 주소를 직접 적어서 해주세요.',
-      });
-    }
-    if (!isReachableIp(address)) {
-      return res.status(400).json({
-        error: `이 인터넷 회선(${address})은 밖에서 찾아올 수 없는 주소를 씁니다. `
-             + '방장을 하려면 Radmin 방식으로 바꿔주세요. (참가는 그대로 됩니다)',
-      });
-    }
-  }
+  // 사람들이 찾아올 주소는 언제나 중계 서버다. 서버가 UDP 2346~2348 을 지금 방장의
+  // WireGuard 터널로 넘긴다(relay/r6relay.sh). 화면이 보낸 주소는 받지 않는다 —
+  // 각자 주소를 적던 Radmin 방식은 걷어냈다.
+  const address = RELAY_ADDRESS;
+  const mode = 'relay';
 
   const first = await q(
     `SELECT handle FROM room_members WHERE room = $1 ORDER BY joined_at, handle LIMIT 1`, [room]
