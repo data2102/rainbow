@@ -80,7 +80,8 @@ cmd_setup() {
   if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q '^Status: active'; then
     ufw allow "$WG_PORT/udp" >/dev/null
     ufw allow 2346:2348/udp >/dev/null
-    ok "ufw 에 UDP $WG_PORT · 2346-2348 허용"
+    ufw allow 2346:2348/tcp >/dev/null
+    ok "ufw 에 UDP $WG_PORT · 2346-2348(UDP·TCP) 허용"
   fi
 
   echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/99-r6relay.conf
@@ -113,10 +114,15 @@ cmd_apply() {
   iptables -A R6_IN -p udp --dport "$WG_PORT" -j ACCEPT
   iptables -A R6_FWD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
   if [ -n "$host" ]; then
-    iptables -A R6_FWD -i "$wan" -o "$WG" -p udp -d "$host" --dport $GAME_PORTS -j ACCEPT
-    iptables -t nat -A R6_PRE -i "$wan" -p udp --dport $GAME_PORTS -j DNAT --to-destination "$host"
-    # 방장 PC 가 답을 다시 터널로 보내게 한다. 방장 쪽 라우팅을 건드리지 않아도 된다
-    iptables -t nat -A R6_POST -o "$WG" -p udp -d "$host" --dport $GAME_PORTS -j MASQUERADE
+    # 게임이 어느 쪽으로 붙는지 확인하지 못했다 — UDP 만 넘겼더니 접속이 한 개도 안 왔다.
+    # TCP 와 UDP 를 둘 다 넘긴다.
+    local proto
+    for proto in udp tcp; do
+      iptables -A R6_FWD -i "$wan" -o "$WG" -p "$proto" -d "$host" --dport $GAME_PORTS -j ACCEPT
+      iptables -t nat -A R6_PRE -i "$wan" -p "$proto" --dport $GAME_PORTS -j DNAT --to-destination "$host"
+      # 방장 PC 가 답을 다시 터널로 보내게 한다. 방장 쪽 라우팅을 건드리지 않아도 된다
+      iptables -t nat -A R6_POST -o "$WG" -p "$proto" -d "$host" --dport $GAME_PORTS -j MASQUERADE
+    done
   fi
 }
 
@@ -223,6 +229,14 @@ case "${1:-}" in
   list)   cmd_list ;;
   status) cmd_status ;;
   apply)  cmd_apply ;;
+  update)
+    need_root
+    curl -fsSL https://raw.githubusercontent.com/data2102/rainbow/main/relay/r6relay.sh -o "$SELF.new" \
+      && install -m 755 "$SELF.new" "$SELF" && rm -f "$SELF.new" || die "새 버전을 받지 못했습니다."
+    if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q '^Status: active'; then
+      ufw allow 2346:2348/tcp >/dev/null
+    fi
+    "$SELF" apply && ok "최신 규칙으로 다시 걸었습니다." ;;
   clear)  cmd_clear ;;
   *) sed -n '2,25p' "$0" ;;
 esac
