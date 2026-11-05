@@ -3574,10 +3574,11 @@ if (/[?&]room=\d+/.test(location.search)) {
               <span class="ko-stage">6경기</span>
               <span class="ko-win">Rambo 팀 승</span>
             </div>
+            <!-- 좌우는 위 '팀 구성' 카드와 같은 차례로 둔다 (CarloS · Rambo) -->
             <div class="ko-pair">
-              <div class="ko-side won"><span class="ko-nm">Rambo 팀</span><span class="ko-sc">5</span></div>
-              <span class="ko-vs">:</span>
               <div class="ko-side lost"><span class="ko-nm">CarloS 팀</span><span class="ko-sc">1</span></div>
+              <span class="ko-vs">:</span>
+              <div class="ko-side won"><span class="ko-nm">Rambo 팀</span><span class="ko-sc">5</span></div>
             </div>
             <div class="ko-games">
               <span class="ko-game"><b>1경기</b> Rambo 팀 승</span>
@@ -4795,7 +4796,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 122;
+const APP_VERSION = 123;
 let toldToRefresh = false;
 
 /**
