@@ -62,6 +62,7 @@ if not "%HITLAYER%"=="1" echo   [-] no compatibility flag was set - nothing to c
 rem ---------- 3. the firewall rules ----------
 netsh advfirewall firewall delete rule name="Rainbow Six (r6rank)" >nul 2>&1
 netsh advfirewall firewall delete rule name="Rainbow Six UDP (r6rank)" >nul 2>&1
+netsh advfirewall firewall delete rule name="Rainbow Six TCP (r6rank)" >nul 2>&1
 netsh advfirewall firewall delete rule name="Rainbow Six PING (r6rank)" >nul 2>&1
 echo   [O] firewall rules removed - Windows will ask again next time
 

@@ -15,6 +15,8 @@ rem
 rem  Opens:
 rem   - RainbowSix.exe (in and out)
 rem   - UDP 2346 (JOIN) 2347 (ANNOUNCE) 2348 (INFO)
+rem   - TCP 2346 - 2348 as well: joining through the relay server showed
+rem     the game connects to JOIN over TCP, not only UDP
 rem   - ping replies, used by the launcher to warm the path
 rem
 rem  ASCII only on purpose - see the note in r6launch.bat.
@@ -42,6 +44,7 @@ echo.
 rem drop old rules first so repeated runs do not pile up
 netsh advfirewall firewall delete rule name="Rainbow Six (r6rank)" >nul 2>&1
 netsh advfirewall firewall delete rule name="Rainbow Six UDP (r6rank)" >nul 2>&1
+netsh advfirewall firewall delete rule name="Rainbow Six TCP (r6rank)" >nul 2>&1
 netsh advfirewall firewall delete rule name="Rainbow Six PING (r6rank)" >nul 2>&1
 
 rem  Windows writes a BLOCK rule of its own if anyone ever pressed Cancel on
@@ -67,15 +70,20 @@ netsh advfirewall firewall add rule name="Rainbow Six UDP (r6rank)" dir=in  acti
 netsh advfirewall firewall add rule name="Rainbow Six UDP (r6rank)" dir=out action=allow protocol=UDP localport=2346-2348 enable=yes profile=any >nul
 echo   [O] UDP 2346 - 2348 opened
 
+netsh advfirewall firewall add rule name="Rainbow Six TCP (r6rank)" dir=in  action=allow protocol=TCP localport=2346-2348 enable=yes profile=any >nul
+netsh advfirewall firewall add rule name="Rainbow Six TCP (r6rank)" dir=out action=allow protocol=TCP localport=2346-2348 enable=yes profile=any >nul
+echo   [O] TCP 2346 - 2348 opened
+
 netsh advfirewall firewall add rule name="Rainbow Six PING (r6rank)" dir=in action=allow protocol=icmpv4:8,any enable=yes profile=any >nul
 echo   [O] ping replies allowed
 
 echo.
 echo   Done. Open the game and try connecting again.
 echo.
-echo   To undo, paste these three lines into this window:
+echo   To undo, paste these four lines into this window:
 echo     netsh advfirewall firewall delete rule name="Rainbow Six (r6rank)"
 echo     netsh advfirewall firewall delete rule name="Rainbow Six UDP (r6rank)"
+echo     netsh advfirewall firewall delete rule name="Rainbow Six TCP (r6rank)"
 echo     netsh advfirewall firewall delete rule name="Rainbow Six PING (r6rank)"
 echo.
 pause

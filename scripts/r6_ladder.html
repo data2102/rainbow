@@ -4183,31 +4183,9 @@ if (/[?&]room=\d+/.test(location.search)) {
       <div class="panel-head">
         <h2>런쳐 · Launcher</h2>
       </div>
-      <div class="vpn-bar vpn-stack" id="vpnBar" style="display:none;">
-        <div class="vpn-title">■ Radmin VPN 정보</div>
-        <div class="vpn-line">
-          <span class="vpn-k">설정 경로</span>
-          <span class="vpn-path">Radmin 설치 › 네트워크 › 네트워크 연결</span>
-        </div>
-        <div class="vpn-line">
-          <span class="vpn-k">아이디</span>
-          <code class="vpn-v" id="vpnName"></code>
-        </div>
-        <div class="vpn-line" id="vpnPwWrap" style="display:none;">
-          <span class="vpn-k">비밀번호</span>
-          <code class="vpn-v" id="vpnPw"></code>
-        </div>
-        <div class="vpn-line" id="myIpBar" style="display:none;">
-          <span class="vpn-k">내 접속 주소</span>
-          <code class="vpn-v" id="myIpValue"></code>
-          <span class="vpn-path" id="myIpKind"></span>
-          <button type="button" class="btn-mini btn-edit" id="myIpEdit">방식 바꾸기</button>
-        </div>
-        <div class="vpn-note" id="myIpNote" style="display:none;"></div>
-      </div>
 
       <div class="dl-box">
-        <div class="dl-h">■ 필수사항</div>
+        <div class="dl-h">■ 처음 한 번 · 모두</div>
 
         <div class="dl-row">
           <span class="dl-n">1</span>
@@ -4220,8 +4198,7 @@ if (/[?&]room=\d+/.test(location.search)) {
           <span class="dl-n">2</span>
           <a class="dl-a" href="/r6launch.bat" download>r6launch.bat</a>
           <span class="dl-d"><code>C:\R6Clan\</code> 폴더를 만들어 그 안에 넣기 ·
-            <b>이 경로가 아니면 동작하지 않습니다.</b>
-            따로 설치할 프로그램은 없습니다.</span>
+            <b>이 경로가 아니면 동작하지 않습니다.</b></span>
         </div>
 
         <div class="dl-row">
@@ -4231,50 +4208,24 @@ if (/[?&]room=\d+/.test(location.search)) {
             <b>내 컴퓨터</b>의 윈도우 방화벽을 엽니다. 안 열면 접속이 느립니다.</span>
         </div>
 
-        <details class="dl-row dl-block">
-          <summary class="dl-head">
-            <span class="dl-n">4</span>
-            <span class="dl-t">MULTIPLAYER OPTIONS 설정</span>
-          </summary>
-          <ul class="opt-list">
-            <li><b>ANNOUNCE SERVER</b> <span>해제</span> — <b>꺼두세요.</b> 켜두면 방이
-                모두의 <kbd>JOIN GAME</kbd> 목록에 떠서, 런쳐를 거치지 않고도 아무나
-                들어옵니다. 끄면 <b>주소를 아는 사람만</b> 들어올 수 있고,
-                그 주소는 사이트에서 <b>같은 방에 들어와 있는 사람에게만</b> 보입니다</li>
-            <li data-mode="radmin"><b>INTERNET / LAN</b> <span>LAN</span> —
-                Radmin 이 랜처럼 이어주므로 <b>LAN 이 더 빠릅니다.</b>
-                이 값은 게임이 응답을 얼마나 참고 기다릴지를 정합니다 —
-                INTERNET 은 느린 회선을 가정해 한참 기다립니다.</li>
-            <li data-mode="auto"><b>INTERNET / LAN</b> <span>INTERNET</span> —
-                공인 IP 로 곧장 붙는 방식이라 INTERNET 이 맞습니다.</li>
-            <li><b>BEHIND FIREWALL</b> <span>NO</span> — YES 로 두면 느려집니다.
-                대신 아래 포트를 열어주세요</li>
-            <li><b>JOIN PORT</b> <span>2346</span> · <b>ANNOUNCE PORT</b> <span>2347</span> ·
-                <b>INFO PORT</b> <span>2348</span> — 기본값 그대로</li>
-          </ul>
-          <p class="setup-warn"><b>ANNOUNCE SERVER 를 끄면 <kbd>JOIN GAME</kbd> 목록에
-             아무것도 안 뜨는 것이 정상입니다.</b> 그게 목적입니다 —
-             런쳐가 알려주는 주소로만 들어오게 하려는 것입니다.
-             참가자는 런쳐가 알아서 그 주소로 붙여줍니다.</p>
-          <p class="setup-warn">그래도 목록에서 들어오게 하고 싶다면 ANNOUNCE 를 켜두시면
-             됩니다. 다만 여러 방이 동시에 열리면 목록에 다 떠서
-             <b>엉뚱한 방에 들어가는 일</b>이 생깁니다.</p>
-        </details>
-
-        <div class="dl-row dl-host" data-mode="auto">
-          <span class="dl-n">＋</span>
-          <a class="dl-a" href="/r6upnp.bat" download>r6upnp.bat</a>
-          <span class="dl-d"><b>지금은 안 하셔도 됩니다</b> · Radmin 을 쓰면 공유기를
-            건드릴 일이 없습니다. 나중에 <b>Radmin 없이</b> 공인 IP 로 방장을 하고 싶을 때만,
-            그때 관리자 권한으로 실행하세요.</span>
+        <div class="dl-h" style="margin-top:var(--sp-5);">■ 참가자</div>
+        <div class="dl-row">
+          <span class="dl-n">✓</span>
+          <span class="dl-d">방에 들어가 <b>조인하기</b>만 누르면 됩니다 ·
+            게임이 <b>중계 서버</b>를 거쳐 방장에게 붙습니다. 따로 켤 프로그램은 없습니다.</span>
         </div>
 
-        <div class="dl-row dl-undo">
-          <span class="dl-n">↺</span>
-          <a class="dl-a" href="/r6restore.bat" download>r6restore.bat</a>
-          <span class="dl-d"><b>깔고 나서 문제가 생겼을 때만</b> · 오른쪽 클릭 →
-            <b>관리자 권한으로 실행</b> · 위 ①②③ 이 바꿔놓은 것을 모두 되돌립니다.
-            게임과 Radmin, 게임 설정은 건드리지 않습니다.</span>
+        <div class="dl-h" style="margin-top:var(--sp-5);">■ 방장 · 중계 서버에 등록된 사람만</div>
+        <div class="dl-row">
+          <span class="dl-n">A</span>
+          <a class="dl-a" href="https://www.wireguard.com/install/" target="_blank" rel="noopener">WireGuard</a>
+          <span class="dl-d">처음 한 번 · 설치하고 <b>관리자에게 받은 설정</b>을 "빈 터널 추가"에 붙여 넣어
+            저장합니다. 설정은 사람마다 다르니 다른 사람에게 주지 마세요.</span>
+        </div>
+        <div class="dl-row">
+          <span class="dl-n">B</span>
+          <span class="dl-d">게임할 때마다 · WireGuard 의 터널을 <b>활성화</b>한 채로 방을 만들고
+            <b>실행하기</b>를 누릅니다. 방장을 하고 싶으면 관리자에게 등록을 부탁하세요.</span>
         </div>
 
         <div class="dl-sub" id="dlSub"></div>
