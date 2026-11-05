@@ -4,12 +4,52 @@ Radmin 없이 게임에 들어가게 해 주는 서버입니다.
 
 ```
 유저들 ──(그냥 접속)──▶ 중계 서버 ◀──(방장만 연결)── 방장 PC
-          UDP 2346~2348                WireGuard 터널
+          TCP·UDP 2346~2348            WireGuard 터널
 ```
 
 - **유저는 아무것도 설치하지 않습니다.** 방장 IP 대신 중계 서버 주소로 들어갑니다.
 - **방장 공유기·CGNAT 와 상관없습니다.** 방장 PC 가 중계 서버로 *먼저 나가서* 연결해 두기 때문입니다.
 - 방장의 다른 인터넷(웹, 디스코드 등)은 터널을 타지 않습니다. 중계 서버 대역(`10.66.0.0/24`)만 보냅니다.
+
+## 방장 가이드 (현재 버전 · 2026-11-05 접속 확인)
+
+이 게임은 **TCP 2346** 으로 접속하고, 방장 게임은 **집 공유기 주소(192.168.x.x)에서만** 기다린다.
+그래서 방장 PC 에는 WireGuard 말고도 **방화벽(TCP)** 과 **넘기기 설정(portproxy)** 이 필요하다.
+
+### 처음 한 번
+1. 관리자에게 받은 설정으로 **WireGuard** 터널 `r6relay` 만들기 (빈 터널 추가 → 붙여 넣기 → 저장)
+2. 사이트 런쳐의 **최신 `r6firewall.bat`** 을 관리자 권한으로 실행 → `[O] TCP 2346 - 2348 opened` 확인
+3. 게임 **MULTIPLAYER → OPTIONS**: ANNOUNCE SERVER 해제, 포트 2346/2347/2348 기본값
+4. cmd 에서 `ipconfig` → 인터넷이 연결된 랜카드의 **IPv4 주소**(예: `192.168.0.15`) 확인
+5. **관리자 권한 cmd** 에서 (내 터널 주소는 관리자가 알려 준다. 예: `10.66.0.2`)
+   ```
+   netsh interface portproxy add v4tov4 listenaddress=내터널주소 listenport=2346 connectaddress=내IPv4주소 connectport=2346
+   ```
+   `netsh interface portproxy show all` 로 확인
+
+### 게임할 때마다
+1. WireGuard `r6relay` **활성화** → cmd 에서 `ping 10.66.0.1` 응답 확인
+2. 관리자에게 "오늘 방장 나" 라고 알리기 (관리자가 `r6relay use 아이디`)
+3. 사이트 런쳐에서 방 만들고 **실행하기** → 대기 화면
+4. 회원들은 **조인하기**
+
+### 집 주소(IPv4)가 바뀌었을 때
+`ipconfig` 로 새 주소를 보고, 관리자 권한 cmd 에서 지웠다가 다시 넣는다.
+```
+netsh interface portproxy delete v4tov4 listenaddress=내터널주소 listenport=2346
+```
+그다음 위 5번 다시.
+
+### 관리자가 볼 것
+- `ssh r6 r6relay status` — 지금 방장, 방장 터널 연결(handshake 1분 이내)
+- `ssh r6 r6relay log 30` — 참가자마다 어디서 끊겼는지
+
+| log 의 `=>` | 원인 |
+|---|---|
+| 방장이 지정돼 있지 않음 | `r6relay use` 안 함 |
+| 방장 PC 가 아무 답도 안 함 | 방장 방화벽·백신, WireGuard 꺼짐 |
+| 방장 PC 가 거절 | 방장 게임이 안 떠 있거나 **portproxy 가 없음/주소가 바뀜** |
+| 길은 끝까지 이어짐 | 중계 정상 |
 
 ## 1. 서버 만들기 (AWS Lightsail, 휴대폰으로 가능)
 
