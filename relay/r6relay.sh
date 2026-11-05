@@ -59,8 +59,9 @@ reload() {
 cmd_setup() {
   need_root
   echo "== 중계 서버 설치 =="
-  apt-get update -y >/dev/null
-  DEBIAN_FRONTEND=noninteractive apt-get install -y wireguard iptables curl >/dev/null
+  # 서버를 처음 켤 때(시작 스크립트) 돌면 자동 업데이트가 apt 를 잡고 있다 - 풀릴 때까지 기다린다
+  apt-get -o DPkg::Lock::Timeout=600 update -y >/dev/null
+  DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 install -y wireguard iptables curl >/dev/null
   ok "WireGuard 설치"
 
   install -d -m 700 "$DIR" "$DIR/hosts"
@@ -132,6 +133,11 @@ next_ip() {
 cmd_add() {
   need_root; local name=${1:-}; [ -n "$name" ] || die "사용법: r6relay add <방장이름>"; valid_name "$name"
   [ -e "$DIR/hosts/$name.ip" ] && die "이미 있는 이름입니다: $name  (파일: $DIR/hosts/$name.conf)"
+  # 고정 IP 는 설치 뒤에 붙이는 일이 많다. 방장 파일을 만들 때마다 지금 주소를 다시 읽는다
+  local now; now=$(curl -4 -fsS --max-time 5 https://api.ipify.org 2>/dev/null || true)
+  if [[ "$now" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] && [ "$now" != "$(cat "$DIR/endpoint")" ]; then
+    echo "$now" > "$DIR/endpoint"; ok "서버 주소가 바뀌어 $now 로 맞췄습니다."
+  fi
   local key pub ip
   key=$(wg genkey); pub=$(wg pubkey <<<"$key"); ip=$(next_ip)
   echo "$ip" > "$DIR/hosts/$name.ip"
