@@ -18,6 +18,8 @@
 #    sudo r6relay off                  stop sending games
 #    sudo r6relay status               who is connected, traffic
 #    sudo r6relay list | remove <name>
+#    sudo r6relay log [minutes]        what happened (default 30 min)
+#    sudo r6relay update               fetch the latest script
 # ============================================================
 set -euo pipefail
 
@@ -27,8 +29,12 @@ NET=10.66.0                # tunnel network, relay is .1
 WG_PORT=51820
 GAME_PORTS=2346:2348       # JOIN / ANNOUNCE / INFO
 SELF=/usr/local/sbin/r6relay
+LOGDIR=${R6_LOGDIR:-/var/log/r6relay}
+LOG_SVC=r6relay-log
 
 die()  { echo "  [X] $*" >&2; exit 1; }
+# 누가 언제 방장이 됐는지. 접속 기록과 맞춰 봐야 "그때 누구에게 넘겼나"를 안다
+event() { mkdir -p "$LOGDIR"; echo "$(TZ=Asia/Seoul date '+%F %T') $*" >> "$LOGDIR/events.log"; }
 ok()   { echo "  [O] $*"; }
 need_root() { [ "$(id -u)" -eq 0 ] || die "sudo 로 실행해 주세요."; }
 wan_if() { ip -4 route show default | awk '{for(i=1;i<=NF;i++) if($i=="dev"){print $(i+1); exit}}'; }
@@ -88,6 +94,7 @@ cmd_setup() {
   sysctl -q -p /etc/sysctl.d/99-r6relay.conf
   ok "패킷 전달 켜기"
 
+  ensure_log
   write_conf
   systemctl enable "wg-quick@$WG" >/dev/null 2>&1
   systemctl restart "wg-quick@$WG"
@@ -98,8 +105,46 @@ cmd_setup() {
   echo "   2) sudo r6relay add <방장이름>   으로 방장 터널 파일을 만드세요."
 }
 
+# 게임 포트로 오가는 것을 24시간 적어 둔다. 시험할 때 시간을 맞춰 tcpdump 를 돌리지
+# 않아도, 나중에 'r6relay log' 로 그때 무슨 일이 있었는지 볼 수 있다.
+# 터널(wg0) 쪽도 같이 적어서 "방장에게 넘어갔나 / 방장이 답했나"까지 보인다.
+ensure_log() {
+  [ -f "/etc/systemd/system/$LOG_SVC.service" ] && return 0
+  command -v tcpdump >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 install -y tcpdump >/dev/null
+  mkdir -p "$LOGDIR"
+  cat > "/etc/systemd/system/$LOG_SVC.service" <<UNIT
+[Unit]
+Description=r6relay game traffic log
+After=network-online.target
+
+[Service]
+Environment=TZ=Asia/Seoul
+ExecStart=/bin/sh -c 'exec $(command -v tcpdump) -ni any -l -tttt "portrange 2346-2348" >> $LOGDIR/traffic.log 2>/dev/null'
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+  cat > /etc/logrotate.d/r6relay <<ROT
+$LOGDIR/*.log {
+  daily
+  rotate 7
+  compress
+  missingok
+  notifempty
+  copytruncate
+}
+ROT
+  systemctl daemon-reload
+  # 부팅 중 wg-quick 의 PostUp 에서 불릴 수 있다 — 기다리면 서로 막히므로 --no-block
+  systemctl enable --now --no-block "$LOG_SVC" >/dev/null 2>&1 || true
+  ok "접속 기록 시작 ($LOGDIR)"
+}
+
 # 게임 포트를 지금 방장에게 넘기는 규칙. 우리 체인만 만지므로 다른 규칙은 건드리지 않는다
 cmd_apply() {
+  ensure_log
   local wan host; wan=$(wan_if); [ -n "$wan" ] || die "인터넷 쪽 네트워크 장치를 찾지 못했습니다."
   host=$(cat "$DIR/current.ip" 2>/dev/null || true)
 
@@ -171,25 +216,26 @@ CONF
 )
   reload
   ok "$name 등록 ($ip)"
+  event "add $name $ip"
+  # 비밀키는 화면에 찍지 않는다 — 화면을 그대로 복사해 단톡방·채팅에 붙이는 일이 잦았다.
   echo
-  echo "  아래 내용을 방장 PC 에 r6relay-$name.conf 로 저장해 WireGuard 에서 가져오세요."
-  echo "  (비밀키가 들어 있습니다. 그 방장에게만 주세요.)"
-  echo "  ----------------------------------------------------------"
-  cat "$DIR/hosts/$name.conf"
-  echo "  ----------------------------------------------------------"
+  echo "  방장 PC 용 설정(비밀키 포함)은 화면에 띄우지 않습니다. 맥에서 이렇게 복사하세요:"
+  echo "    ssh r6 cat $DIR/hosts/$name.conf | pbcopy"
+  echo "  그 방장에게만 1:1 로 보내세요."
 }
 
 cmd_use() {
   need_root; local name=${1:-}; [ -n "$name" ] || die "사용법: r6relay use <방장이름>"; valid_name "$name"
   [ -e "$DIR/hosts/$name.ip" ] || die "등록되지 않은 방장입니다: $name"
   cp "$DIR/hosts/$name.ip" "$DIR/current.ip"; echo "$name" > "$DIR/current.name"
+  event "use $name $(cat "$DIR/current.ip")"
   cmd_apply
   ok "이제 게임은 $name ($(cat "$DIR/current.ip")) 에게 갑니다."
   echo "  유저 접속 주소: $(cat "$DIR/endpoint")"
 }
 
 cmd_off() {
-  need_root; rm -f "$DIR/current.ip" "$DIR/current.name"; cmd_apply; ok "게임 넘기기를 멈췄습니다."
+  need_root; rm -f "$DIR/current.ip" "$DIR/current.name"; cmd_apply; event "off"; ok "게임 넘기기를 멈췄습니다."
 }
 
 cmd_remove() {
@@ -197,6 +243,7 @@ cmd_remove() {
   [ -e "$DIR/hosts/$name.ip" ] || die "등록되지 않은 방장입니다: $name"
   [ "$(cat "$DIR/current.name" 2>/dev/null)" = "$name" ] && cmd_off
   rm -f "$DIR/hosts/$name".{ip,peer,conf}
+  event "remove $name"
   reload; ok "$name 삭제"
 }
 
@@ -220,6 +267,99 @@ cmd_status() {
   iptables -t nat -L R6_PRE -v -n 2>/dev/null | sed 's/^/    /'
 }
 
+# 최근 N 분 동안 무슨 일이 있었는지 사람 말로 풀어 보인다.
+cmd_log() {
+  need_root
+  local mins=${1:-30}
+  [[ "$mins" =~ ^[0-9]+$ ]] || { [ "$mins" = raw ] && { tail -n 80 "$LOGDIR/traffic.log" 2>/dev/null; return; }; die "사용법: r6relay log [분|raw]"; }
+  [ -f "$LOGDIR/traffic.log" ] || die "아직 기록이 없습니다. 'r6relay apply' 를 한 번 실행했는지 확인하세요."
+  local since; since=$(TZ=Asia/Seoul date -d "-$mins min" '+%F %T')
+  python3 - "$since" "$LOGDIR/events.log" "$LOGDIR/traffic.log" "$(cat "$DIR/current.name" 2>/dev/null)" <<'PY'
+import re, sys
+from collections import defaultdict, OrderedDict
+since, evf, trf, cur = sys.argv[1:5]
+print(f"== {since[5:16]} 이후 ==   지금 방장: {cur or '없음'}")
+print()
+print("[방장 변경]")
+n = 0
+try:
+    for line in open(evf, encoding="utf-8"):
+        if line[:19] >= since:
+            print("  " + line.rstrip()[5:]); n += 1
+except FileNotFoundError:
+    pass
+if not n: print("  (없음)")
+print()
+
+pat = re.compile(r'^(\S+ \S+) (\S+)\s+(In|Out)\s+IP (\d+\.\d+\.\d+\.\d+)\.(\d+) > (\d+\.\d+\.\d+\.\d+)\.(\d+): (.*)$')
+def kind(rest):
+    m = re.search(r'Flags \[([^\]]+)\]', rest)
+    if m:
+        f = m.group(1)
+        if f == 'S': return 'SYN'
+        if f == 'S.': return 'SYN-ACK'
+        if 'R' in f: return 'RST'
+        return 'TCP'
+    return 'UDP' if 'UDP' in rest else 'ETC'
+def wg(ip): return ip.startswith('10.66.0.')
+
+flows = OrderedDict()            # (guest ip, guest port) -> counters
+by_port = {}                     # guest port -> key (MASQUERADE 가 보통 포트를 그대로 둔다)
+host_first = []                  # 방장이 먼저 밖으로 보낸 것
+for line in open(trf, encoding="utf-8", errors="replace"):
+    m = pat.match(line)
+    if not m or m.group(1)[:19] < since: continue
+    ts, ifc, d, sip, sp, dip, dp, rest = m.groups()
+    t = ts[11:19]; k = kind(rest)
+    if ifc != 'wg0' and d == 'In' and not wg(sip):
+        key = (sip, sp)
+        f = flows.setdefault(key, {'first': t, 'last': t, 'port': dp, 'proto': 'TCP' if k != 'UDP' else 'UDP',
+                                   'came': 0, 'fwd': 0, 'host': defaultdict(int), 'back': 0})
+        f['came'] += 1; f['last'] = t; by_port[sp] = key
+    elif ifc == 'wg0' and d == 'Out' and sip == '10.66.0.1':
+        key = by_port.get(sp)
+        if key: flows[key]['fwd'] += 1
+    elif ifc == 'wg0' and d == 'In' and wg(sip):
+        key = by_port.get(dp) if dip == '10.66.0.1' else None
+        if key: flows[key]['host'][k] += 1
+        else: host_first.append(f"  {t}  {sip}:{sp} -> {dip}:{dp}  {k}")
+    elif ifc != 'wg0' and d == 'Out' and not wg(dip):
+        key = (dip, dp)
+        if key in flows: flows[key]['back'] += 1
+
+print("[참가자 접속]")
+if not flows:
+    print("  (없음) - 이 시간 동안 중계 서버 2346~2348 로 온 접속이 하나도 없습니다.")
+per_ip = OrderedDict()
+for (ip, port), f in flows.items():
+    per_ip.setdefault(ip, []).append(f)
+for ip, fs in per_ip.items():
+    came = sum(f['came'] for f in fs); fwd = sum(f['fwd'] for f in fs); back = sum(f['back'] for f in fs)
+    host = defaultdict(int)
+    for f in fs:
+        for k2, v in f['host'].items(): host[k2] += v
+    ports = sorted({f"{f['proto']} {f['port']}" for f in fs})
+    print(f"  {ip}   {fs[0]['first']} ~ {fs[-1]['last']}   {', '.join(ports)}")
+    hs = ', '.join(f"{k2} {v}" for k2, v in host.items()) or '없음'
+    print(f"    도착 {came}  ->  방장에게 넘김 {fwd}  ->  방장 답 [{hs}]  ->  참가자에게 돌려줌 {back}")
+    if fwd == 0:
+        why = "방장이 지정돼 있지 않거나 넘기는 규칙이 없음 (r6relay use / apply 확인)"
+    elif not host:
+        why = "방장 PC 가 아무 답도 안 함 -> 방장 PC 방화벽·백신이 막거나 WireGuard 가 꺼짐"
+    elif host.get('RST') and not host.get('SYN-ACK'):
+        why = "방장 PC 가 '받을 게임이 없다'고 거절 -> 방장 게임이 대기 화면까지 안 떠 있음"
+    elif back == 0:
+        why = "방장은 답했는데 참가자에게 못 돌려줌 -> 중계 서버 규칙 문제 (알려 주세요)"
+    else:
+        why = "길은 끝까지 이어짐 -> 이래도 안 들어가지면 게임 쪽 문제"
+    print(f"    => {why}")
+print()
+print("[방장이 먼저 밖으로 보낸 것]")
+for l in host_first[-15:]: print(l)
+if not host_first: print("  (없음)")
+PY
+}
+
 case "${1:-}" in
   setup)  cmd_setup ;;
   add)    cmd_add "${2:-}" ;;
@@ -228,6 +368,7 @@ case "${1:-}" in
   remove) cmd_remove "${2:-}" ;;
   list)   cmd_list ;;
   status) cmd_status ;;
+  log)    cmd_log "${2:-}" ;;
   apply)  cmd_apply ;;
   update)
     need_root
@@ -236,6 +377,7 @@ case "${1:-}" in
     if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q '^Status: active'; then
       ufw allow 2346:2348/tcp >/dev/null
     fi
+    event "update"
     "$SELF" apply && ok "최신 규칙으로 다시 걸었습니다." ;;
   clear)  cmd_clear ;;
   *) sed -n '2,25p' "$0" ;;
