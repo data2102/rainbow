@@ -4184,19 +4184,6 @@ if (/[?&]room=\d+/.test(location.search)) {
         <h2>런쳐 · Launcher</h2>
       </div>
       <div class="vpn-bar vpn-stack" id="vpnBar" style="display:none;">
-        <div class="vpn-title">■ Radmin VPN 정보</div>
-        <div class="vpn-line">
-          <span class="vpn-k">설정 경로</span>
-          <span class="vpn-path">Radmin 설치 › 네트워크 › 네트워크 연결</span>
-        </div>
-        <div class="vpn-line">
-          <span class="vpn-k">아이디</span>
-          <code class="vpn-v" id="vpnName"></code>
-        </div>
-        <div class="vpn-line" id="vpnPwWrap" style="display:none;">
-          <span class="vpn-k">비밀번호</span>
-          <code class="vpn-v" id="vpnPw"></code>
-        </div>
         <div class="vpn-line" id="myIpBar" style="display:none;">
           <span class="vpn-k">내 접속 주소</span>
           <code class="vpn-v" id="myIpValue"></code>
@@ -4242,9 +4229,8 @@ if (/[?&]room=\d+/.test(location.search)) {
                 들어옵니다. 끄면 <b>주소를 아는 사람만</b> 들어올 수 있고,
                 그 주소는 사이트에서 <b>같은 방에 들어와 있는 사람에게만</b> 보입니다</li>
             <li data-mode="radmin"><b>INTERNET / LAN</b> <span>LAN</span> —
-                Radmin 이 랜처럼 이어주므로 <b>LAN 이 더 빠릅니다.</b>
                 이 값은 게임이 응답을 얼마나 참고 기다릴지를 정합니다 —
-                INTERNET 은 느린 회선을 가정해 한참 기다립니다.</li>
+                INTERNET 은 느린 회선을 가정해 한참 기다리므로 <b>LAN 이 더 빠릅니다.</b></li>
             <li data-mode="auto"><b>INTERNET / LAN</b> <span>INTERNET</span> —
                 공인 IP 로 곧장 붙는 방식이라 INTERNET 이 맞습니다.</li>
             <li><b>BEHIND FIREWALL</b> <span>NO</span> — YES 로 두면 느려집니다.
@@ -4264,9 +4250,8 @@ if (/[?&]room=\d+/.test(location.search)) {
         <div class="dl-row dl-host" data-mode="auto">
           <span class="dl-n">＋</span>
           <a class="dl-a" href="/r6upnp.bat" download>r6upnp.bat</a>
-          <span class="dl-d"><b>지금은 안 하셔도 됩니다</b> · Radmin 을 쓰면 공유기를
-            건드릴 일이 없습니다. 나중에 <b>Radmin 없이</b> 공인 IP 로 방장을 하고 싶을 때만,
-            그때 관리자 권한으로 실행하세요.</span>
+          <span class="dl-d"><b>지금은 안 하셔도 됩니다</b> · 나중에 공인 IP 로 직접
+            방장을 하고 싶을 때만, 그때 관리자 권한으로 실행하세요.</span>
         </div>
 
         <div class="dl-row dl-undo">
@@ -4274,7 +4259,7 @@ if (/[?&]room=\d+/.test(location.search)) {
           <a class="dl-a" href="/r6restore.bat" download>r6restore.bat</a>
           <span class="dl-d"><b>깔고 나서 문제가 생겼을 때만</b> · 오른쪽 클릭 →
             <b>관리자 권한으로 실행</b> · 위 ①②③ 이 바꿔놓은 것을 모두 되돌립니다.
-            게임과 Radmin, 게임 설정은 건드리지 않습니다.</span>
+            게임과 게임 설정은 건드리지 않습니다.</span>
         </div>
 
         <div class="dl-sub" id="dlSub"></div>

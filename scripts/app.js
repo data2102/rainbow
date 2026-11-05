@@ -418,7 +418,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 123;
+const APP_VERSION = 124;
 let toldToRefresh = false;
 
 /**
@@ -5098,17 +5098,20 @@ function renderMyIp() {
   val.textContent = addr || '아직 없음';
   // 방식을 고를 게 없으면 버튼은 주소를 적는 일만 한다
   btn.textContent = SHOW_CONN_MODE ? '방식 바꾸기' : (addr ? '주소 수정' : '주소 적기');
-  if (kind) kind.textContent = mode === 'radmin' ? 'Radmin' : '공인 IP · 자동';
+  if (kind) {
+    kind.textContent = mode === 'radmin' ? '' : '공인 IP · 자동';
+    kind.style.display = kind.textContent ? '' : 'none';   // 빈 칩이 남지 않게
+  }
 
   if (!note) return;
   note.classList.toggle('warn', mode === 'auto' && !publicIpUsable);
-  note.classList.toggle('must', mode === 'radmin' && !!addr);
+  note.classList.remove('must');
   if (mode === 'radmin') {
     note.textContent = addr
-      ? '※ Radmin VPN이 실행되어 있어야 게임 접속이 가능합니다.'
-      : 'Radmin 창의 내 주소(26.…)를 적어주세요.';
+      ? '방장이 되면 사람들이 이 주소로 들어옵니다.'
+      : '방장을 하려면 접속 주소를 적어주세요.';
   } else if (!publicIpUsable) {
-    note.textContent = '이 회선은 밖에서 찾아올 수 없는 주소입니다 · 방장을 하려면 Radmin 방식으로 바꿔주세요.';
+    note.textContent = '이 회선은 밖에서 찾아올 수 없는 주소입니다 · 방장을 하려면 주소를 직접 적어주세요.';
   } else {
     note.textContent = '적을 것이 없습니다 · 방장을 하려면 공유기에 UDP 2346 을 열어두세요.';
   }
@@ -5184,16 +5187,16 @@ function showIpModal() {
 function showRadminModal() {
   openModal(`
     <button class="modal-x" onclick="closeModal()">✕</button>
-    <h3>내 Radmin 주소</h3>
-    <div class="foot-note" style="margin-top:0;">Radmin VPN 창에서 내 이름 옆에 있는
-      <b>26. 으로 시작하는 주소</b>를 적어주세요. 한 번만 적어두면 됩니다.</div>
+    <h3>내 접속 주소</h3>
+    <div class="foot-note" style="margin-top:0;">방장이 되었을 때 사람들이 찾아올
+      <b>주소</b>를 적어주세요. 한 번만 적어두면 됩니다.</div>
     <label>내 주소</label>
     <input type="text" id="ipValue" maxlength="21" autocomplete="off"
-           placeholder="예: 26.131.188.239" value="${esc(savedAddress || '')}">
+           placeholder="예: 123.45.67.89" value="${esc(savedAddress || '')}">
     <div class="modal-error" id="ipErr"></div>
     <button class="btn" id="ipSubmit">저장</button>
     <div class="foot-note">방장이 되면 사람들이 이 주소로 찾아 들어옵니다 ·
-      컴퓨터를 바꾸거나 Radmin 을 다시 깔면 주소가 달라질 수 있습니다.</div>`);
+      컴퓨터나 접속 방식을 바꾸면 주소가 달라질 수 있습니다.</div>`);
   const go = () => saveMyIp();
   document.getElementById('ipSubmit').addEventListener('click', go);
   const input = document.getElementById('ipValue');
@@ -5217,7 +5220,7 @@ async function saveMyIp() {
     closeModal();
     renderLauncher();
     showToast(mode === 'radmin'
-      ? `Radmin 주소 ${savedAddress} 로 접속합니다.`
+      ? `접속 주소 ${savedAddress} 로 저장했습니다.`
       : '공인 IP 로 접속합니다. 적을 것이 없습니다.');
   } catch (e) {
     if (err) err.textContent = e.message;
@@ -5435,7 +5438,7 @@ function renderRoomView(r) {
            ? `혹시 못 붙으면 <kbd>MULTIPLAYER</kbd> › <kbd>MANUAL JOIN</kbd> 에
               <b>${esc(r.address)}</b> · 포트 <b>2346</b> 을 직접 넣으세요
               (조인하기를 누르면 주소가 복사됩니다).`
-           : '방장이 아직 Radmin 주소를 적지 않아 자동으로 붙지 못할 수 있습니다.'}</div>`;
+           : '방장이 아직 접속 주소를 적지 않아 자동으로 붙지 못할 수 있습니다.'}</div>`;
   }
 
   const actions = document.getElementById('roomActions');
@@ -5457,7 +5460,7 @@ function renderRoomView(r) {
   const note = document.getElementById('roomNote');
   if (note) {
     note.innerHTML = host
-      ? 'Radmin VPN 에 들어와 있어야 하고, 실행하기에 내 Radmin 주소(26.…)가 필요합니다.'
+      ? '실행하기에 내 접속 주소가 필요합니다.'
         + ' 방에 있는 모두가 함께 카운트다운을 보고 게임이 켜집니다.'
       : (r.running
         ? '게임이 안 켜졌다면 조인하기를 눌러주세요.'
@@ -5483,12 +5486,12 @@ function showStartModal() {
   openModal(`
     <button class="modal-x" onclick="closeModal()">✕</button>
     <h3>게임 실행</h3>
-    <div class="foot-note" style="margin-top:0;">Radmin VPN 창에 보이는
-      <b>내 주소</b>를 적어주세요. 방이 여러 개 열려 있으면 목록만 보고는
+    <div class="foot-note" style="margin-top:0;">사람들이 찾아올
+      <b>내 접속 주소</b>를 적어주세요. 방이 여러 개 열려 있으면 목록만 보고는
       어느 방인지 가릴 수 없어, 사람들이 이 주소로 곧장 찾아 들어갑니다.</div>
-    <label>내 Radmin 주소</label>
+    <label>내 접속 주소</label>
     <input type="text" id="startAddr" maxlength="21" autocomplete="off"
-           placeholder="예: 26.131.188.239" value="${esc((here && here.address) || savedAddress || '')}">
+           placeholder="예: 123.45.67.89" value="${esc((here && here.address) || savedAddress || '')}">
     <div class="modal-error" id="startErr"></div>
     <button class="btn" id="startSubmit">실행하기</button>
     <div class="foot-note">한 번 적어두면 다음부터 자동으로 채워집니다.</div>`);
@@ -5525,15 +5528,16 @@ function paintChat(id, msgs, empty) {
     const mine = me && m.handle === me.handle;
     return `<div class="chat-line">
       <span class="chat-who${mine ? ' me' : ''}">${esc(m.handle)}</span>${esc(m.body)}
-      <span class="chat-t">${hhmm(m.ts)}</span>
+      <span class="chat-t">${chatTime(m.ts)}</span>
     </div>`;
   }).join('') || `<div class="chat-line chat-sys">· ${empty}</div>`;
   box.scrollTop = box.scrollHeight;
 }
 
-function hhmm(ts) {
+/** 대화 시각. 대기실 대화는 며칠씩 남아 있어서 시각만으로는 언제 말인지 모른다 — 월/일을 붙인다 */
+function chatTime(ts) {
   const d = new Date(ts);
-  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  return `${d.getMonth() + 1}/${d.getDate()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 
 /**
@@ -5903,7 +5907,7 @@ async function startRoom(known) {
   const address = known !== undefined ? known : (input ? input.value.trim() : '');
   if (err) err.textContent = '';
   if (connMode === 'radmin' && !address) {
-    const msg = 'Radmin 주소를 적지 않으면 사람들이 찾아올 수 없습니다.';
+    const msg = '접속 주소를 적지 않으면 사람들이 찾아올 수 없습니다.';
     if (err) err.textContent = msg; else showToast(msg);
     return;
   }

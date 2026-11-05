@@ -29,7 +29,7 @@ export const MAX_TITLE = 24;
 export const PING_VERSION = 3;
 
 /** 사이트가 바뀌었는지 브라우저가 알아채는 표. 배포할 때마다 올린다. */
-export const APP_VERSION = 123;
+export const APP_VERSION = 124;
 
 /** 이 시간 동안 아무 신호가 없으면 나간 것으로 본다 (브라우저를 그냥 닫는 경우) */
 const IDLE_MS = 3 * 60 * 1000;
@@ -636,7 +636,7 @@ async function setIp(req, res) {
 
   const address = cleanAddress(b.address);
   if (mode === 'radmin' && !address) {
-    return res.status(400).json({ error: 'Radmin 주소를 적어주세요.' });
+    return res.status(400).json({ error: '접속 주소를 적어주세요.' });
   }
 
   // 방식만 바꿀 때는 적어둔 Radmin 주소를 건드리지 않는다.
@@ -778,14 +778,14 @@ async function start(req, res) {
     // 창에서 새로 적어 보냈으면 그것으로 갈아끼운다
     address = cleanAddress(body(req).address) || (who.length ? who[0].radmin_ip : null);
     if (!address) {
-      return res.status(400).json({ error: 'Radmin 주소를 적어야 사람들이 찾아올 수 있습니다.' });
+      return res.status(400).json({ error: '접속 주소를 적어야 사람들이 찾아올 수 있습니다.' });
     }
     await q(`UPDATE players SET radmin_ip = $1 WHERE handle = $2`, [address, me]);
   } else {
     address = clientIp(req);
     if (!address) {
       return res.status(400).json({
-        error: '접속 주소를 읽지 못했습니다. Radmin 방식으로 바꿔서 해주세요.',
+        error: '접속 주소를 읽지 못했습니다. 주소를 직접 적어서 해주세요.',
       });
     }
     if (!isReachableIp(address)) {
