@@ -162,4 +162,35 @@ Radmin 없이 접속하려고 만든 UDP 중계. Vercel 은 UDP 를 못 받으�
 
 ## 남은 일
 
+### 중계 서버 — 다음 순서 (2026-11-06 합의)
+
+**먼저 확인할 것 (이게 끝나야 다음으로 간다)**
+1. **실행하기 → 방장 자동 지정**: `ssh r6 r6relay use TEST` 로 돌려 놓고 TeaRs 가 실행하기 →
+   `r6relay status` 가 `LOTUS_TeaRs` 로 바뀌는지.
+2. **[방장 등록하기]**: Windows 에서 아직 한 번도 안 돌렸다. TeaRs PC 에서 최신 `r6launch.bat` →
+   버튼 → 창에 `DONE`. 실패하면 창 화면과 `C:\R6Clan\r6host.log` 를 받아 `public/r6host.ps1` 를 고친다.
+3. **렉 실제 테스트**: 회원들과 여러 판, Radmin 때와 체감 비교. 사용자는 **렉이 없는 게 확인된 뒤에**
+   다방(多房)으로 가자고 했다.
+
+**그다음: 여러 방 동시 운영 — A 방식(방마다 다른 포트)으로 하기로 했다**
+- 1번방 `158.247.243.55:2346`, 2번방 `:2356`, 3번방 `:2366` … (10 단위, 방마다 2346~2348 세 칸).
+  중계 서버가 각 문을 그 방 방장 터널 주소의 2346~2348 로 DNAT(포트 바꿔 넘김).
+- B 방식(방마다 공인 IP 추가, 월 IP당 약 $3)은 게임이 2346 아닌 포트를 못 받을 때만 쓴다.
+- **구현 전 5분 시험:** 중계 서버에 2356→방장:2346 규칙을 손으로 하나 걸고, 참가자가 게임
+  MULTIPLAYER → MANUAL JOIN 에 `158.247.243.55` / `2356` 으로 들어가지는지. 되면 A 확정.
+- 바꿀 곳
+  - `relay/r6relay.sh`: 방 번호별 현재 방장(`current.N`), `use <name> <room>`, R6_PRE 를 방마다.
+    `r6relay log` 도 포트로 방을 가른다. agent 의 `use` 에 room 추가.
+  - `api/room.js` `start()`: `relayCall('use', { name, room })`, 응답·`room_state.address` 에 포트 포함.
+  - `scripts/app.js` `launchGame`: join url 에 포트(`r6clan://join/IP:PORT`).
+  - `public/r6launch.bat`: `:readip` 이 지금 `:` 뒤를 버린다 — 포트를 읽어 `-client IP PORT` 로.
+    **참가자도 최신 `r6launch.bat` 이 필요해진다**(공지 필요). 예전 bat 은 포트를 버리고 2346=1번방으로 간다.
+- 방장 PC 쪽(`r6host.ps1`, portproxy)은 그대로 — 방장은 늘 자기 PC 의 2346 으로 연다.
+- 비용 추가 없음(서버 한 대, $6). 트래픽은 `r6relay log`·Vultr 그래프로 본다.
+
+**보안 메모**
+- `RELAY_SECRET` 과 LOTUS_TeaRs·LOTUS_NaiLaRt·TEST 의 WireGuard 비밀키가 작업 채팅에 노출된 적이 있다.
+  사용자는 당장은 그대로 쓰기로 했다. 바꿀 때: `ssh r6 "rm /etc/r6relay/agent.secret && r6relay agent-setup"` →
+  Vercel `RELAY_SECRET` 교체 → Redeploy. 방장 열쇠는 [방장 등록하기]를 다시 누르면 새로 바뀐다.
+
 - **Neon DB 비밀번호 교체** — 연결 문자열이 노출된 적이 있다. 아직 안 했다.
