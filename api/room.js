@@ -1,6 +1,7 @@
 import { q, tx, body, methodGuard, currentUser, requireUser, clientIp, isReachableIp,
          ensureAccounts,
          verifyPw, TEMP_PASSWORD } from './_lib.js';
+import { relayEnabled, relayName, relayCall, makeRegisterToken, readRegisterToken } from './_relay.js';
 
 /**
  * 런쳐. 1번방부터 8번방까지, 방마다 최대 16명이 모여 이야기를 나누고
@@ -29,7 +30,7 @@ export const MAX_TITLE = 24;
 export const PING_VERSION = 3;
 
 /** 사이트가 바뀌었는지 브라우저가 알아채는 표. 배포할 때마다 올린다. */
-export const APP_VERSION = 128;
+export const APP_VERSION = 129;
 
 /** 이 시간 동안 아무 신호가 없으면 나간 것으로 본다 (브라우저를 그냥 닫는 경우) */
 const IDLE_MS = 3 * 60 * 1000;
@@ -422,6 +423,8 @@ export default async function handler(req, res) {
       case 'setCap':   return await setCap(req, res);
       case 'sayLobby': return await sayLobby(req, res);
       case 'setTitle': return await setTitle(req, res);
+      case 'relayToken':    return await relayToken(req, res);
+      case 'relayRegister': return await relayRegister(req, res);
       default:      return res.status(400).json({ error: '알 수 없는 요청입니다.' });
     }
   } catch (e) {
@@ -768,6 +771,36 @@ async function kick(req, res) {
  * 방장의 Radmin 주소를 함께 받아 방에 걸어둔다 — 나머지는 그 주소로 찾아 들어간다.
  * 실제로 게임을 켜는 것은 각자의 컴퓨터에서 일어난다 (app.js 의 launchGame 참고).
  */
+/** 방장 등록용 일회 표를 준다 (로그인한 사람만) */
+async function relayToken(req, res) {
+  const me = await requireUser(req, res);
+  if (!me) return;
+  if (!relayEnabled()) {
+    return res.status(400).json({ error: '중계 서버 연결이 아직 설정되지 않았습니다. 관리자에게 알려주세요.' });
+  }
+  res.status(200).json({ token: makeRegisterToken(me), name: relayName(me) });
+}
+
+/**
+ * 방장 PC 의 설치 스크립트(public/r6host.ps1)가 부른다. 로그인 대신 일회 표로 누구인지 확인하고,
+ * PC 가 스스로 만든 공개키를 중계 서버에 등록한 뒤 터널 설정에 필요한 값을 돌려준다.
+ */
+async function relayRegister(req, res) {
+  const b = body(req);
+  const handle = readRegisterToken(b.token);
+  if (!handle) return res.status(403).json({ error: '등록 표가 만료됐습니다. 런쳐에서 [방장 등록하기] 를 다시 눌러 주세요.' });
+  const pubkey = String(b.pubkey || '');
+  if (!/^[A-Za-z0-9+/]{42}[AEIMQUYcgkosw048]=$/.test(pubkey)) {
+    return res.status(400).json({ error: '공개키 형식이 아닙니다.' });
+  }
+  try {
+    const d = await relayCall('register', { name: relayName(handle), pubkey });
+    res.status(200).json({ handle, ...d });
+  } catch (e) {
+    res.status(e.status === 400 ? 400 : 502).json({ error: e.message });
+  }
+}
+
 async function start(req, res) {
   const me = await requireUser(req, res);
   if (!me) return;
@@ -787,6 +820,21 @@ async function start(req, res) {
   );
   if (!first.length || first[0].handle !== me) {
     return res.status(403).json({ error: '방장만 실행할 수 있습니다.' });
+  }
+
+  // 중계 서버에 "이번 방장은 이 사람" 이라고 알린다. 손으로 r6relay use 를 치던 일이다.
+  // 등록 안 된 PC 면 게임을 띄워 봐야 아무도 못 들어오니, 여기서 멈추고 이유를 말한다.
+  if (relayEnabled()) {
+    try {
+      await relayCall('use', { name: relayName(me) });
+    } catch (e) {
+      if (e.status === 404) {
+        return res.status(400).json({
+          error: '이 계정은 아직 방장 등록이 안 되어 있습니다. 런쳐의 [방장 등록하기] 를 방장 PC 에서 먼저 해 주세요.',
+        });
+      }
+      return res.status(502).json({ error: e.message });
+    }
   }
 
   const now = Date.now();

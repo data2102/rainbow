@@ -4228,17 +4228,18 @@ if (/[?&]room=\d+/.test(location.search)) {
             게임이 <b>중계 서버</b>를 거쳐 방장에게 붙습니다. 따로 켤 프로그램은 없습니다.</span>
         </div>
 
-        <div class="dl-h" style="margin-top:var(--sp-5);">■ 방장 · 중계 서버에 등록된 사람만</div>
+        <div class="dl-h" style="margin-top:var(--sp-5);">■ 방장</div>
         <div class="dl-row">
           <span class="dl-n">A</span>
-          <a class="dl-a" href="https://www.wireguard.com/install/" target="_blank" rel="noopener">WireGuard</a>
-          <span class="dl-d">처음 한 번 · 설치하고 <b>관리자에게 받은 설정</b>을 "빈 터널 추가"에 붙여 넣어
-            저장합니다. 설정은 사람마다 다르니 다른 사람에게 주지 마세요.</span>
+          <button type="button" class="btn-mini btn-approve" id="relayRegBtn">방장 등록하기</button>
+          <span class="dl-d">처음 한 번 · <b>방장을 할 PC 에서</b> 로그인하고 누르세요 · Windows 확인 창에서
+            <b>예</b> · WireGuard 설치와 연결이 자동으로 끝납니다 (2분쯤). 위 ② <code>r6launch.bat</code> 은
+            최신으로 받아 두세요.</span>
         </div>
         <div class="dl-row">
           <span class="dl-n">B</span>
-          <span class="dl-d">게임할 때마다 · WireGuard 의 터널을 <b>활성화</b>한 채로 방을 만들고
-            <b>실행하기</b>를 누릅니다. 방장을 하고 싶으면 관리자에게 등록을 부탁하세요.</span>
+          <span class="dl-d">게임할 때마다 · 방을 만들고 <b>실행하기</b>만 누르면 됩니다 ·
+            중계 서버가 이번 방장을 알아서 맞춥니다. Radmin 은 필요 없습니다.</span>
         </div>
 
         <div class="dl-sub" id="dlSub"></div>
@@ -4760,7 +4761,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 128;
+const APP_VERSION = 129;
 let toldToRefresh = false;
 
 /**
@@ -9855,7 +9856,7 @@ function renderRoomView(r) {
   const note = document.getElementById('roomNote');
   if (note) {
     note.innerHTML = host
-      ? '방장 PC 에서 <b>WireGuard 가 활성</b> 상태여야 합니다 · 중계 서버에 등록된 방장만 열 수 있습니다.'
+      ? '방장 PC 는 한 번 <b>방장 등록하기</b>를 해 두어야 합니다 · 실행하기를 누르면 중계 서버가 이 방으로 맞춰집니다.'
         + ' 방에 있는 모두가 함께 카운트다운을 보고 게임이 켜집니다.'
       : (r.running
         ? '게임이 안 켜졌다면 조인하기를 눌러주세요.'
@@ -10355,6 +10356,23 @@ async function postChat(inputId, action) {
   if (lobby) renderLobbyChat(); else renderChatLog();
 }
 
+/**
+ * 이 PC 를 방장으로 등록한다.
+ * 사이트가 15분짜리 일회 표를 주고, r6clan://register/<표> 로 런쳐(r6launch.bat)를 부른다.
+ * 런쳐가 r6host.ps1 을 받아 관리자 권한으로 돌린다 — WireGuard 설치, 열쇠 만들기(비밀키는
+ * PC 밖으로 안 나감), 중계 서버 등록, 방화벽, 넘기기 감시까지. 다시 누르면 열쇠만 새로 바뀐다.
+ */
+async function registerHostPc() {
+  if (!isLoggedIn()) { showToast('로그인한 뒤에 눌러 주세요.'); return; }
+  try {
+    const d = await apiPost('/api/room', { action: 'relayToken' });
+    showToast('방장 등록 창을 엽니다 · Windows 확인 창에서 "예" 를 눌러 주세요.');
+    window.location.href = GAME_PROTOCOL + 'register/' + encodeURIComponent(d.token);
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+
 function initLauncherEvents() {
   const grid = document.getElementById('roomGrid');
   if (grid) grid.addEventListener('click', (e) => {
@@ -10364,6 +10382,9 @@ function initLauncherEvents() {
 
   const login = document.getElementById('lcLoginBtn');
   if (login) login.addEventListener('click', showLoginModal);
+
+  const reg = document.getElementById('relayRegBtn');
+  if (reg) reg.addEventListener('click', registerHostPc);
 
   const ipEdit = document.getElementById('myIpEdit');
   if (ipEdit) ipEdit.addEventListener('click', showIpModal);

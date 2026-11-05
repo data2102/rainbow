@@ -4228,17 +4228,18 @@ if (/[?&]room=\d+/.test(location.search)) {
             게임이 <b>중계 서버</b>를 거쳐 방장에게 붙습니다. 따로 켤 프로그램은 없습니다.</span>
         </div>
 
-        <div class="dl-h" style="margin-top:var(--sp-5);">■ 방장 · 중계 서버에 등록된 사람만</div>
+        <div class="dl-h" style="margin-top:var(--sp-5);">■ 방장</div>
         <div class="dl-row">
           <span class="dl-n">A</span>
-          <a class="dl-a" href="https://www.wireguard.com/install/" target="_blank" rel="noopener">WireGuard</a>
-          <span class="dl-d">처음 한 번 · 설치하고 <b>관리자에게 받은 설정</b>을 "빈 터널 추가"에 붙여 넣어
-            저장합니다. 설정은 사람마다 다르니 다른 사람에게 주지 마세요.</span>
+          <button type="button" class="btn-mini btn-approve" id="relayRegBtn">방장 등록하기</button>
+          <span class="dl-d">처음 한 번 · <b>방장을 할 PC 에서</b> 로그인하고 누르세요 · Windows 확인 창에서
+            <b>예</b> · WireGuard 설치와 연결이 자동으로 끝납니다 (2분쯤). 위 ② <code>r6launch.bat</code> 은
+            최신으로 받아 두세요.</span>
         </div>
         <div class="dl-row">
           <span class="dl-n">B</span>
-          <span class="dl-d">게임할 때마다 · WireGuard 의 터널을 <b>활성화</b>한 채로 방을 만들고
-            <b>실행하기</b>를 누릅니다. 방장을 하고 싶으면 관리자에게 등록을 부탁하세요.</span>
+          <span class="dl-d">게임할 때마다 · 방을 만들고 <b>실행하기</b>만 누르면 됩니다 ·
+            중계 서버가 이번 방장을 알아서 맞춥니다. Radmin 은 필요 없습니다.</span>
         </div>
 
         <div class="dl-sub" id="dlSub"></div>

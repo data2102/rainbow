@@ -152,6 +152,12 @@ Radmin 없이 접속하려고 만든 UDP 중계. Vercel 은 UDP 를 못 받으�
   터널 주소:2346 → 집 주소:2346 을 걸어서 처음 접속에 성공했다(2026-11-05). 집 주소가 바뀌면 다시 걸어야 한다 —
   런쳐가 자동으로 하게 만드는 게 다음 일이다.
 - `r6relay add` 는 비밀키를 화면에 찍지 않는다(채팅에 붙여 넣는 일이 잦았다).
+- **자동 운영(v129):** 사이트 ↔ 중계 서버는 `relay` agent(TCP 8723, HMAC 서명, `api/_relay.js`)로 이야기한다.
+  실행하기 → `use`, [방장 등록하기] → 15분 일회 표 → `r6clan://register/<표>` → `r6launch.bat` →
+  `public/r6host.ps1`(관리자) 가 WireGuard·열쇠·방화벽·감시 작업을 깐다. 비밀키는 방장 PC 밖으로 안 나간다.
+  Vercel 환경변수 `RELAY_SECRET` 이 없으면 relay 호출을 건너뛴다(예전처럼 손으로 use).
+- 사이트 아이디가 영문·숫자·_- 가 아니면 중계 서버 이름은 `h_` + 해시 16자리(`relayName`).
+- `r6host.ps1` 과 `r6launch.bat` 는 ASCII 만 쓴다. Windows PowerShell 5 는 BOM 없는 파일을 ANSI 로 읽는다.
 - 지금은 방 하나만 중계한다. 실제 게임으로는 아직 시험하지 않았다(`relay/README.md` 의 "시험할 것").
 
 ## 남은 일

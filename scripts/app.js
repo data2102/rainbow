@@ -418,7 +418,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 128;
+const APP_VERSION = 129;
 let toldToRefresh = false;
 
 /**
@@ -5513,7 +5513,7 @@ function renderRoomView(r) {
   const note = document.getElementById('roomNote');
   if (note) {
     note.innerHTML = host
-      ? '방장 PC 에서 <b>WireGuard 가 활성</b> 상태여야 합니다 · 중계 서버에 등록된 방장만 열 수 있습니다.'
+      ? '방장 PC 는 한 번 <b>방장 등록하기</b>를 해 두어야 합니다 · 실행하기를 누르면 중계 서버가 이 방으로 맞춰집니다.'
         + ' 방에 있는 모두가 함께 카운트다운을 보고 게임이 켜집니다.'
       : (r.running
         ? '게임이 안 켜졌다면 조인하기를 눌러주세요.'
@@ -6013,6 +6013,23 @@ async function postChat(inputId, action) {
   if (lobby) renderLobbyChat(); else renderChatLog();
 }
 
+/**
+ * 이 PC 를 방장으로 등록한다.
+ * 사이트가 15분짜리 일회 표를 주고, r6clan://register/<표> 로 런쳐(r6launch.bat)를 부른다.
+ * 런쳐가 r6host.ps1 을 받아 관리자 권한으로 돌린다 — WireGuard 설치, 열쇠 만들기(비밀키는
+ * PC 밖으로 안 나감), 중계 서버 등록, 방화벽, 넘기기 감시까지. 다시 누르면 열쇠만 새로 바뀐다.
+ */
+async function registerHostPc() {
+  if (!isLoggedIn()) { showToast('로그인한 뒤에 눌러 주세요.'); return; }
+  try {
+    const d = await apiPost('/api/room', { action: 'relayToken' });
+    showToast('방장 등록 창을 엽니다 · Windows 확인 창에서 "예" 를 눌러 주세요.');
+    window.location.href = GAME_PROTOCOL + 'register/' + encodeURIComponent(d.token);
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+
 function initLauncherEvents() {
   const grid = document.getElementById('roomGrid');
   if (grid) grid.addEventListener('click', (e) => {
@@ -6022,6 +6039,9 @@ function initLauncherEvents() {
 
   const login = document.getElementById('lcLoginBtn');
   if (login) login.addEventListener('click', showLoginModal);
+
+  const reg = document.getElementById('relayRegBtn');
+  if (reg) reg.addEventListener('click', registerHostPc);
 
   const ipEdit = document.getElementById('myIpEdit');
   if (ipEdit) ipEdit.addEventListener('click', showIpModal);

@@ -8,6 +8,7 @@ rem ------------------------------------------------------------
 rem  Called by the site as:
 rem     r6clan://create                 -> host
 rem     r6clan://join/1.233.204.132     -> guest
+rem     r6clan://register/TOKEN         -> make this PC a host (once)
 rem
 rem  All it does is start the game with the right switches:
 rem     host  : RainbowSix.exe -server 2346
@@ -41,6 +42,9 @@ rem ---------- read the address the site handed us ----------
 set "URL=%~1"
 call :log "-------- %DATE% %TIME%"
 call :log "URL     = %URL%"
+
+rem  Checked first: the token is random letters and could contain "join".
+if not "%URL%"=="%URL:register/=%" goto :register
 
 set "MODE=create"
 if not "%URL%"=="%URL:join=%" set "MODE=join"
@@ -228,3 +232,38 @@ rem one line into the log; redirect first so a trailing digit is safe
 :log
 >>"%LOG%" echo %~1
 exit /b
+
+rem ============================================================
+rem  register - make this PC a host for the relay server (once)
+rem ------------------------------------------------------------
+rem  The real work is in r6host.ps1, fetched fresh from the site so it
+rem  is always the current one. It needs administrator rights (it
+rem  installs WireGuard and a small background watcher), so Windows
+rem  asks once. The token in the url proves who you are and expires
+rem  after 15 minutes.
+rem ============================================================
+:register
+set "T=%URL:/= %"
+for %%A in (%T%) do set "TOKEN=%%A"
+call :log "MODE    = register"
+echo.
+echo   Making this PC a host for the relay server.
+echo   Windows will ask for permission - press YES.
+echo.
+curl.exe -fsSL "https://www.r6rank.co.kr/r6host.ps1" -o "%~dp0r6host.ps1"
+if errorlevel 1 goto :nohostscript
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process powershell -Verb RunAs -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File','%~dp0r6host.ps1','-Register','%TOKEN%'"
+if errorlevel 1 goto :noelevate
+call :log "RESULT  = register window opened"
+exit /b 0
+
+:nohostscript
+call :log "RESULT  = could not download r6host.ps1"
+echo   Could not download the host setup script from the site.
+echo   Check the internet connection and press the button again.
+goto :stop
+
+:noelevate
+call :log "RESULT  = permission refused"
+echo   Permission was not given. Press the button again and pick YES.
+goto :stop
