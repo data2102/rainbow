@@ -418,7 +418,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 127;
+const APP_VERSION = 128;
 let toldToRefresh = false;
 
 /**
@@ -3245,6 +3245,38 @@ function renderKoBoard() {
   }
 }
 
+/**
+ * 가장 마지막에 올린 판. 되돌리기는 언제나 이것부터다 —
+ * 서버도 뒤에서부터만 지우게 막아두었으므로 이 한 판은 늘 지울 수 있다.
+ */
+function koLastGame() {
+  const rows = tOf(TOURNAMENT_LATEST);
+  if (!rows.length) return null;
+  return [...rows].sort((a, b) => (b.ts - a.ts) || ((b.id || 0) - (a.id || 0)))[0];
+}
+
+/** '최종전 2차전 · C팀 승' 처럼 한 줄로 적는다 */
+function koGameText(m) {
+  const name = (KO_STAGES.find(x => x.id === m.stage) || {}).label || m.stage;
+  return `${name}${m.game ? ` ${m.game}차전` : ''} · ${koLabel(m.winner)} 승`;
+}
+
+/**
+ * 잘못 누른 것을 되돌리는 줄.
+ *
+ * 판마다 붙은 × 로도 지울 수 있지만 그것은 작고 눈에 안 띈다. 방금 한 번
+ * 잘못 누른 경우가 대부분이라, 마지막 한 판을 크게 되돌릴 자리를 따로 둔다.
+ */
+function renderKoUndo() {
+  const box = document.getElementById('koUndo');
+  if (!box) return;
+  const last = tourEditable() ? koLastGame() : null;
+  box.hidden = !last;
+  if (!last) return;
+  box.innerHTML = `<span class="ko-undo-t">방금 기록 · <b>${esc(koGameText(last))}</b></span>
+    <button type="button" class="btn-mini btn-reject" data-koundo="${last.id}">되돌리기</button>`;
+}
+
 /** 경기 기록 */
 function renderKoLog() {
   const el = document.getElementById('koLog');
@@ -3315,6 +3347,7 @@ function renderTournament() {
   // 진행 중인 회차
   renderKoTeams();
   renderKoBoard();
+  renderKoUndo();
   renderKoLog();
 }
 
@@ -3346,8 +3379,27 @@ async function recordFixture(a, b, winner) {
   } catch (e) { showToast(e.message); }
 }
 
+/** 방금 올린 한 판을 되돌린다 */
+async function undoKo(id) {
+  const m = tOf(TOURNAMENT_LATEST).find(x => String(x.id) === String(id));
+  if (!m) return;
+  if (!confirm(`${koGameText(m)}\n이 기록을 되돌릴까요?`)) return;
+  try {
+    await apiPost('/api/tournament', { action: 'delete', id: Number(id) });
+    await loadTournament();
+    renderTournament();
+    showToast(`되돌렸습니다 · ${koGameText(m)}`);
+  } catch (e) { showToast(e.message); }
+}
+
 async function deleteTournamentMatch(id) {
-  if (!confirm('이 대회 경기 기록을 삭제할까요? 예선 순위에서도 함께 빠집니다.')) return;
+  // 대회 경기는 순위표 점수와 무관하다. 1회차 예선만 순위표(예선 순위)를 만든다.
+  const m = tMatches.find(x => String(x.id) === String(id));
+  const ko = m && Number(m.edition || 1) === TOURNAMENT_LATEST;
+  const msg = ko
+    ? `${koGameText(m)}\n이 기록을 지울까요?`
+    : '이 대회 경기 기록을 삭제할까요? 예선 순위에서도 함께 빠집니다.';
+  if (!confirm(msg)) return;
   try {
     await apiPost('/api/tournament', { action: 'delete', id: Number(id) });
     await loadTournament();
@@ -3385,11 +3437,12 @@ function initTournamentEvents() {
   if (sel) sel.addEventListener('change', () => selectTourEdition(sel.value));
 
   // 대진표와 기록. 두 군데 모두 삭제 단추가 있다.
-  for (const id of ['koBoard', 'koLog']) {
+  for (const id of ['koBoard', 'koLog', 'koUndo']) {
     const box = document.getElementById(id);
     if (!box) continue;
     box.addEventListener('click', e => {
       const d = e.target.dataset || {};
+      if (d.koundo) return undoKo(d.koundo);
       if (d.tdel) return deleteTournamentMatch(d.tdel);
       if (d.ko) {
         const [stage, a, b, winner] = d.ko.split(':');
