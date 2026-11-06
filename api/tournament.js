@@ -1,4 +1,4 @@
-import { q, body, methodGuard, requireAdmin, audit } from './_lib.js';
+import { q, body, methodGuard, requireAdmin, requireMaster, audit } from './_lib.js';
 
 /**
  * 회차마다 참가 팀도 경기 방식도 다르다. 화면(app.js)의 TOURNAMENT_EDITIONS 와
@@ -282,8 +282,14 @@ async function record(req, res) {
   res.status(200).json({ ok: true, match: rowToMatch(rows[0]) });
 }
 
+/**
+ * 기록 삭제·되돌리기는 **마스터만** 한다 (등록은 관리자도 된다).
+ *
+ * 토너먼트는 앞 판이 뒷 판의 대진을 정해서, 한 판을 지우면 그 뒤가 전부 어긋난다.
+ * 넣는 것은 다시 넣으면 그만이지만 지우는 것은 그렇지 않아 문을 좁혔다.
+ */
 async function remove(req, res) {
-  const me = await requireAdmin(req, res);
+  const me = await requireMaster(req, res);
   if (!me) return;
 
   const { id } = body(req);

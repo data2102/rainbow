@@ -216,6 +216,8 @@ async function gate(req, res, need) {
 export function requireUser(req, res) { return gate(req, res, 'member'); }
 /** 관리자 이상 */
 export function requireAdmin(req, res) { return gate(req, res, 'admin'); }
+/** 마스터만. 되돌릴 수 없는 일(대회 기록 삭제 등)에 쓴다 — 관리자는 넣을 수만 있다. */
+export function requireMaster(req, res) { return gate(req, res, 'master'); }
 
 /** 누가 무엇을 했는지 남긴다. ts 는 audit_log 가 자동으로 찍는다. */
 export async function audit(adminId, action, detail) {

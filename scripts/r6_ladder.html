@@ -1228,6 +1228,11 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .ko-undo-t{ font-size:var(--fs-footnote); color:var(--text-secondary); }
 .ko-undo-t b{ color:var(--text-primary); font-weight:var(--fw-bold); }
 .ko-undo .btn-mini{ margin-left:auto; }
+/* 관리자에게는 단추 대신 이 줄이 뜬다 — 권한이 없다는 안내지 경고는 아니다 */
+.ko-undo-no{
+  margin-left:auto; font-size:var(--fs-footnote);
+  color:var(--text-tertiary); white-space:nowrap;
+}
 
 /* 치른 판을 하나씩. 3판 2선승이라 많아야 세 칸이다. */
 .ko-games{ display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-top:var(--sp-3); }

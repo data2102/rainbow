@@ -182,8 +182,16 @@ function koBracket() {
 
 /** 지금 보고 있는 회차가 진행 중인 대회인가 (끝난 회차는 손대지 않는다) */
 function tourLive() { return tourEdition === TOURNAMENT_LATEST; }
-/** 지금 화면에서 결과를 등록·삭제할 수 있는가 */
+/** 지금 화면에서 결과를 **등록**할 수 있는가 (관리자 이상) */
 function tourEditable() { return isAdmin() && tourLive(); }
+/**
+ * 기록을 **지우거나 되돌릴** 수 있는가 — 마스터만.
+ *
+ * 앞 판이 뒷 판의 대진을 정하는 구조라 한 판을 지우면 뒤가 전부 어긋난다.
+ * 넣는 것은 다시 넣으면 되지만 지우는 것은 그렇지 않아 문을 좁혔다.
+ * 서버(`api/tournament.js` 의 remove)도 같은 자리에서 막는다.
+ */
+function tourDeletable() { return isMaster() && tourLive(); }
 const ADVANCING = 4;        // 예선 통과 팀 수
 const CLAN_TOP = 5;         // 클랜 순위에 보여줄 등수
 const TOP_N = 5;            // 개인 순위 표에 보여줄 인원
@@ -418,7 +426,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 134;
+const APP_VERSION = 135;
 let toldToRefresh = false;
 
 /**
@@ -3053,7 +3061,7 @@ function renderGroupFixtures() {
           <span class="fx-vs">승</span>
           <span class="loss-txt">${esc(teamLabel(loser))}</span>
         </span>
-        ${tourEditable() ? `<button class="btn-mini btn-reject" data-tdel="${f.match.id}">삭제</button>` : ''}
+        ${tourDeletable() ? `<button class="btn-mini btn-reject" data-tdel="${f.match.id}">삭제</button>` : ''}
       </div>`;
     }
     return `<div class="fx">
@@ -3124,7 +3132,7 @@ function renderTournamentLog() {
           <span class="loss-txt">${esc(teamLabel(loser))}</span>
         </span>
         ${m.note ? `<span class="tlog-note">${esc(m.note)}</span>` : ''}
-        ${tourEditable() ? `<button class="btn-mini btn-reject" data-tdel="${m.id}">삭제</button>` : ''}
+        ${tourDeletable() ? `<button class="btn-mini btn-reject" data-tdel="${m.id}">삭제</button>` : ''}
       </div>
       <div class="tlog-meta">등록자 : ${esc(m.recordedBy || '-')} · ${formatDateTime(m.ts)}</div>
     </div>`;
@@ -3184,7 +3192,7 @@ function renderKoBoard() {
       ? `<div class="ko-games">${ser.games.map(g => `
           <span class="ko-game">
             <b>${g.game}차전</b> ${esc(koLabel(g.winner))} 승
-            ${tourEditable() && last && g.id === last.id
+            ${tourDeletable() && last && g.id === last.id
               ? `<button class="ko-gx" data-tdel="${g.id}" title="이 판 지우기">×</button>` : ''}
           </span>`).join('')}</div>`
       : '';
@@ -3273,8 +3281,11 @@ function renderKoUndo() {
   const last = tourEditable() ? koLastGame() : null;
   box.hidden = !last;
   if (!last) return;
-  box.innerHTML = `<span class="ko-undo-t">방금 기록 · <b>${esc(koGameText(last))}</b></span>
-    <button type="button" class="btn-mini btn-reject" data-koundo="${last.id}">되돌리기</button>`;
+  // 되돌리기는 마스터만. 관리자에게 단추만 숨기면 왜 안 되는지 몰라 헤매므로 까닭을 적는다.
+  box.innerHTML = `<span class="ko-undo-t">방금 기록 · <b>${esc(koGameText(last))}</b></span>`
+    + (tourDeletable()
+        ? `<button type="button" class="btn-mini btn-reject" data-koundo="${last.id}">되돌리기</button>`
+        : `<span class="ko-undo-no">되돌리기는 마스터만 할 수 있습니다</span>`);
 }
 
 /** 경기 기록 */
