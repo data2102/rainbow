@@ -14,6 +14,7 @@ import { ensureSeason, ensureRescore } from './_season.js';
  * POST /api/match {action:'host'}      팀 나누기 + 팀별 호스트 뽑기
  * POST /api/match {action:'hostResult'} 그 판의 승패 등록
  * POST /api/match {action:'hostManual'}  그 판은 리폿에서 손으로 썼다고 표시
+ * POST /api/match {action:'hostVoid'}   그 판 하나만 무효 (관리자 이상)
  * POST /api/match {action:'hostClear'}  뽑기 기록 비우기 (관리자 이상)
  *
  * 호스트 뽑기가 여기 얹혀 있는 까닭: Vercel Hobby 는 서버리스 함수가 12개까지다.
@@ -28,6 +29,7 @@ export default async function handler(req, res) {
   if (b.action === 'host') return hostDraw(req, res, b);
   if (b.action === 'hostResult') return hostResult(req, res, b);
   if (b.action === 'hostManual') return hostManual(req, res, b);
+  if (b.action === 'hostVoid') return hostVoid(req, res, b);
   if (b.action === 'hostClear') return hostClear(req, res, b);
   return record(req, res, b);
 }
@@ -714,6 +716,49 @@ async function hostLog(req, res) {
     });
   } catch (e) {
     res.status(500).json({ error: '기록을 불러오지 못했습니다: ' + e.message });
+  }
+}
+
+/**
+ * POST {action:'hostVoid', id} — 그 판 하나만 없앤다.
+ *
+ * 잘못 돌렸을 때 쓴다. 판을 지우면 **그 판에서 호스트로 뽑혔던 사람이 오늘 다시
+ * 뽑힐 수 있게 된다** — hostCountToday() 가 오늘 밤(18시 기준) 의 host_draws 를
+ * 세어 호스트를 뒤로 미루기 때문이다. 지우면 그 셈에서 빠진다.
+ *
+ * 결과까지 올린 판은 막는다. 여기서 지워도 경기와 점수는 리폿에 그대로 남아,
+ * 지운 줄 모르고 순위가 왜 그런지 설명할 길이 없어진다. 그 경우에는 리폿에서
+ * 먼저 경기를 취소해야 한다.
+ */
+async function hostVoid(req, res, b) {
+  const me = await requireAdmin(req, res);
+  if (!me) return;
+
+  const id = Number(b.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: '어떤 판인지 알 수 없습니다.' });
+  }
+
+  try {
+    await ensureHostDraws();
+    const out = await tx(async (c) => {
+      const { rows } = await c.query(`SELECT * FROM host_draws WHERE id = $1 FOR UPDATE`, [id]);
+      if (!rows.length) throw new Error('이미 없는 판입니다.');
+      const d = rowToDraw(rows[0]);
+      const done = d.pairs.filter(p => p.result);
+      if (done.length) {
+        throw new Error('결과를 올린 판은 무효로 할 수 없습니다. 리폿에서 그 경기를 먼저 취소해주세요.');
+      }
+      await c.query(`DELETE FROM host_draws WHERE id = $1`, [id]);
+      // 이 판에서 호스트였던 사람들 — 오늘 다시 뽑힐 수 있게 된다
+      const hosts = d.teams.map(t => (t.order || [])[0]).filter(Boolean);
+      return { ts: d.ts, hosts, teams: d.teams };
+    });
+
+    await audit(me, 'host_void', { id, ts: out.ts, hosts: out.hosts });
+    res.status(200).json({ ok: true, hosts: out.hosts });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
   }
 }
 

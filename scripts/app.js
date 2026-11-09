@@ -426,7 +426,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 135;
+const APP_VERSION = 136;
 let toldToRefresh = false;
 
 /**
@@ -6741,6 +6741,18 @@ function rlLogResult(r, p, i, many) {
          data-manual="1">수기작성</button>`;
 }
 
+/**
+ * 잘못 돌린 판을 없애는 단추 (관리자).
+ *
+ * 결과를 올린 판에는 안 보인다 — 그 경기와 점수는 리폿에 남아 있어서, 여기서
+ * 지우면 순위가 왜 그런지 설명할 길이 없어진다. 서버도 같은 자리에서 막는다.
+ */
+function rlVoidBtn(r) {
+  if (!isAdmin()) return '';
+  if (r.pairs.some(p => p.result)) return '';
+  return `<button type="button" class="rl-log-void" data-rlvoid="${r.id}">이 판 무효</button>`;
+}
+
 function renderRlLog() {
   const box = document.getElementById('rlLog');
   const empty = document.getElementById('rlLogEmpty');
@@ -6774,6 +6786,7 @@ function renderRlLog() {
         ${r.teams.map(t => team(t, r.pairs.some(p => p.first === t.name))).join('')}
       </div>
       ${r.pairs.map((p, i) => rlLogResult(r, p, i, many)).join(' ')}
+      ${rlVoidBtn(r)}
     </div>`;
   }).join('');
 
@@ -6892,6 +6905,43 @@ async function rlManual(i, clear) {
 }
 
 /**
+ * 그 판 하나만 없앤다 (관리자).
+ *
+ * 지우면 그 판에서 호스트로 뽑혔던 사람이 **오늘 다시 뽑힐 수 있게 된다** —
+ * 서버가 오늘 밤(18시 기준) 뽑기 기록을 세어 호스트를 뒤로 밀기 때문이다.
+ */
+async function rlVoidDraw(btn) {
+  const id = Number(btn.dataset.rlvoid);
+  const row = (rlLogData && rlLogData.draws || []).find(d => d.id === id);
+  if (!row) return;
+  const hosts = row.teams.map(t => (t.order || [])[0]).filter(Boolean);
+  const tonight = nightStartMs() <= row.ts;
+  if (!confirm(`${formatDateTime(row.ts)} 에 나눈 판을 없앱니다.\n`
+    + `${row.teams.map(t => `${t.name} ${t.order.length}명`).join(' vs ')}\n\n`
+    + `호스트였던 ${hosts.join(' · ')} 님은 `
+    + (tonight ? '오늘 다시 뽑힐 수 있게 됩니다.' : '그 날 기록에서 빠집니다.')
+    + `\n되돌릴 수 없습니다. 계속할까요?`)) return;
+
+  btn.disabled = true;
+  try {
+    const r = await apiPost('/api/match', { action: 'hostVoid', id });
+    await loadRlLog();
+    showToast(`무효 처리했습니다${(r && r.hosts && r.hosts.length)
+      ? ` · ${r.hosts.join(' · ')} 님 호스트 다시 가능` : ''}`);
+  } catch (e) {
+    btn.disabled = false;
+    showToast('무효 실패: ' + e.message);
+  }
+}
+
+/** 오늘 밤의 시작(18시). 서버의 nightStart() 와 같은 셈이다. */
+function nightStartMs(ms = Date.now()) {
+  const KST = 9 * 60 * 60 * 1000;
+  const edge = 18 * 60 * 60 * 1000;
+  return Math.floor((ms + KST - edge) / 86400000) * 86400000 + edge - KST;
+}
+
+/**
  * 뽑기 기록을 통째로 비운다 (관리자).
  *
  * 되돌릴 수 없고, 결과까지 올린 경기가 있으면 그 경기는 리폿에 그대로 남는다 —
@@ -7000,6 +7050,8 @@ function initRouletteEvents() {
 
   const log = document.getElementById('rlLog');
   if (log) log.addEventListener('click', (e) => {
+    const vd = e.target.closest('.rl-log-void');
+    if (vd && !vd.disabled) return rlVoidDraw(vd);
     const un = e.target.closest('.rl-log-undo');
     if (un && !un.disabled) return rlManualFromLog(un, true);
     const btn = e.target.closest('.rl-log-win');

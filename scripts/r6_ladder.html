@@ -1580,6 +1580,19 @@ body.rule-v2 #standingTable .streak-txt{ display:none; }
 .rl-log-undo:focus-visible{ outline:none; box-shadow:var(--shadow-focus); }
 /* 시험 삼아 돌려본 기록을 치우는 길. 관리자에게만 보인다. */
 .rl-log-wipe{ border-color:var(--danger); color:var(--danger-strong); }
+/* 잘못 돌린 판 하나만 없애는 단추 — 호스트 자격도 같이 풀린다 */
+.rl-log-void{
+  margin-left:var(--sp-2); font-family:inherit; white-space:nowrap;
+  font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+  padding:2px var(--sp-3); border-radius:var(--radius-sm);
+  border:1px solid var(--border-strong); background:var(--surface);
+  color:var(--text-tertiary); cursor:pointer;
+}
+.rl-log-void:hover:not(:disabled){
+  border-color:var(--danger); background:var(--danger-bg); color:var(--danger-strong);
+}
+.rl-log-void:disabled{ color:var(--text-disabled); cursor:not-allowed; }
+.rl-log-void:focus-visible{ outline:none; box-shadow:var(--shadow-focus); }
 /* 계정 로그에서 바로 되살리는 단추 */
 .acct-undo{
   margin-left:var(--sp-2); font-size:var(--fs-footnote); font-weight:var(--fw-bold);
