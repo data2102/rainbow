@@ -207,11 +207,16 @@ rem ============================================================
 
 rem The address is the last piece of the url, whatever comes before it:
 rem   r6clan://join/1.233.204.132       -> 1.233.204.132
+rem   r6clan://join/158.247.243.55:2356 -> 158.247.243.55, port 2356
 rem   r6clan://join/now/1.233.204.132/  -> 1.233.204.132
 :readip
 set "T=%URL:/= %"
 for %%A in (%T%) do set "IP=%%A"
-for /f "tokens=1 delims=:" %%A in ("%IP%") do set "IP=%%A"
+rem  Rooms other than 1 come with a port: 158.247.243.55:2356 is room 2.
+rem  The relay sends each room's port to that room's host.
+set "JPORT="
+for /f "tokens=1,2 delims=:" %%A in ("%IP%") do (set "IP=%%A" & set "JPORT=%%B")
+if not "%JPORT%"=="" set "PORT=%JPORT%"
 exit /b
 
 rem Give the host game a moment to come up. Warm the path there while

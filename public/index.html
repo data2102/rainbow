@@ -4251,7 +4251,7 @@ if (/[?&]room=\d+/.test(location.search)) {
 
       <div class="dl-box">
         <div class="dl-h">■ 처음 한 번 · 모두 (방장·참가자)</div>
-        <div class="dl-note">예전에 이미 해 두었다면 다시 안 해도 됩니다 · 한 번도 안 했다면 아래 1~3 을 먼저 해 주세요.</div>
+        <div class="dl-note">예전에 이미 해 두었다면 다시 안 해도 됩니다 · 한 번도 안 했다면 아래 1~3 을 먼저 해 주세요.<br><b>2번방 이상</b>에서 방장을 하거나 참가하려면 ② <code>r6launch.bat</code> 을 <b>최신으로</b> 한 번 다시 받아 주세요.</div>
 
         <div class="dl-row">
           <span class="dl-n">1</span>
@@ -4835,7 +4835,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 137;
+const APP_VERSION = 138;
 let toldToRefresh = false;
 
 /**
@@ -9909,7 +9909,7 @@ function renderRoomView(r) {
          </ol>
          <div class="steps-alt">${r.address
            ? `혹시 못 붙으면 <kbd>MULTIPLAYER</kbd> › <kbd>MANUAL JOIN</kbd> 에
-              <b>${esc(r.address)}</b> · 포트 <b>2346</b> 을 직접 넣으세요
+              <b>${esc(String(r.address).split(':')[0])}</b> · 포트 <b>${esc(String(r.address).split(':')[1] || '2346')}</b> 을 직접 넣으세요
               (조인하기를 누르면 주소가 복사됩니다).`
            : '방장이 아직 접속 주소를 적지 않아 자동으로 붙지 못할 수 있습니다.'}</div>`;
   }

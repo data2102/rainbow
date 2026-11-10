@@ -429,7 +429,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 137;
+const APP_VERSION = 138;
 let toldToRefresh = false;
 
 /**
@@ -5503,7 +5503,7 @@ function renderRoomView(r) {
          </ol>
          <div class="steps-alt">${r.address
            ? `혹시 못 붙으면 <kbd>MULTIPLAYER</kbd> › <kbd>MANUAL JOIN</kbd> 에
-              <b>${esc(r.address)}</b> · 포트 <b>2346</b> 을 직접 넣으세요
+              <b>${esc(String(r.address).split(':')[0])}</b> · 포트 <b>${esc(String(r.address).split(':')[1] || '2346')}</b> 을 직접 넣으세요
               (조인하기를 누르면 주소가 복사됩니다).`
            : '방장이 아직 접속 주소를 적지 않아 자동으로 붙지 못할 수 있습니다.'}</div>`;
   }
