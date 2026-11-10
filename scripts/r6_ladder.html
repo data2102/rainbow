@@ -2357,6 +2357,7 @@ body.rule-v2 #standingTable .streak-txt{ display:none; }
   color:var(--text-primary); margin-bottom:var(--sp-3);
 }
 .dl-note{ font-size:var(--fs-footnote); color:var(--text-tertiary); margin:calc(-1 * var(--sp-2)) 0 var(--sp-3); }
+.setup-state{ margin:var(--sp-4) 0 var(--sp-2); font-size:var(--fs-subhead); font-weight:var(--fw-bold); color:var(--accent); }
 /* 목록 아래에 붙는 마무리 한 줄이라 위쪽으로 간격을 준다 */
 .dl-sub{ font-size:var(--fs-footnote); color:var(--text-tertiary); margin-top:var(--sp-3); }
 .dl-row{
@@ -4289,10 +4290,14 @@ if (/[?&]room=\d+/.test(location.search)) {
         <div class="dl-h" style="margin-top:var(--sp-5);">■ 방장</div>
         <div class="dl-row">
           <span class="dl-n">A</span>
-          <button type="button" class="btn-mini btn-approve" id="relayRegBtn">방장 등록하기</button>
-          <span class="dl-d">처음 한 번 · <b>방장을 할 PC 에서</b> 로그인하고 누르세요 · Windows 확인 창에서
-            <b>예</b> · WireGuard 설치와 연결이 자동으로 끝납니다 (2분쯤). 위 ② <code>r6launch.bat</code> 은
-            최신으로 받아 두세요.</span>
+          <span class="dl-d"><b>처음 실행하기를 누르면 이 PC 를 자동으로 준비합니다</b> ·
+            Windows 확인 창에서 <b>예</b> · 1~2분 뒤 게임이 저절로 실행됩니다 (PC 마다 처음 한 번).
+            위 ② <code>r6launch.bat</code> 은 <b>최신으로</b> 받아 두세요.</span>
+        </div>
+        <div class="dl-row">
+          <span class="dl-n">↺</span>
+          <button type="button" class="btn-mini btn-edit" id="relayRegBtn">방장 PC 다시 준비하기</button>
+          <span class="dl-d">문제가 있을 때만 · 이 PC 의 연결을 새로 만듭니다.</span>
         </div>
         <div class="dl-row">
           <span class="dl-n">B</span>

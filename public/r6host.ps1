@@ -221,7 +221,7 @@ function Do-Register([string]$token) {
   else     { Say 'Check: no answer from the relay yet - wait a minute, it may still be connecting' }
 
   Write-Host ''
-  Write-Host '  DONE. From now on just press Start on the site.'
+  Write-Host '  DONE. The site starts the game by itself in a moment.'
   Write-Host '  (Radmin is not needed for hosting.)'
   Write-Host ''
 }
@@ -229,14 +229,21 @@ function Do-Register([string]$token) {
 # ---------------------------------------------------------------- main
 if ($Watch) { Watch-Loop; exit 0 }
 if ($Register) {
-  try { Do-Register $Register }
+  $ok = $false
+  try { Do-Register $Register; $ok = $true }
   catch {
     Write-Host ''
     Say ("FAILED: " + $_.Exception.Message)
     Write-Host "  log: $LogFile"
   }
   Write-Host ''
-  Read-Host '  Press Enter to close' | Out-Null
+  if ($ok) {
+    # nothing to read on success - the site page carries on by itself
+    Write-Host '  This window closes in 5 seconds.'
+    Start-Sleep -Seconds 5
+  } else {
+    Read-Host '  Press Enter to close' | Out-Null
+  }
   exit 0
 }
 Write-Host 'Use the [host register] button on r6rank.co.kr - launcher tab.'

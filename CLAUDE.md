@@ -156,6 +156,10 @@ Radmin 없이 접속하려고 만든 UDP 중계. Vercel 은 UDP 를 못 받으�
   실행하기 → `use`, [방장 등록하기] → 15분 일회 표 → `r6clan://register/<표>` → `r6launch.bat` →
   `public/r6host.ps1`(관리자) 가 WireGuard·열쇠·방화벽·감시 작업을 깐다. 비밀키는 방장 PC 밖으로 안 나간다.
   Vercel 환경변수 `RELAY_SECRET` 이 없으면 relay 호출을 건너뛴다(예전처럼 손으로 use).
+- **방장 준비는 실행하기에 붙어 있다(v137).** 실행하기 → agent `use` 가 404(등록 없음) 또는 409(등록은 됐는데
+  그 PC 가 3분 넘게 터널에 없음 — 다른 PC·꺼진 터널)면 사이트가 `needSetup` + 일회 표를 돌려주고, 화면이
+  준비 창을 연 뒤 5초마다 실행을 다시 시도해 붙으면 저절로 실행한다(`hostSetupFlow`). [방장 PC 다시 준비하기]
+  버튼은 문제 있을 때만. 예전 `r6launch.bat` 은 register 를 몰라 준비 대신 게임을 띄운다 — 방장은 최신 bat 필요.
 - 사이트 아이디가 영문·숫자·_- 가 아니면 중계 서버 이름은 `h_` + 해시 16자리(`relayName`).
 - `r6host.ps1` 과 `r6launch.bat` 는 ASCII 만 쓴다. Windows PowerShell 5 는 BOM 없는 파일을 ANSI 로 읽는다.
 - 지금은 방 하나만 중계한다. 실제 게임으로는 아직 시험하지 않았다(`relay/README.md` 의 "시험할 것").

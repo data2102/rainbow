@@ -309,6 +309,22 @@ SECRET = open('/etc/r6relay/agent.secret', 'rb').read().strip()
 CLI = '/usr/local/sbin/r6relay'
 CUR = '/etc/r6relay/current.name'
 
+def handshake_age(name):
+    """Seconds since that host PC last talked to us, or None if it never did."""
+    try:
+        pub = ''
+        for line in open(f'/etc/r6relay/hosts/{name}.peer'):
+            if line.startswith('PublicKey'):
+                pub = line.split('=', 1)[1].strip()
+        out = subprocess.run(['wg', 'show', 'wg0', 'latest-handshakes'], capture_output=True, text=True, timeout=5).stdout
+        for line in out.splitlines():
+            k, _, t = line.partition('\t')
+            if k.strip() == pub and t.strip().isdigit() and int(t) > 0:
+                return int(time.time()) - int(t)
+    except Exception:
+        pass
+    return None
+
 def run(*args):
     p = subprocess.run([CLI, *args], capture_output=True, text=True, timeout=20)
     return p.returncode, (p.stdout or '').strip(), (p.stderr or '').strip()
@@ -338,6 +354,12 @@ class H(BaseHTTPRequestHandler):
         if act == 'use':
             if not os.path.exists(f'/etc/r6relay/hosts/{name}.ip') or '/' in name:
                 return self.reply(404, {'error': 'not registered'})
+            # Registered but its PC is not on the tunnel (another PC, or never set up
+            # by the new script): switching to it would send players nowhere.
+            # The tunnel keeps alive every 25 s, so 3 minutes of silence means it is not there.
+            age = handshake_age(name)
+            if age is None or age > 180:
+                return self.reply(409, {'error': 'not connected', 'age': age})
             rc, out, err = run('use', name)
             return self.reply(200 if rc == 0 else 500, {'ok': rc == 0} if rc == 0 else {'error': err or out})
         if act == 'register':
