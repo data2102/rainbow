@@ -161,6 +161,11 @@ Radmin 없이 접속하려고 만든 UDP 중계. Vercel 은 UDP 를 못 받으�
   준비 창을 연 뒤 5초마다 실행을 다시 시도해 붙으면 저절로 실행한다(`hostSetupFlow`). [방장 PC 다시 준비하기]
   버튼은 문제 있을 때만. 예전 `r6launch.bat` 은 register 를 몰라 준비 대신 게임을 띄운다 — 방장은 최신 bat 필요.
 - 사이트 아이디가 영문·숫자·_- 가 아니면 중계 서버 이름은 `h_` + 해시 16자리(`relayName`).
+- **설치는 `public/r6setup.bat` 하나(v139).** 관리자 확인 한 번으로 `C:\R6Clan` + 런쳐, r6clan:// 등록(HKLM·HKCU 둘 다),
+  게임 RUNASADMIN, 방화벽(게임 + TCP/UDP 2346-2418)을 한다. 예전 ①②③(reg·bat·firewall)은 '예전 방식'으로 접어 뒀다.
+- **`r6launch.bat` 은 이제 바뀌지 않는 시작 파일**이다. 누를 때마다 사이트의 `public/r6main.bat`(실제 런쳐, 첫 줄 뒤
+  `rem R6MAIN` 표시)을 받아 `call` 한다. 받기 실패·이상한 파일이면 지난번 것을 쓴다. **런쳐 동작을 고칠 때는
+  `r6main.bat` 을 고친다** — 회원은 다시 받을 필요가 없다. 예전 통짜 `r6launch.bat` 을 가진 회원은 r6setup 한 번이 필요.
 - `r6host.ps1` 과 `r6launch.bat` 는 ASCII 만 쓴다. Windows PowerShell 5 는 BOM 없는 파일을 ANSI 로 읽는다.
 - **여러 방 동시 운영(v138, A 방식):** 방 N 의 바깥 포트는 `2346+10*(N-1)` ~ +2 (1번방 2346, 2번방 2356 … 8번방 2416).
   중계 서버가 방마다 그 방 방장 터널 주소의 2346~2348 로 한 칸씩 짝지어 DNAT 한다(`rooms/N.ip|name`).

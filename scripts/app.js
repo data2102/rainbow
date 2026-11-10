@@ -429,7 +429,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 138;
+const APP_VERSION = 139;
 let toldToRefresh = false;
 
 /**
@@ -5104,7 +5104,7 @@ function applyConnMode() {
   const sub = document.getElementById('dlSub');
   if (sub) {
     sub.innerHTML = mode === 'radmin'
-      ? '※ <b>1~3 은 처음 한 번만</b> 하면 그 다음부터는 방에 들어가 버튼만 누르면 됩니다.'
+      ? '※ <b>r6setup.bat 은 처음 한 번만</b> 실행하면 그 다음부터는 방에 들어가 버튼만 누르면 됩니다.'
       : '※ <b>①~③ 은 모두</b> 하고, <b>＋ 는 방장을 할 사람만</b> 하면 됩니다 ·'
         + ' 최초 1회만 실행하면 그 다음부터는 게임만 접속하시면 됩니다.';
   }
@@ -6031,7 +6031,7 @@ async function hostSetupFlow(info) {
       if (state) state.textContent = `준비 중… ${sec}초`;
       if (hint && sec >= 40) {
         hint.innerHTML = '확인 창이 안 보이면 작업 표시줄을 확인해 주세요 · '
-          + '준비 창 대신 <b>게임이 켜졌다면</b> 런쳐 ② <code>r6launch.bat</code> 을 최신으로 받아 덮어쓴 뒤 다시 실행하기를 눌러 주세요.';
+          + '준비 창 대신 <b>게임이 켜졌다면</b> 런쳐 탭의 <code>r6setup.bat</code> 을 한 번 실행한 뒤 다시 실행하기를 눌러 주세요.';
       }
       try {
         const d = await apiPost('/api/room', { action: 'start', address: '' });
