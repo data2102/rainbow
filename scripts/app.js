@@ -426,7 +426,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 136;
+const APP_VERSION = 137;
 let toldToRefresh = false;
 
 /**
@@ -2460,6 +2460,13 @@ function kstHourNow(ms = Date.now()) {
 }
 
 /** handle -> Set(시간대) */
+/** 그 사람 줄을 누가 대신 넣었나 (본인이 고쳤으면 null) */
+function scheduleSetBy() {
+  const m = new Map();
+  for (const r of playSchedule) if (r.setBy) m.set(r.handle, r.setBy);
+  return m;
+}
+
 function scheduleMap() {
   const map = new Map();
   for (const r of playSchedule) {
@@ -2579,6 +2586,7 @@ function renderSlotSummary() {
   const idle = players.filter(p => !voted.has(p.handle))
     .sort((a, b) => a.handle.localeCompare(b.handle));
 
+  const proxy = scheduleSetBy();
   el.innerHTML = playSlots.map(slot => {
     const names = bySlot.get(slot).sort((a, b) => a.localeCompare(b));
     // 미정·불참은 시간대 두 칸을 합친 너비로 둔다. 시간대가 아니므로
@@ -2591,7 +2599,9 @@ function renderSlotSummary() {
         <span class="slot-col-n">${names.length}명</span>
       </div>
       <div class="slot-names">${names.length
-        ? names.map(h => `<span class="slot-name who-id" data-pcard="${esc(h)}" role="button" tabindex="0">${esc(h)}</span>`).join('')
+        ? names.map(h => `<span class="slot-name who-id" data-pcard="${esc(h)}" role="button" tabindex="0">${esc(h)}`
+            + (proxy.has(h) ? `<i class="slot-proxy-tag" title="${esc(proxy.get(h))} 님이 대신 넣음">대리</i>` : '')
+            + `</span>`).join('')
         : '<span class="slot-none">아직 없음</span>'}</div>
     </div>`;
   }).join('')
@@ -2645,6 +2655,57 @@ function renderSchedule() {
   }
   renderSlotSummary();
   renderSlotMine();
+  renderSlotProxy();
+}
+
+/**
+ * 마스터가 남 대신 출석을 넣는 칸.
+ *
+ * 0~18시 창은 "경기 끝나고 점수 받으러 체크"를 막으려고 둔 것이라, 이 칸은
+ * 그 규칙에 구멍을 낸다. 그래서 마스터에게만 보이고, 넣은 줄에는 '대리' 가
+ * 붙으며, 감사 로그에도 남는다. 꼭 필요할 때만 쓰라고 까닭도 적어 둔다.
+ */
+function renderSlotProxy() {
+  const box = document.getElementById('slotProxy');
+  if (!box) return;
+  box.hidden = !isMaster();
+  if (!isMaster()) return;
+  const done = scheduleMap();
+  const who = [...players].sort((a, b) => a.handle.localeCompare(b.handle));
+  box.innerHTML = `<div class="slot-proxy-h">대리 출석 <span>마스터 전용 · 마감 뒤에도 넣을 수 있습니다</span></div>
+    <div class="slot-proxy-row">
+      <select id="slotProxyWho">${who.map(p => {
+        const cur = [...(done.get(p.handle) || [])][0];
+        return `<option value="${esc(p.handle)}">${esc(p.handle)}`
+          + `${cur === undefined ? '' : ` — 이미 ${slotLabel(cur)}`}</option>`;
+      }).join('')}</select>
+      <select id="slotProxySlot">${playSlots.map(sx =>
+        `<option value="${sx}">${slotLabel(sx)}</option>`).join('')}</select>
+      <button type="button" class="btn-mini" id="slotProxyGo">넣기</button>
+    </div>
+    <div class="slot-proxy-note">넣은 줄에는 <b>대리</b> 가 붙고, 누가 넣었는지 계정 로그에 남습니다.</div>`;
+}
+
+/** 대리로 한 사람의 출석을 넣는다 (마스터) */
+async function slotProxyPut() {
+  const w = document.getElementById('slotProxyWho');
+  const sl = document.getElementById('slotProxySlot');
+  const btn = document.getElementById('slotProxyGo');
+  if (!w || !sl || !btn) return;
+  const handle = w.value, slot = Number(sl.value);
+  if (!confirm(`${handle} 님을 ${slotLabel(slot)} 로 대신 넣습니다.\n`
+    + `본인이 고른 것이 아니라 '대리' 로 표시되고, 계정 로그에 남습니다.\n계속할까요?`)) return;
+  btn.disabled = true;
+  try {
+    await apiPost('/api/attendance', { action: 'scheduleFor', handle, slots: [slot] });
+    await loadAttendance();
+    renderAttendance();
+    showToast(`${handle} → ${slotLabel(slot)} (대리)`);
+  } catch (e) {
+    showToast('실패: ' + e.message);
+  }
+  const again = document.getElementById('slotProxyGo');
+  if (again) again.disabled = false;
 }
 
 /** 칩 하나를 눌러 내 그 시간대를 켜고 끈다 (대상은 언제나 로그인한 계정) */
@@ -2678,6 +2739,11 @@ async function toggleSlot(slot) {
 }
 
 function initScheduleEvents() {
+  const px = document.getElementById('slotProxy');
+  if (px) px.addEventListener('click', (e) => {
+    if (e.target.closest('#slotProxyGo')) slotProxyPut();
+  });
+
   const el = document.getElementById('slotMine');
   if (el) el.addEventListener('click', (e) => {
     if (e.target.closest('[data-slot-login]')) { showLoginModal(); return; }
