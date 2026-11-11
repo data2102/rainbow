@@ -1667,33 +1667,6 @@ body.rule-v2 #standingTable .streak-txt{ display:none; }
 .pill-remove{ color:var(--danger-strong); background:var(--danger-bg); }
 .pill-warn{ color:var(--warning-strong); background:var(--warning-bg); }
 
-/* 마스터가 남 대신 출석을 넣는 칸. 규칙에 구멍을 내는 길이라 눈에 띄게 두되
-   들뜨지 않게 — 자주 쓰라고 만든 것이 아니다. */
-.slot-proxy{
-  margin-top:var(--sp-4); padding:var(--sp-4);
-  border:1px solid var(--warning); border-radius:var(--radius-md);
-  background:var(--warning-bg);
-}
-.slot-proxy-h{
-  font-size:var(--fs-caption); font-weight:var(--fw-bold); color:var(--warning-strong);
-  margin-bottom:var(--sp-3);
-}
-.slot-proxy-h span{ font-weight:var(--fw-regular); color:var(--text-tertiary); margin-left:var(--sp-2); }
-.slot-proxy-row{ display:flex; gap:var(--sp-2); flex-wrap:wrap; align-items:center; }
-.slot-proxy-row select{
-  font-family:inherit; font-size:var(--fs-footnote); padding:var(--sp-2) var(--sp-3);
-  border:1px solid var(--border-strong); border-radius:var(--radius-sm);
-  background:var(--surface); color:var(--text-primary); min-width:150px;
-}
-.slot-proxy-note{ margin-top:var(--sp-2); font-size:var(--fs-footnote); color:var(--text-tertiary); }
-.slot-proxy-note b{ color:var(--warning-strong); font-weight:var(--fw-bold); }
-/* 출석표에서 대리로 넣힌 줄 — 본인 체크와 섞이면 안 된다 */
-.slot-proxy-tag{
-  margin-left:4px; padding:0 4px; border-radius:var(--radius-sm);
-  font-size:9px; font-style:normal; font-weight:var(--fw-bold);
-  background:var(--warning); color:var(--bg); vertical-align:1px;
-}
-
 /* ---------- 계정 권한 ---------- */
 .role-select{
   width:auto; min-width:110px; padding:var(--sp-1) var(--sp-3);
@@ -3553,7 +3526,6 @@ if (/[?&]room=\d+/.test(location.search)) {
         자정을 넘겨도 그날 밤은 출석과 상관없이 점수가 들어갑니다.
       </div>
       <div class="mine" id="slotMine"></div>
-      <div class="slot-proxy" id="slotProxy" hidden></div>
       <div class="slot-divider"></div>
 
       <div id="slotSummary" class="slot-summary"></div>

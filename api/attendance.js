@@ -1,5 +1,5 @@
 import {
-  q, tx, body, methodGuard, currentUser, requireUser, requireAdmin, requireMaster, audit,
+  q, tx, body, methodGuard, currentUser, requireUser, requireAdmin, audit,
   ruleV2, attendRule, kstHour, nightDay, ATTEND_CLOSE_HOUR,
 } from './_lib.js';
 import { syncSeason } from './_season.js';
@@ -112,9 +112,6 @@ async function ensureTable() {
      WHERE a.day = b.day AND a.handle = b.handle AND a.ctid > b.ctid`);
   await q(`CREATE UNIQUE INDEX IF NOT EXISTS idx_sched_one
              ON play_schedule (day, handle)`);
-  // 누가 대신 넣었는지. 본인이 직접 고른 줄은 NULL 이다.
-  // 대리와 본인 체크가 구별되지 않으면 0~18시 규칙이 뜻을 잃는다.
-  await q(`ALTER TABLE play_schedule ADD COLUMN IF NOT EXISTS set_by TEXT`);
   ensured = true;
 }
 
@@ -142,7 +139,7 @@ export default async function handler(req, res) {
       const night = nightDay();
       const [rows, picks, nightPicks] = await Promise.all([
         id ? q(`SELECT * FROM attendance WHERE season = $1 ORDER BY clock_in ASC`, [id]) : [],
-        q(`SELECT handle, slot, set_by FROM play_schedule WHERE day = $1 ORDER BY handle, slot`, [day]),
+        q(`SELECT handle, slot FROM play_schedule WHERE day = $1 ORDER BY handle, slot`, [day]),
         night === day
           ? null
           : q(`SELECT handle FROM play_schedule WHERE day = $1`, [night]),
@@ -158,7 +155,7 @@ export default async function handler(req, res) {
         open: attendOpen(),
         ruleV2: ruleV2(Date.now()),
         attendRule: attendRule(Date.now()),
-        schedule: picks.map(r => ({ handle: r.handle, slot: r.slot, setBy: r.set_by || null })),
+        schedule: picks.map(r => ({ handle: r.handle, slot: r.slot })),
         night: {
           day: night,
           handles: (nightPicks || picks).map(r => r.handle),
@@ -183,7 +180,6 @@ export default async function handler(req, res) {
       }
       return await setSchedule(res, me, body(req).slots);
     }
-    if (action === 'scheduleFor') return await scheduleFor(req, res);
     if (action === 'remove') return await remove(req, res, id);
     if (action === 'voteStats') return await voteStats(req, res);
     return res.status(400).json({ error: '알 수 없는 요청입니다.' });
@@ -264,7 +260,7 @@ async function punch(res, action, handle, season) {
 }
 
 /** 로그인한 사람의 접속 예상 시간대를 통째로 다시 저장한다 */
-async function setSchedule(res, handle, slots, by = null) {
+async function setSchedule(res, handle, slots) {
   let picked = Array.isArray(slots)
     ? [...new Set(slots.map(Number))].filter(n => SLOTS.includes(n))
     : [];
@@ -280,32 +276,11 @@ async function setSchedule(res, handle, slots, by = null) {
     if (!rows.length) throw new Error('명단에 없는 선수입니다: ' + handle);
     await c.query(`DELETE FROM play_schedule WHERE day = $1 AND handle = $2`, [day, handle]);
     for (const slot of picked) {
-      await c.query(`INSERT INTO play_schedule (day, handle, slot, set_by) VALUES ($1,$2,$3,$4)`,
-        [day, handle, slot, by]);
+      await c.query(`INSERT INTO play_schedule (day, handle, slot) VALUES ($1,$2,$3)`,
+        [day, handle, slot]);
     }
   });
-  res.status(200).json({ ok: true, day, handle, slots: picked, setBy: by });
-}
-
-/**
- * POST {action:'scheduleFor', handle, slots} — **마스터가 남 대신** 출석을 넣는다.
- *
- * 0~18시 창은 "경기 끝나고 점수 받으러 체크"를 막으려고 둔 것이라, 그 창을
- * 넘어서도 넣을 수 있는 이 길은 규칙에 구멍을 낸다. 그래서 셋을 지킨다.
- *   - **마스터만** 쓸 수 있다 (관리자도 안 된다)
- *   - 누가 대신 넣었는지 `set_by` 에 남고, 출석표에 '대리' 로 보인다
- *   - 감사 로그에도 남는다
- * 본인이 직접 고친 줄은 set_by 가 NULL 이므로 둘은 섞이지 않는다.
- */
-async function scheduleFor(req, res) {
-  const me = await requireMaster(req, res);
-  if (!me) return;
-  const { handle, slots } = body(req);
-  if (!handle || typeof handle !== 'string') {
-    return res.status(400).json({ error: '누구 대신 넣을지 알려주세요.' });
-  }
-  await setSchedule(res, handle, slots, me);
-  await audit(me, 'schedule_for', { day: playDay(), handle, slots });
+  res.status(200).json({ ok: true, day, handle, slots: picked });
 }
 
 /** 잘못 찍힌 기록 지우기 — 관리자만 */
