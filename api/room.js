@@ -30,7 +30,7 @@ export const MAX_TITLE = 24;
 export const PING_VERSION = 3;
 
 /** 사이트가 바뀌었는지 브라우저가 알아채는 표. 배포할 때마다 올린다. */
-export const APP_VERSION = 137;
+export const APP_VERSION = 140;
 
 /** 이 시간 동안 아무 신호가 없으면 나간 것으로 본다 (브라우저를 그냥 닫는 경우) */
 const IDLE_MS = 3 * 60 * 1000;
@@ -812,7 +812,10 @@ async function start(req, res) {
   // 사람들이 찾아올 주소는 언제나 중계 서버다. 서버가 UDP 2346~2348 을 지금 방장의
   // WireGuard 터널로 넘긴다(relay/r6relay.sh). 화면이 보낸 주소는 받지 않는다 —
   // 각자 주소를 적던 Radmin 방식은 걷어냈다.
-  const address = RELAY_ADDRESS;
+  // 방마다 바깥 포트가 다르다: 1번방 2346, 2번방 2356 … (relay/r6relay.sh 의 room_port).
+  // 1번방은 포트를 붙이지 않는다 — 예전 런쳐는 포트를 버리고 2346 으로 가므로 1번방은 그대로 된다.
+  const port = 2346 + 10 * (Number(room) - 1);
+  const address = Number(room) === 1 ? RELAY_ADDRESS : `${RELAY_ADDRESS}:${port}`;
   const mode = 'relay';
 
   const first = await q(
@@ -824,13 +827,19 @@ async function start(req, res) {
 
   // 중계 서버에 "이번 방장은 이 사람" 이라고 알린다. 손으로 r6relay use 를 치던 일이다.
   // 등록 안 된 PC 면 게임을 띄워 봐야 아무도 못 들어오니, 여기서 멈추고 이유를 말한다.
+  // 처음 방장이거나(404), 등록은 됐는데 이 PC 가 터널에 없으면(409 — 다른 PC, 꺼진 터널)
+  // 실행하지 않고 "이 PC 를 준비하라" 고 돌려준다. 화면이 일회 표로 준비 창을 열고,
+  // 준비가 끝날 때까지 실행을 다시 시도한다 — 방장은 실행하기 한 번만 누른다.
   if (relayEnabled()) {
     try {
-      await relayCall('use', { name: relayName(me) });
+      await relayCall('use', { name: relayName(me), room: Number(room) });
     } catch (e) {
-      if (e.status === 404) {
-        return res.status(400).json({
-          error: '이 계정은 아직 방장 등록이 안 되어 있습니다. 런쳐의 [방장 등록하기] 를 방장 PC 에서 먼저 해 주세요.',
+      if (e.status === 404 || e.status === 409) {
+        return res.status(409).json({
+          needSetup: true,
+          reason: e.status === 404 ? 'new' : 'offline',
+          token: makeRegisterToken(me),
+          error: '이 PC 를 방장으로 준비해야 합니다.',
         });
       }
       return res.status(502).json({ error: e.message });

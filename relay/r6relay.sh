@@ -29,7 +29,12 @@ DIR=${R6_DIR:-/etc/r6relay}
 WG=wg0
 NET=10.66.0                # tunnel network, relay is .1
 WG_PORT=51820
-GAME_PORTS=2346:2348       # JOIN / ANNOUNCE / INFO
+GAME_PORTS=2346:2348       # JOIN / ANNOUNCE / INFO (on the host PC, every room)
+# Several rooms at once: room N comes in on 2346+10*(N-1) .. +2 and goes to that
+# room's host on 2346..2348. Room 1 keeps 2346, so old launchers still reach it.
+ROOMS=8
+room_port() { echo $((2346 + 10 * ($1 - 1))); }
+valid_room() { [[ "$1" =~ ^[1-8]$ ]] || die "방 번호는 1~8 입니다: '$1'"; }
 SELF=/usr/local/sbin/r6relay
 LOGDIR=${R6_LOGDIR:-/var/log/r6relay}
 LOG_SVC=r6relay-log
@@ -90,8 +95,8 @@ cmd_setup() {
   # 막히지 않도록 ufw 에도 같은 구멍을 적어 둔다
   if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q '^Status: active'; then
     ufw allow "$WG_PORT/udp" >/dev/null
-    ufw allow 2346:2348/udp >/dev/null
-    ufw allow 2346:2348/tcp >/dev/null
+    ufw allow 2346:2418/udp >/dev/null
+    ufw allow 2346:2418/tcp >/dev/null
     ok "ufw 에 UDP $WG_PORT · 2346-2348(UDP·TCP) 허용"
   fi
 
@@ -114,7 +119,8 @@ cmd_setup() {
 # 않아도, 나중에 'r6relay log' 로 그때 무슨 일이 있었는지 볼 수 있다.
 # 터널(wg0) 쪽도 같이 적어서 "방장에게 넘어갔나 / 방장이 답했나"까지 보인다.
 ensure_log() {
-  [ -f "/etc/systemd/system/$LOG_SVC.service" ] && return 0
+  # 방이 늘며 기록할 포트가 넓어졌다 — 예전 범위로 깔린 기록 서비스는 다시 깐다
+  [ -f "/etc/systemd/system/$LOG_SVC.service" ] && grep -q 'portrange 2346-2418' "/etc/systemd/system/$LOG_SVC.service" && return 0
   command -v tcpdump >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 install -y tcpdump >/dev/null
   mkdir -p "$LOGDIR"
   cat > "/etc/systemd/system/$LOG_SVC.service" <<UNIT
@@ -124,7 +130,7 @@ After=network-online.target
 
 [Service]
 Environment=TZ=Asia/Seoul
-ExecStart=/bin/sh -c 'exec $(command -v tcpdump) -ni any -l -tttt "portrange 2346-2348" >> $LOGDIR/traffic.log 2>/dev/null'
+ExecStart=/bin/sh -c 'exec $(command -v tcpdump) -ni any -l -tttt "portrange 2346-2418" >> $LOGDIR/traffic.log 2>/dev/null'
 Restart=always
 RestartSec=3
 
@@ -143,15 +149,21 @@ $LOGDIR/*.log {
 ROT
   systemctl daemon-reload
   # 부팅 중 wg-quick 의 PostUp 에서 불릴 수 있다 — 기다리면 서로 막히므로 --no-block
-  systemctl enable --now --no-block "$LOG_SVC" >/dev/null 2>&1 || true
+  systemctl enable --no-block "$LOG_SVC" >/dev/null 2>&1 || true
+  systemctl restart --no-block "$LOG_SVC" >/dev/null 2>&1 || true
   ok "접속 기록 시작 ($LOGDIR)"
 }
 
 # 게임 포트를 지금 방장에게 넘기는 규칙. 우리 체인만 만지므로 다른 규칙은 건드리지 않는다
 cmd_apply() {
   ensure_log
-  local wan host; wan=$(wan_if); [ -n "$wan" ] || die "인터넷 쪽 네트워크 장치를 찾지 못했습니다."
-  host=$(cat "$DIR/current.ip" 2>/dev/null || true)
+  local wan; wan=$(wan_if); [ -n "$wan" ] || die "인터넷 쪽 네트워크 장치를 찾지 못했습니다."
+  mkdir -p "$DIR/rooms"
+  # 방 하나만 있던 때의 기록은 1번방으로 옮긴다
+  if [ -s "$DIR/current.ip" ] && [ ! -e "$DIR/rooms/1.ip" ]; then
+    mv "$DIR/current.ip" "$DIR/rooms/1.ip"; mv "$DIR/current.name" "$DIR/rooms/1.name" 2>/dev/null || true
+  fi
+  rm -f "$DIR/current.ip" "$DIR/current.name"
 
   for c in R6_IN R6_FWD; do iptables -N $c 2>/dev/null || true; iptables -F $c; done
   for c in R6_PRE R6_POST; do iptables -t nat -N $c 2>/dev/null || true; iptables -t nat -F $c; done
@@ -164,17 +176,30 @@ cmd_apply() {
   iptables -A R6_IN -p udp --dport "$WG_PORT" -j ACCEPT
   [ -s "$DIR/agent.secret" ] && iptables -A R6_IN -p tcp --dport "$AGENT_PORT" -j ACCEPT
   iptables -A R6_FWD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-  if [ -n "$host" ]; then
-    # 게임이 어느 쪽으로 붙는지 확인하지 못했다 — UDP 만 넘겼더니 접속이 한 개도 안 왔다.
-    # TCP 와 UDP 를 둘 다 넘긴다.
-    local proto
+
+  # 방마다: 바깥 포트 세 칸 -> 그 방 방장의 2346~2348. 한 칸씩 짝지어 넘긴다
+  # (범위째 넘기면 커널이 범위 안의 아무 포트나 고를 수 있다).
+  # 게임은 JOIN 을 TCP 로 한다 — UDP 만 넘기던 동안 아무도 못 들어왔다. 둘 다 넘긴다.
+  local n host base proto k seen=" "
+  for n in $(seq 1 $ROOMS); do
+    host=$(cat "$DIR/rooms/$n.ip" 2>/dev/null || true)
+    [ -n "$host" ] || continue
+    base=$(room_port "$n")
+    for proto in udp tcp; do
+      for k in 0 1 2; do
+        iptables -t nat -A R6_PRE -i "$wan" -p "$proto" --dport $((base + k)) \
+          -j DNAT --to-destination "$host:$((2346 + k))"
+      done
+    done
+    # 한 방장이 두 방을 열어도 아래 두 줄은 한 번만
+    case "$seen" in *" $host "*) continue ;; esac
+    seen="$seen$host "
     for proto in udp tcp; do
       iptables -A R6_FWD -i "$wan" -o "$WG" -p "$proto" -d "$host" --dport $GAME_PORTS -j ACCEPT
-      iptables -t nat -A R6_PRE -i "$wan" -p "$proto" --dport $GAME_PORTS -j DNAT --to-destination "$host"
       # 방장 PC 가 답을 다시 터널로 보내게 한다. 방장 쪽 라우팅을 건드리지 않아도 된다
       iptables -t nat -A R6_POST -o "$WG" -p "$proto" -d "$host" --dport $GAME_PORTS -j MASQUERADE
     done
-  fi
+  done
 }
 
 cmd_clear() {
@@ -253,23 +278,32 @@ cmd_register() {
 }
 
 cmd_use() {
-  need_root; local name=${1:-}; [ -n "$name" ] || die "사용법: r6relay use <방장이름>"; valid_name "$name"
+  need_root; local name=${1:-} room=${2:-1}
+  [ -n "$name" ] || die "사용법: r6relay use <방장이름> [방번호]"; valid_name "$name"; valid_room "$room"
   [ -e "$DIR/hosts/$name.ip" ] || die "등록되지 않은 방장입니다: $name"
-  cp "$DIR/hosts/$name.ip" "$DIR/current.ip"; echo "$name" > "$DIR/current.name"
-  event "use $name $(cat "$DIR/current.ip")"
+  mkdir -p "$DIR/rooms"
+  cp "$DIR/hosts/$name.ip" "$DIR/rooms/$room.ip"; echo "$name" > "$DIR/rooms/$room.name"
+  event "use $name $(cat "$DIR/rooms/$room.ip") room $room"
   cmd_apply
-  ok "이제 게임은 $name ($(cat "$DIR/current.ip")) 에게 갑니다."
-  echo "  유저 접속 주소: $(cat "$DIR/endpoint")"
+  ok "이제 ${room}번방 게임은 $name ($(cat "$DIR/rooms/$room.ip")) 에게 갑니다."
+  echo "  유저 접속 주소: $(cat "$DIR/endpoint"):$(room_port "$room")"
 }
 
 cmd_off() {
-  need_root; rm -f "$DIR/current.ip" "$DIR/current.name"; cmd_apply; event "off"; ok "게임 넘기기를 멈췄습니다."
+  need_root; local room=${1:-all}
+  if [ "$room" = all ]; then rm -f "$DIR"/rooms/*.ip "$DIR"/rooms/*.name
+  else valid_room "$room"; rm -f "$DIR/rooms/$room.ip" "$DIR/rooms/$room.name"; fi
+  cmd_apply; event "off $room"; ok "게임 넘기기를 멈췄습니다 ($room)."
 }
 
 cmd_remove() {
   need_root; local name=${1:-}; valid_name "$name"
   [ -e "$DIR/hosts/$name.ip" ] || die "등록되지 않은 방장입니다: $name"
-  [ "$(cat "$DIR/current.name" 2>/dev/null)" = "$name" ] && cmd_off
+  local f
+  for f in "$DIR"/rooms/*.name; do
+    [ -e "$f" ] && [ "$(cat "$f")" = "$name" ] && rm -f "$f" "${f%.name}.ip"
+  done
+  cmd_apply
   rm -f "$DIR/hosts/$name".{ip,peer,conf}
   event "remove $name"
   reload; ok "$name 삭제"
@@ -286,7 +320,14 @@ cmd_list() {
 cmd_status() {
   need_root
   echo "  접속 주소   : $(cat "$DIR/endpoint" 2>/dev/null || echo '-')"
-  echo "  지금 방장   : $(cat "$DIR/current.name" 2>/dev/null || echo '없음') $(cat "$DIR/current.ip" 2>/dev/null || true)"
+  echo "  [방별 방장]"
+  local n any=0
+  for n in $(seq 1 $ROOMS); do
+    [ -e "$DIR/rooms/$n.name" ] || continue
+    any=1
+    printf '    %s번방  :%s  ->  %s %s\n' "$n" "$(room_port "$n")" "$(cat "$DIR/rooms/$n.name")" "$(cat "$DIR/rooms/$n.ip")"
+  done
+  [ "$any" = 1 ] || echo "    (없음)"
   echo
   echo "  [방장 연결] latest handshake 가 2분 이내면 연결된 것입니다"
   wg show "$WG" 2>/dev/null | sed 's/^/    /' || echo "    중계가 꺼져 있습니다 (systemctl status wg-quick@$WG)"
@@ -307,7 +348,23 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 SECRET = open('/etc/r6relay/agent.secret', 'rb').read().strip()
 CLI = '/usr/local/sbin/r6relay'
-CUR = '/etc/r6relay/current.name'
+ROOMS_DIR = '/etc/r6relay/rooms'
+
+def handshake_age(name):
+    """Seconds since that host PC last talked to us, or None if it never did."""
+    try:
+        pub = ''
+        for line in open(f'/etc/r6relay/hosts/{name}.peer'):
+            if line.startswith('PublicKey'):
+                pub = line.split('=', 1)[1].strip()
+        out = subprocess.run(['wg', 'show', 'wg0', 'latest-handshakes'], capture_output=True, text=True, timeout=5).stdout
+        for line in out.splitlines():
+            k, _, t = line.partition('\t')
+            if k.strip() == pub and t.strip().isdigit() and int(t) > 0:
+                return int(time.time()) - int(t)
+    except Exception:
+        pass
+    return None
 
 def run(*args):
     p = subprocess.run([CLI, *args], capture_output=True, text=True, timeout=20)
@@ -333,12 +390,25 @@ class H(BaseHTTPRequestHandler):
         if abs(time.time() - float(d.get('ts', 0))) > 120: return self.reply(403, {'error': 'stale'})
         act = d.get('action'); name = str(d.get('name', ''))
         if act == 'status':
-            cur = open(CUR).read().strip() if os.path.exists(CUR) else ''
-            return self.reply(200, {'current': cur})
+            rooms = {}
+            if os.path.isdir(ROOMS_DIR):
+                for f in os.listdir(ROOMS_DIR):
+                    if f.endswith('.name'):
+                        rooms[f[:-5]] = open(os.path.join(ROOMS_DIR, f)).read().strip()
+            return self.reply(200, {'rooms': rooms})
         if act == 'use':
             if not os.path.exists(f'/etc/r6relay/hosts/{name}.ip') or '/' in name:
                 return self.reply(404, {'error': 'not registered'})
-            rc, out, err = run('use', name)
+            # Registered but its PC is not on the tunnel (another PC, or never set up
+            # by the new script): switching to it would send players nowhere.
+            # The tunnel keeps alive every 25 s, so 3 minutes of silence means it is not there.
+            age = handshake_age(name)
+            if age is None or age > 180:
+                return self.reply(409, {'error': 'not connected', 'age': age})
+            room = str(d.get('room', 1))
+            if room not in {str(i) for i in range(1, 9)}:
+                return self.reply(400, {'error': 'bad room'})
+            rc, out, err = run('use', name, room)
             return self.reply(200 if rc == 0 else 500, {'ok': rc == 0} if rc == 0 else {'error': err or out})
         if act == 'register':
             rc, out, err = run('register', name, str(d.get('pubkey', '')))
@@ -383,7 +453,7 @@ cmd_log() {
   [[ "$mins" =~ ^[0-9]+$ ]] || { [ "$mins" = raw ] && { tail -n 80 "$LOGDIR/traffic.log" 2>/dev/null; return; }; die "사용법: r6relay log [분|raw]"; }
   [ -f "$LOGDIR/traffic.log" ] || die "아직 기록이 없습니다. 'r6relay apply' 를 한 번 실행했는지 확인하세요."
   local since; since=$(TZ=Asia/Seoul date -d "-$mins min" '+%F %T')
-  python3 - "$since" "$LOGDIR/events.log" "$LOGDIR/traffic.log" "$(cat "$DIR/current.name" 2>/dev/null)" <<'PY'
+  python3 - "$since" "$LOGDIR/events.log" "$LOGDIR/traffic.log" "$(for f in "$DIR"/rooms/*.name; do [ -e "$f" ] && printf '%s번방=%s ' "$(basename "$f" .name)" "$(cat "$f")"; done)" <<'PY'
 import re, sys
 from collections import defaultdict, OrderedDict
 since, evf, trf, cur = sys.argv[1:5]
@@ -447,7 +517,7 @@ for ip, fs in per_ip.items():
     host = defaultdict(int)
     for f in fs:
         for k2, v in f['host'].items(): host[k2] += v
-    ports = sorted({f"{f['proto']} {f['port']}" for f in fs})
+    ports = sorted({f"{f['proto']} {f['port']}({(int(f['port']) - 2346) // 10 + 1}번방)" for f in fs})
     print(f"  {ip}   {fs[0]['first']} ~ {fs[-1]['last']}   {', '.join(ports)}")
     hs = ', '.join(f"{k2} {v}" for k2, v in host.items()) or '없음'
     print(f"    도착 {came}  ->  방장에게 넘김 {fwd}  ->  방장 답 [{hs}]  ->  참가자에게 돌려줌 {back}")
@@ -472,8 +542,8 @@ PY
 case "${1:-}" in
   setup)  cmd_setup ;;
   add)    cmd_add "${2:-}" ;;
-  use)    cmd_use "${2:-}" ;;
-  off)    cmd_off ;;
+  use)    cmd_use "${2:-}" "${3:-1}" ;;
+  off)    cmd_off "${2:-all}" ;;
   remove) cmd_remove "${2:-}" ;;
   list)   cmd_list ;;
   status) cmd_status ;;
@@ -486,7 +556,8 @@ case "${1:-}" in
     curl -fsSL https://raw.githubusercontent.com/data2102/rainbow/main/relay/r6relay.sh -o "$SELF.new" \
       && install -m 755 "$SELF.new" "$SELF" && rm -f "$SELF.new" || die "새 버전을 받지 못했습니다."
     if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q '^Status: active'; then
-      ufw allow 2346:2348/tcp >/dev/null
+      ufw allow 2346:2418/tcp >/dev/null
+      ufw allow 2346:2418/udp >/dev/null
     fi
     event "update"
     "$SELF" apply && ok "최신 규칙으로 다시 걸었습니다."

@@ -291,7 +291,10 @@ async function handleRes(r) {
       // 표가 만료됐거나 지워졌다. 들고 있어봐야 계속 튕기므로 버린다.
       authToken = null; me = null; clearLogin(); renderAuthBar();
     }
-    throw new Error((data && data.error) || `서버 오류 (${r.status})`);
+    const err = new Error((data && data.error) || `서버 오류 (${r.status})`);
+    err.status = r.status;
+    err.data = data;          // 서버가 덧붙인 값(예: 방장 준비가 필요하다는 표시)
+    throw err;
   }
   return data;
 }
@@ -426,7 +429,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 137;
+const APP_VERSION = 140;
 let toldToRefresh = false;
 
 /**
@@ -5167,7 +5170,7 @@ function applyConnMode() {
   const sub = document.getElementById('dlSub');
   if (sub) {
     sub.innerHTML = mode === 'radmin'
-      ? '※ <b>1~3 은 처음 한 번만</b> 하면 그 다음부터는 방에 들어가 버튼만 누르면 됩니다.'
+      ? '※ <b>r6setup.bat 은 처음 한 번만</b> 실행하면 그 다음부터는 방에 들어가 버튼만 누르면 됩니다.'
       : '※ <b>①~③ 은 모두</b> 하고, <b>＋ 는 방장을 할 사람만</b> 하면 됩니다 ·'
         + ' 최초 1회만 실행하면 그 다음부터는 게임만 접속하시면 됩니다.';
   }
@@ -5566,7 +5569,7 @@ function renderRoomView(r) {
          </ol>
          <div class="steps-alt">${r.address
            ? `혹시 못 붙으면 <kbd>MULTIPLAYER</kbd> › <kbd>MANUAL JOIN</kbd> 에
-              <b>${esc(r.address)}</b> · 포트 <b>2346</b> 을 직접 넣으세요
+              <b>${esc(String(r.address).split(':')[0])}</b> · 포트 <b>${esc(String(r.address).split(':')[1] || '2346')}</b> 을 직접 넣으세요
               (조인하기를 누르면 주소가 복사됩니다).`
            : '방장이 아직 접속 주소를 적지 않아 자동으로 붙지 못할 수 있습니다.'}</div>`;
   }
@@ -6044,8 +6047,79 @@ async function startRoom(known) {
     playCountdown(d.startedAt || Date.now(), () => launchGame(d.address, 'create'));
     loadRooms().then(renderLauncher).catch(() => {});
   } catch (e) {
+    if (e.data && e.data.needSetup) { hostSetupFlow(e.data); return; }
     if (err) err.textContent = e.message;
     else showToast(e.message);
+  }
+}
+
+/**
+ * 이 PC 를 방장으로 준비하고, 끝나면 저절로 실행한다.
+ *
+ * 실행하기를 눌렀는데 서버가 "이 PC 는 아직 중계 서버에 붙어 있지 않다"(needSetup)고 하면
+ * 일회 표로 준비 창(r6clan://register → r6launch.bat → r6host.ps1)을 연다. 그 창이
+ * WireGuard·열쇠·방화벽·감시를 깔고 터널을 붙이면, 서버가 그 PC 를 보게 되고 실행이 통과한다.
+ * 그때까지 5초마다 실행을 다시 시도한다 — 방장이 버튼을 다시 찾을 필요가 없다.
+ */
+let hostSetupBusy = false;
+async function hostSetupFlow(info) {
+  if (hostSetupBusy) return;
+  hostSetupBusy = true;
+  let cancelled = false;
+  const first = info.reason === 'new';
+  openModal(`
+    <h3>방장 PC 준비</h3>
+    <div class="foot-note" style="margin-top:0;">
+      ${first ? '이 계정으로 처음 방장을 합니다.' : '이 PC 가 아직 중계 서버에 연결되어 있지 않습니다.'}
+      <b>처음 한 번</b>만 이 PC 를 준비합니다 (1~2분).<br>
+      Windows 확인 창이 뜨면 <b>"예"</b> 를 눌러 주세요. 끝나면 게임이 저절로 실행됩니다.
+    </div>
+    <div class="setup-state" id="setupState">준비 창을 여는 중…</div>
+    <div class="foot-note" id="setupHint"></div>
+    <button class="btn-ghost" id="setupCancel">그만두기</button>`);
+  const state = document.getElementById('setupState');
+  const hint = document.getElementById('setupHint');
+  const cancel = document.getElementById('setupCancel');
+  if (cancel) cancel.addEventListener('click', () => { cancelled = true; closeModal(); });
+
+  window.location.href = GAME_PROTOCOL + 'register/' + encodeURIComponent(info.token);
+
+  const started = Date.now();
+  const LIMIT = 4 * 60 * 1000;
+  try {
+    while (!cancelled && Date.now() - started < LIMIT) {
+      await new Promise(r => setTimeout(r, 5000));
+      // 창을 다른 방법(바깥 클릭 등)으로 닫았어도 그만둔 것으로 본다 — 몇 분 뒤 게임이 불쑥 켜지면 안 된다
+      const ov = document.getElementById('modalOverlay');
+      if (ov && !ov.classList.contains('show')) cancelled = true;
+      if (cancelled) return;
+      const sec = Math.round((Date.now() - started) / 1000);
+      if (state) state.textContent = `준비 중… ${sec}초`;
+      if (hint && sec >= 40) {
+        hint.innerHTML = '확인 창이 안 보이면 작업 표시줄을 확인해 주세요 · '
+          + '준비 창 대신 <b>게임이 켜졌다면</b> 런쳐 탭의 <code>r6setup.bat</code> 을 한 번 실행한 뒤 다시 실행하기를 눌러 주세요.';
+      }
+      try {
+        const d = await apiPost('/api/room', { action: 'start', address: '' });
+        closeModal();
+        showToast('방장 준비가 끝났습니다 · 게임을 실행합니다.');
+        playCountdown(d.startedAt || Date.now(), () => launchGame(d.address, 'create'));
+        loadRooms().then(renderLauncher).catch(() => {});
+        return;
+      } catch (e) {
+        if (!(e.data && e.data.needSetup)) {
+          if (state) state.textContent = e.message;
+          return;
+        }
+      }
+    }
+    if (!cancelled && state) {
+      state.textContent = '아직 준비가 끝나지 않았습니다.';
+      if (hint) hint.innerHTML = '준비 창에 오류가 있었다면 그 화면을 관리자에게 보내 주세요 · '
+        + '<code>C:\\R6Clan\\r6host.log</code> 에 기록이 남습니다. 실행하기를 다시 누르면 처음부터 다시 합니다.';
+    }
+  } finally {
+    hostSetupBusy = false;
   }
 }
 
