@@ -27,10 +27,10 @@
       rel="stylesheet" media="print" onload="this.media='all';this.onload=null;">
 <noscript><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet"></noscript>
 <script>
-  /* 저장해둔 선택을 첫 페인트 전에 적용한다. 저장값이 없으면 화이트가 기본. */
+  /* 저장해둔 선택을 첫 페인트 전에 적용한다. 저장값이 없으면 다크가 기본. */
   (function(){
-    var t = "light";
-    try { if (localStorage.getItem("r6-theme") === "dark") t = "dark"; } catch (e) {}
+    var t = "dark";
+    try { if (localStorage.getItem("r6-theme") === "light") t = "light"; } catch (e) {}
     document.documentElement.setAttribute("data-theme", t);
   })();
 </script>
@@ -97,49 +97,51 @@
 
 :root {
   /* ===== 색: 브랜드 / 행동 (파랑은 "누를 수 있는 것"에만) ===== */
-  --accent:            #3182f6;   /* 기본 액션색 (토스 블루) */
-  --accent-hover:      #2b74dc;
-  --accent-pressed:    #2264c4;
-  --accent-bg:         #e8f3ff;   /* 연한 배경 틴트 (아이콘칩, 선택 상태) */
-  --on-accent:         #ffffff;   /* 파란 버튼 위 글자 */
+  --accent:            #c9201a;   /* 표지 로고의 빨강 */
+  --accent-hover:      #b01a15;
+  --accent-pressed:    #97140f;
+  --accent-bg:         #fbeceb;   /* 연한 배경 틴트 (아이콘칩, 선택 상태) */
+  --on-accent:         #ffffff;   /* 빨간 버튼 위 글자 (5.7:1) */
 
   /* 따뜻한 포인트(개인 도구/기억비서용 보조 액센트, 선택) */
-  --warm:              #c96f4c;
-  --warm-bg:           #faece7;
+  --warm:              #b5603a;
+  --warm-bg:           #f9ece5;
 
   /* ===== 색: 텍스트 (무채색으로 조용히) ===== */
-  --text-primary:      #191f28;   /* 본문/제목 */
-  --text-secondary:    #4e5968;   /* 보조 설명 */
-  --text-tertiary:     #8b95a1;   /* 힌트/메타/캡션 */
-  --text-disabled:     #b0b8c1;
+  --text-primary:      #1f2119;   /* 본문/제목 (16.3:1) */
+  --text-secondary:    #575a4c;   /* 보조 설명 (7.1:1) */
+  --text-tertiary:     #7d8073;   /* 힌트/메타/캡션 */
+  --text-disabled:     #a8aa9c;
 
   /* ===== 색: 표면 / 배경 ===== */
-  --bg:                #f2f4f6;   /* 페이지 바탕 (살짝 회색) */
+  --bg:                #efece2;   /* 페이지 바탕 — 표지 위쪽 하늘의 크림 */
   --surface:           #ffffff;   /* 카드 */
-  --surface-sunken:    #f9fafb;   /* 카드 안 살짝 눌린 영역 */
+  --surface-sunken:    #f8f6ef;   /* 카드 안 살짝 눌린 영역 */
 
   /* ===== 색: 경계선 ===== */
-  --border:            #eef1f4;   /* 기본 hairline */
-  --border-strong:     #d1d6db;   /* 강조 구분선 */
+  --border:            #ebe7dc;   /* 기본 hairline */
+  --border-strong:     #cfc8b8;   /* 강조 구분선 */
 
   /* ===== 색: 상태 (의미가 있을 때만) ===== */
-  /* 연승/연패 표시 — 국내 시세판처럼 오름은 빨강, 내림은 파랑 */
-  --rise:              #e4453a;  --rise-bg:    #ffeceb;
-  --fall:              #1b64da;  --fall-bg:    #e9f1ff;
+  /* 연승/연패 — 오름은 빨강 그대로. 내림 파랑은 이 화면에 파랑이 한 점도
+     없어 혼자 겉돌기에 가라앉은 카키로 바꿨다. */
+  --rise:              #d6342a;  --rise-bg:    #fdecea;
+  --fall:              #6f7263;  --fall-bg:    #f0efe7;
 
-  /* STANDING 상위권 표시 */
-  --top-rank:          #d6336c;  --top-rank-bg:  #ffe3ee;  --top-rank-row: #fff5f9;
+  /* STANDING 상위권 — 금색. 빨강으로 두면 1~5위 세 칸이 전부 빨개져
+     "누를 수 있는 것"이라는 빨강의 뜻이 흐려진다. */
+  --top-rank:          #9a6d12;  --top-rank-bg:  #fbf0d8;  --top-rank-row: #fdf8ec;
 
-  --success:           #12b886;  --success-bg: #e6fcf5;
-  --warning:           #f59f00;  --warning-bg: #fff9db;
-  --danger:            #f03e3e;  --danger-bg:  #fff0f0;
-  --info:              #3182f6;  --info-bg:    #e8f3ff;
+  --success:           #4f7a2e;  --success-bg: #eef4e2;   /* 전술복 카키그린 */
+  --warning:           #946200;  --warning-bg: #fdf3dc;
+  --danger:            #c0261e;  --danger-bg:  #fdecea;
+  --info:              #c9201a;  --info-bg:    #fbeceb;
 
   /* 진한 텍스트용(연한 배경 위 글자·채운 버튼) — WCAG AA 대비 확보 */
-  --accent-strong:     #1d63c9;   /* 흰 글자 버튼 배경 */
-  --success-strong:    #0a7350;
-  --warning-strong:    #7a5300;
-  --danger-strong:     #c0261e;
+  --accent-strong:     #a81912;   /* 연한 틴트 위 글자 (흰 바탕 7.5:1) */
+  --success-strong:    #3d6322;
+  --warning-strong:    #7a5a12;
+  --danger-strong:     #a81912;
 
   /* ===== 타이포 ===== */
   --font-sans: "Noto Sans KR", "Pretendard", -apple-system, "Malgun Gothic", "맑은 고딕", sans-serif;
@@ -175,8 +177,8 @@
   /* ===== 그림자 (아주 절제) ===== */
   --shadow-card:    0 1px 3px rgba(0,0,0,0.06);
   --shadow-popover: 0 8px 24px rgba(0,0,0,0.12);
-  --shadow-focus:   0 0 0 3px rgba(49,130,246,0.35);
-  --shadow-focus-danger: 0 0 0 3px rgba(240,62,62,0.30);
+  --shadow-focus:   0 0 0 3px rgba(201,32,26,0.30);
+  --shadow-focus-danger: 0 0 0 3px rgba(201,32,26,0.30);
 
   /* ===== 모션 (mode 무관) ===== */
   --dur-fast: 120ms;   --dur-base: 200ms;   --dur-slow: 320ms;
@@ -188,8 +190,8 @@
   --z-modal:    1300; --z-toast:  1400; --z-tooltip: 1500;
 
   /* ===== 데이터 시각화 팔레트 (라이트/다크 공통) ===== */
-  --viz-1:#3182f6; --viz-2:#12b886; --viz-3:#f59f00;
-  --viz-4:#c96f4c; --viz-5:#845ef7; --viz-6:#f06595;
+  --viz-1:#c9201a; --viz-2:#4f7a2e; --viz-3:#946200;
+  --viz-4:#46566b; --viz-5:#7c3b32; --viz-6:#8a8779;
 
   /* 로고 빨강 — 원본 로고의 빨강. 상태색(--danger)과는 쓰임이 다르다. */
   --r6-red:            #e21b1b;
@@ -206,14 +208,14 @@
      이웃한 조각의 색 차이(OKLab ΔE)는 최소 27, 색각 이상에서도 25다.
      글자색은 조각마다 따로 둔다. 진한 칸은 흰 글씨(대비 6.4 이상),
      연한 칸은 짙은 남색(6.8 이상)이다. */
-  --rl-1: #225a93;  --rl-1-ink: #ffffff;   /* 파랑 진한 */
-  --rl-2: #74b9b8;  --rl-2-ink: #10213a;   /* 청록 연한 */
-  --rl-3: #674689;  --rl-3-ink: #ffffff;   /* 보라 진한 */
-  --rl-4: #8ab895;  --rl-4-ink: #10213a;   /* 초록 연한 */
-  --rl-5: #006a6b;  --rl-5-ink: #ffffff;   /* 청록 진한 */
-  --rl-6: #8baed6;  --rl-6-ink: #10213a;   /* 파랑 연한 */
-  --rl-7: #176938;  --rl-7-ink: #ffffff;   /* 초록 진한 */
-  --rl-8: #b5a0cf;  --rl-8-ink: #10213a;   /* 보라 연한 */
+  --rl-1: #3b4a5c;  --rl-1-ink: #ffffff;   /* 청회 진한 */
+  --rl-2: #9fb578;  --rl-2-ink: #1c1e18;   /* 올리브 연한 */
+  --rl-3: #70342b;  --rl-3-ink: #ffffff;   /* 적갈 진한 */
+  --rl-4: #c6b182;  --rl-4-ink: #1c1e18;   /* 모래 연한 */
+  --rl-5: #42542c;  --rl-5-ink: #ffffff;   /* 올리브 진한 */
+  --rl-6: #93a7bb;  --rl-6-ink: #1c1e18;   /* 청회 연한 */
+  --rl-7: #5e4a1f;  --rl-7-ink: #ffffff;   /* 황갈 진한 */
+  --rl-8: #cf9d95;  --rl-8-ink: #1c1e18;   /* 적갈 연한 */
 }
 
 /* ============================================================
@@ -290,16 +292,16 @@
   /* 룰렛 조각 — 짜임은 밝은 쪽과 같다. 네 계열을 진한 단과 연한 단으로
      두 번씩, 이웃끼리 밝기가 엇갈리게. 계열만 표지 쪽으로 옮겼다
      (파랑→청회, 청록→올리브, 보라→적갈, 초록→황갈).
-     이웃 조각의 색 차이(OKLab ΔE)는 최소 22로 기존 다크와 같고,
-     글자 대비는 모든 조각에서 5.7 이상이다. */
+     이웃 조각의 색 차이(OKLab ΔE)는 최소 30(기존 다크 22)이고,
+     글자 대비는 모든 조각에서 6.9 이상이다. */
   --rl-1: #46566b;  --rl-1-ink: #ffffff;   /* 청회 진한 */
   --rl-2: #a9bd83;  --rl-2-ink: #1c1e18;   /* 올리브 연한 */
   --rl-3: #7c3b32;  --rl-3-ink: #ffffff;   /* 적갈 진한 */
   --rl-4: #cdb98a;  --rl-4-ink: #1c1e18;   /* 모래 연한 */
   --rl-5: #4a5c33;  --rl-5-ink: #ffffff;   /* 올리브 진한 */
   --rl-6: #9fb0c2;  --rl-6-ink: #1c1e18;   /* 청회 연한 */
-  --rl-7: #7a6333;  --rl-7-ink: #ffffff;   /* 황갈 진한 */
-  --rl-8: #c99a8e;  --rl-8-ink: #1c1e18;   /* 적갈 연한 */
+  --rl-7: #6d5726;  --rl-7-ink: #ffffff;   /* 황갈 진한 */
+  --rl-8: #dcb0a4;  --rl-8-ink: #1c1e18;   /* 적갈 연한 */
 }
 
 /* ============================================================
