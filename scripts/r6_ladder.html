@@ -222,68 +222,84 @@
    → 모니터링·자동화 도구 화면에서 사용.
    ============================================================ */
 :root[data-theme="dark"] {
-  --accent:            #22d3ee;   /* 형광 시안 포인트 */
-  --accent-hover:      #38dcf0;
-  --accent-pressed:    #0fb9d4;
-  --accent-bg:         #10313a;
-  --on-accent:         #06232a;
+  /* ------------------------------------------------------------------
+     다크 = 「야전」. 1998년 레인보우 식스 표지에서 그대로 뽑은 색이다.
+     표지에는 파랑이 한 점도 없다. 위쪽 하늘의 크림(#e7e0cf), 전술복의
+     카키올리브(#5f5f5c·#44443d), 바닥의 먹(#2e2f2c), 그리고 로고와
+     우하단 깃발의 빨강(#ce1513) — 채도가 있는 색은 이 빨강 하나뿐이다.
+     그래서 빨강은 "누를 수 있는 것"에만 쓰고, 나머지는 전부 무채에 가깝게 둔다.
+     (밝은 테마는 건드리지 않았다. 토글하면 예전 파란 화면 그대로다.)
+     ------------------------------------------------------------------ */
 
-  --text-primary:      #edeff4;
-  --text-secondary:    #ced2dc;
-  --text-tertiary:     #9aa1b3;
-  --text-disabled:     #6b7180;
+  /* 빨강은 바탕으로 쓸 때만 진하게. 글자로 쓸 땐 --accent-strong 쪽을 쓴다
+     (진한 빨강은 이 바탕에서 3.2:1 밖에 안 나온다). */
+  --accent:            #c9201a;
+  --accent-hover:      #dc2e26;
+  --accent-pressed:    #a81912;
+  --accent-bg:         #2e1f1b;   /* 연한 틴트 = 어두운 적갈 */
+  --on-accent:         #ffffff;   /* 빨간 버튼 위 글자 (5.7:1) */
 
-  /* 화면에 따라 너무 가라앉아 보인다는 말을 듣고 한 단계씩 올렸다.
-     검정에 가깝던 바닥이 회색 쪽으로 오면서 글씨와의 대비는 그대로 두고
-     테두리만 또렷해진다. */
-  --bg:                #171a23;
-  --surface:           #212530;
-  --surface-sunken:    #1b1e27;
+  --text-primary:      #e7e0cf;   /* 표지 하늘의 크림 (11.9:1) */
+  --text-secondary:    #b3ae9c;
+  --text-tertiary:     #9a9685;
+  --text-disabled:     #7b7868;
 
-  --border:            #2b2f3a;
-  --border-strong:     #383d4a;
+  --bg:                #15170f;   /* 표지 바닥 */
+  --surface:           #22241d;   /* 전술복 그늘 */
+  --surface-sunken:    #1c1e18;
 
-  --warm:              #e08a63;
-  --warm-bg:           #33211a;
+  --border:            #32352b;
+  --border-strong:     #474b3e;
 
-  --rise:              #ff7a70;  --rise-bg:    #3a1c19;
-  --fall:              #7ab4ff;  --fall-bg:    #142238;
+  --warm:              #d9a05b;
+  --warm-bg:           #2e2415;
 
-  --top-rank:          #ff8cc0;  --top-rank-bg:  #3b2130;  --top-rank-row: #221a20;
+  /* 연승/연패 — 밝은 테마의 "오름 빨강·내림 파랑"을 그대로 따른다.
+     다만 내림 파랑은 이 화면에 파랑이 없어 겉돌기에 가라앉은 카키로 바꿨다.
+     연승 배지는 작아서 버튼 빨강과 부딪히지 않는다. */
+  --rise:              #f2554a;  --rise-bg:    #2e1f1b;
+  --fall:              #9a9685;  --fall-bg:    #2a2b24;
 
-  --success:           #34d399;  --success-bg: #0f2e26;
-  --warning:           #fbbf24;  --warning-bg: #2e2408;
-  --danger:            #f87171;  --danger-bg:  #2e1414;
-  --info:              #22d3ee;  --info-bg:    #10313a;
+  /* 상위권은 금색으로. 빨강으로 두면 1~5위 세 칸이 전부 빨개져서
+     "누를 수 있는 것"이라는 빨강의 뜻이 흐려진다. 빨강은 버튼에만 남긴다. */
+  --top-rank:          #e0a83c;  --top-rank-bg:  #2e2415;  --top-rank-row: #1f1d14;
 
-  /* 진한 텍스트용 — 다크에선 밝은 값이 어두운 틴트 위에서 이미 AA 통과 */
-  --accent-strong:     #22d3ee;
-  --success-strong:    #34d399;
-  --warning-strong:    #fbbf24;
-  --danger-strong:     #f87171;
+  --success:           #a8c66c;  --success-bg: #2a3320;   /* 전술복 카키그린 */
+  --warning:           #e0a83c;  --warning-bg: #2e2415;
+  --danger:            #f2554a;  --danger-bg:  #2e1f1b;
+  --info:              #e0a83c;  --info-bg:    #2e2415;
 
-  --shadow-card:    0 1px 3px rgba(0,0,0,0.4);
-  --shadow-popover: 0 8px 24px rgba(0,0,0,0.5);
-  --shadow-focus:   0 0 0 3px rgba(34,211,238,0.35);
-  --shadow-focus-danger: 0 0 0 3px rgba(248,113,113,0.30);
+  /* 연한 틴트 위 글자·채운 버튼용. 전부 이 바탕에서 4.5:1 이상 */
+  --accent-strong:     #f2554a;
+  --success-strong:    #a8c66c;
+  --warning-strong:    #e0a83c;
+  --danger-strong:     #f2554a;
+
+  --shadow-card:    0 1px 3px rgba(0,0,0,0.5);
+  --shadow-popover: 0 8px 24px rgba(0,0,0,0.6);
+  --shadow-focus:   0 0 0 3px rgba(226,85,74,0.40);
+  --shadow-focus-danger: 0 0 0 3px rgba(226,85,74,0.40);
 
   /* 어두운 바탕에서는 같은 빨강이 가라앉아 한 단계 밝힌다 */
-  --r6-red:            #ff2b2b;
+  --r6-red:            #ff4b3f;
 
   --kakao:       #fee500;
   --kakao-hover: #ffef4d;
   --kakao-ink:   #191600;
 
-  /* 어두운 바탕에서는 진한 단이 바탕에 묻는다. 그 단만 한 칸 밝혀 세운다
-     (바탕과의 대비 3.3 이상). 색과 짜임은 밝은 쪽과 같다. */
-  --rl-1: #3771af;  --rl-1-ink: #ffffff;
-  --rl-2: #75c0c0;  --rl-2-ink: #10213a;
-  --rl-3: #7e5ca4;  --rl-3-ink: #ffffff;
-  --rl-4: #8dbf9a;  --rl-4-ink: #10213a;
-  --rl-5: #008283;  --rl-5-ink: #ffffff;
-  --rl-6: #8fb5e0;  --rl-6-ink: #10213a;
-  --rl-7: #2f814c;  --rl-7-ink: #ffffff;
-  --rl-8: #bca5d8;  --rl-8-ink: #10213a;
+  /* 룰렛 조각 — 짜임은 밝은 쪽과 같다. 네 계열을 진한 단과 연한 단으로
+     두 번씩, 이웃끼리 밝기가 엇갈리게. 계열만 표지 쪽으로 옮겼다
+     (파랑→청회, 청록→올리브, 보라→적갈, 초록→황갈).
+     이웃 조각의 색 차이(OKLab ΔE)는 최소 22로 기존 다크와 같고,
+     글자 대비는 모든 조각에서 5.7 이상이다. */
+  --rl-1: #46566b;  --rl-1-ink: #ffffff;   /* 청회 진한 */
+  --rl-2: #a9bd83;  --rl-2-ink: #1c1e18;   /* 올리브 연한 */
+  --rl-3: #7c3b32;  --rl-3-ink: #ffffff;   /* 적갈 진한 */
+  --rl-4: #cdb98a;  --rl-4-ink: #1c1e18;   /* 모래 연한 */
+  --rl-5: #4a5c33;  --rl-5-ink: #ffffff;   /* 올리브 진한 */
+  --rl-6: #9fb0c2;  --rl-6-ink: #1c1e18;   /* 청회 연한 */
+  --rl-7: #7a6333;  --rl-7-ink: #ffffff;   /* 황갈 진한 */
+  --rl-8: #c99a8e;  --rl-8-ink: #1c1e18;   /* 적갈 연한 */
 }
 
 /* ============================================================
