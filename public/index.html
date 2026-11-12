@@ -168,10 +168,10 @@
   --sp-5: 20px;  --sp-6: 24px;  --sp-8: 32px;  --sp-10: 40px;  --sp-12: 48px;
 
   /* ===== 둥글기 ===== */
-  --radius-sm:   8px;    /* 작은 태그/인풋 */
-  --radius-md:   12px;   /* 버튼 */
-  --radius-lg:   16px;   /* 카드 */
-  --radius-xl:   20px;   /* 큰 카드/시트 */
+  --radius-sm:   3px;    /* 작은 태그/인풋 */
+  --radius-md:   4px;    /* 버튼 */
+  --radius-lg:   6px;    /* 카드 */
+  --radius-xl:   8px;    /* 큰 카드/시트 */
   --radius-pill: 999px;
 
   /* ===== 그림자 (아주 절제) ===== */
@@ -560,14 +560,13 @@ tbody tr:hover td{ background:var(--surface-sunken); }
 /* STANDING 상위 5명만 분홍색으로 묶어 보여준다 (2페이지 순위표에는 적용하지 않는다) */
 #standingTable tr.top-rank-row td{ background:var(--top-rank-row); }
 #standingTable tr.top-rank-row:hover td{ background:var(--top-rank-bg); }
-/* Rank · ID · Clan 세 칸만 분홍색으로 쓴다 */
+/* 상위권은 등수 하나만 금색으로 세운다. 이름·클랜까지 물들이면
+   상위 다섯 줄이 통째로 한 색이 되어, 표가 아니라 띠처럼 보인다.
+   이름은 굵기로만 세운다. */
 #standingTable tr.top-rank-row .rank-cell{
   color:var(--top-rank); font-size:var(--fs-subhead); font-weight:var(--fw-bold);
 }
-#standingTable tr.top-rank-row td:nth-child(2),
-#standingTable tr.top-rank-row td:nth-child(3){
-  color:var(--top-rank); font-weight:var(--fw-bold);
-}
+#standingTable tr.top-rank-row td:nth-child(2){ font-weight:var(--fw-bold); }
 .clan-tag{ color:var(--text-secondary); font-weight:var(--fw-medium); }
 
 /* 색은 신호일 때만 — 승/패 */
@@ -2585,6 +2584,7 @@ button.room-n:hover{ color:var(--accent); text-decoration:underline; }
 
 /* 방만 띄운 창 — 머리글과 다른 메뉴는 접는다 */
 .room-only #app > header,
+.room-only .sstrip,
 .room-only .tabs,
 .room-only #tab-launcher .vpn-bar,
 .room-only #tab-launcher .dl-box,
@@ -3104,6 +3104,112 @@ button.room-n:hover{ color:var(--accent); text-decoration:underline; }
 :root[data-theme="dark"] .theme-btn .to-dark{ display:none; }
 :root[data-theme="dark"] .theme-btn .to-light{ display:inline-flex; align-items:center; gap:var(--sp-2); }
 
+
+/* ============================================================
+   「야전」 — 생김새
+   색만 바꿔서는 표지의 느낌이 나지 않았다. 느낌은 대부분
+   ① 머리글의 사진 띠 ② 시즌 요약 줄 ③ 줄맞춘 고정폭 숫자
+   ④ 각진 모서리와 얇은 선 에서 나온다. 여기 모아 둔다.
+   이 아래 규칙은 밝은 테마에도 똑같이 걸린다 — 생김새는 하나다.
+   ============================================================ */
+
+/* ---------- 머리글 = 야전 배너 ----------
+   사진 위에 글씨를 얹으므로, 두 테마 모두 여기서는 어두운 바탕에
+   크림 글씨로 간다. 토큰을 쓰지 않고 값을 박는 까닭이 그것이다. */
+header{
+  position:relative; overflow:hidden;
+  background:#14160f; border-color:#363a2d;
+}
+header::before{
+  content:""; position:absolute; inset:0; z-index:0;
+  background:url("/hero.jpg") 60% 28%/cover no-repeat;
+  filter:grayscale(.32) contrast(1.06);
+}
+/* 왼쪽은 거의 덮고 오른쪽으로 갈수록 사진을 내준다.
+   오른쪽 끝도 55% 는 덮어서 단추 글씨가 하늘에 묻지 않는다. */
+header::after{
+  content:""; position:absolute; inset:0; z-index:1;
+  background:linear-gradient(100deg,
+    rgba(20,22,15,.96) 0%, rgba(20,22,15,.86) 30%,
+    rgba(20,22,15,.60) 62%, rgba(20,22,15,.42) 100%);
+}
+header > *{ position:relative; z-index:2; }
+header .eyebrow{ color:#a8a492; }
+header .subline{ color:#c4bfae; }
+header .live-dot{ background:#a8c66c; }
+/* 단추는 반투명 어두운 판 위에 올린다 — 사진이 밝은 쪽에서도 읽힌다 */
+header .theme-btn,
+header .admin-btn,
+header .auth-btn{
+  background:rgba(27,30,22,.78); color:#ddd6c4; border-color:#4e5243;
+  backdrop-filter:blur(2px);
+}
+header .theme-btn:hover,
+header .admin-btn:hover,
+header .auth-btn:hover{ color:#fff; border-color:var(--r6-red); }
+header .auth-user{ background:rgba(27,30,22,.78); color:#e7e0cf; }
+header .admin-btn.active{ background:var(--r6-red); border-color:var(--r6-red); color:#fff; }
+
+/* ---------- 시즌 요약 띠 ----------
+   칸 사이를 1px 틈으로만 벌리고 그 틈에 선 색을 비춘다. 선을 네 번
+   긋는 대신 바탕 한 장이 하는 일이다. */
+.sstrip{
+  display:grid; grid-template-columns:repeat(4,1fr); gap:1px;
+  background:var(--border); border:1px solid var(--border);
+  border-radius:var(--radius-lg); overflow:hidden;
+  margin-bottom:var(--sp-4);
+}
+.sx{ background:var(--surface); padding:var(--sp-3) var(--sp-4); min-width:0; }
+.sk{
+  display:block; font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+  letter-spacing:.06em; color:var(--text-tertiary); margin-bottom:2px;
+}
+.sv{
+  display:block; font-size:var(--fs-subhead); font-weight:var(--fw-bold);
+  color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.sv em{
+  font-style:normal; font-size:var(--fs-footnote);
+  font-weight:var(--fw-medium); color:var(--text-tertiary); margin-left:2px;
+}
+.sstrip.closed .sv{ color:var(--text-secondary); }
+@media (max-width:620px){
+  .sstrip{ grid-template-columns:repeat(2,1fr); }
+}
+
+/* ---------- 왼쪽 메뉴: 켜진 칸은 빨간 기둥으로 ----------
+   알약을 통째로 빨갛게 칠하면 그 빨강이 "누를 수 있는 것"이 아니라
+   "지금 여기"라는 다른 뜻을 하나 더 갖는다. 기둥만 세우고 바탕은
+   한 단 눌러서, 빨강의 뜻을 하나로 둔다. */
+.tab-btn{
+  border-radius:0; border-left:3px solid transparent;
+  padding-left:calc(var(--sp-4) - 3px);
+}
+.tab-btn.active{
+  background:var(--surface-sunken); color:var(--text-primary);
+  border-left-color:var(--accent);
+}
+.tab-btn.active .tab-wip{ color:var(--text-disabled); opacity:1; }
+.tab-btn.active .tab-now{ background:var(--accent); color:var(--on-accent); }
+.tab-now{ border-radius:var(--radius-sm); letter-spacing:.02em; }
+
+/* ---------- 표: 머리글은 대문자, 숫자는 줄을 맞춘다 ---------- */
+th{
+  text-transform:uppercase; letter-spacing:.09em;
+  font-size:11px; font-weight:var(--fw-bold);
+}
+/* 한글 머리글(연승·참석률 …)까지 대문자 자간을 주면 사이가 벌어져 읽기 나쁘다 */
+th:lang(ko){ letter-spacing:normal; }
+td, th{ font-variant-numeric:tabular-nums; }
+#standingTable td{ font-variant-numeric:tabular-nums; }
+#standingTable .rank-cell{ font-size:var(--fs-subhead); }
+/* 클랜은 글자가 아니라 꼬리표로. 아이디 옆에서 조용히 자리만 잡는다 */
+#standingTable .clan-tag{
+  font-size:11px; font-weight:var(--fw-bold); letter-spacing:.04em;
+  color:var(--text-tertiary);
+}
+#standingTable tr.top-rank-row .clan-tag{ color:var(--text-tertiary); }
+
 /* 색이 바뀌는 순간이 덜 튀도록 */
 @media (prefers-reduced-motion:no-preference){
   html{ transition:background-color var(--dur-base) var(--ease-standard); }
@@ -3198,6 +3304,15 @@ if (/[?&]room=\d+/.test(location.search)) {
     </span>
     <span class="kakao-go">참여하기 →</span>
   </a>
+
+  <!-- 시즌 요약 띠. 어느 메뉴를 보고 있든 지금이 몇 월이고 며칠 남았는지는
+       늘 보여야 한다. 값은 app.js 의 renderSeasonStrip() 이 채운다. -->
+  <div class="sstrip" id="seasonStrip" hidden>
+    <div class="sx"><span class="sk">시즌</span><span class="sv" id="ssSeason">—</span></div>
+    <div class="sx"><span class="sk">등록 선수</span><span class="sv num" id="ssPlayers">—</span></div>
+    <div class="sx"><span class="sk">이번 달 경기</span><span class="sv num" id="ssMatches">—</span></div>
+    <div class="sx"><span class="sk" id="ssLeftK">마감까지</span><span class="sv num" id="ssLeft">—</span></div>
+  </div>
 
   <div class="shell">
   <nav class="tabs"><div class="tabs-in">
@@ -5246,7 +5361,43 @@ function sortedPlayers() {
 
 /* ---------- 렌더 ---------- */
 
+/**
+ * 머리글 아래 시즌 요약 띠.
+ *
+ * 보고 있는 달을 따라간다 — 순위표가 10월을 보여주는데 띠만 11월이면
+ * 거짓말이 된다. 지난 달을 보고 있으면 남은 날 대신 '마감'이라 적는다.
+ */
+function renderSeasonStrip() {
+  const el = document.getElementById('seasonStrip');
+  if (!el) return;
+  const s = viewSeason();
+  if (!s) { el.hidden = true; return; }
+  el.hidden = false;
+
+  const live = isLiveView();
+  el.classList.toggle('closed', !live);
+
+  const games = viewMatches().filter(m => !m.voidedAt).length;
+  document.getElementById('ssSeason').textContent  = s.label || s.id || '—';
+  document.getElementById('ssPlayers').innerHTML   = viewPlayers().length + '<em>명</em>';
+  document.getElementById('ssMatches').innerHTML   = games + '<em>판</em>';
+
+  const kEl = document.getElementById('ssLeftK');
+  const vEl = document.getElementById('ssLeft');
+  if (!live || !s.endsAt) {
+    kEl.textContent = '시즌';
+    vEl.textContent = '마감';
+    return;
+  }
+  // 남은 날은 '밤 몇 시'가 아니라 '며칠 남았나'다. 하루를 올림해서
+  // 마감일 당일에도 1일로 보이게 한다 — 0일은 이미 끝난 것처럼 읽힌다.
+  const left = Math.max(0, Math.ceil((s.endsAt - Date.now()) / 86400000));
+  kEl.textContent = '마감까지';
+  vEl.innerHTML = left + '<em>일</em>';
+}
+
 function renderStanding() {
+  renderSeasonStrip();
   // 11월부터 Game·Loss·Ratio·Streak 칸을 걷어낸다. 칸을 지우지 않고 감추는
   // 까닭은 10월까지는 그대로 보여야 하기 때문이다 — 머리글과 칸이 한 스위치로
   // 같이 움직인다.

@@ -821,7 +821,43 @@ function sortedPlayers() {
 
 /* ---------- 렌더 ---------- */
 
+/**
+ * 머리글 아래 시즌 요약 띠.
+ *
+ * 보고 있는 달을 따라간다 — 순위표가 10월을 보여주는데 띠만 11월이면
+ * 거짓말이 된다. 지난 달을 보고 있으면 남은 날 대신 '마감'이라 적는다.
+ */
+function renderSeasonStrip() {
+  const el = document.getElementById('seasonStrip');
+  if (!el) return;
+  const s = viewSeason();
+  if (!s) { el.hidden = true; return; }
+  el.hidden = false;
+
+  const live = isLiveView();
+  el.classList.toggle('closed', !live);
+
+  const games = viewMatches().filter(m => !m.voidedAt).length;
+  document.getElementById('ssSeason').textContent  = s.label || s.id || '—';
+  document.getElementById('ssPlayers').innerHTML   = viewPlayers().length + '<em>명</em>';
+  document.getElementById('ssMatches').innerHTML   = games + '<em>판</em>';
+
+  const kEl = document.getElementById('ssLeftK');
+  const vEl = document.getElementById('ssLeft');
+  if (!live || !s.endsAt) {
+    kEl.textContent = '시즌';
+    vEl.textContent = '마감';
+    return;
+  }
+  // 남은 날은 '밤 몇 시'가 아니라 '며칠 남았나'다. 하루를 올림해서
+  // 마감일 당일에도 1일로 보이게 한다 — 0일은 이미 끝난 것처럼 읽힌다.
+  const left = Math.max(0, Math.ceil((s.endsAt - Date.now()) / 86400000));
+  kEl.textContent = '마감까지';
+  vEl.innerHTML = left + '<em>일</em>';
+}
+
 function renderStanding() {
+  renderSeasonStrip();
   // 11월부터 Game·Loss·Ratio·Streak 칸을 걷어낸다. 칸을 지우지 않고 감추는
   // 까닭은 10월까지는 그대로 보여야 하기 때문이다 — 머리글과 칸이 한 스위치로
   // 같이 움직인다.
