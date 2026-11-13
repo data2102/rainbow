@@ -6,9 +6,9 @@ let players = [];
 let matches = [];
 let requests = [];
 let me = null;              // 로그인한 계정 { handle, role }
-let accounts = [];          // 계정 권한 목록 (관리자 이상)
+let accounts = [];          // 계정 권한 목록 (웹마스터 이상)
 let acctLogs = [];          // 계정 로그
-let defSlots = [];          // 기본 출석 시간대가 걸린 회원 (관리자 이상)
+let defSlots = [];          // 기본 출석 시간대가 걸린 회원 (웹마스터 이상)
 let defSlotDay = '';        // 그 목록을 받아온 날
 let tMatches = [];          // 대회 경기 기록
 let posts = [];             // 게시판 글
@@ -187,7 +187,7 @@ function tourLive() { return tourEdition === TOURNAMENT_LATEST; }
 /** 지금 화면에서 결과를 **등록**할 수 있는가 (관리자 이상) */
 function tourEditable() { return isAdmin() && tourLive(); }
 /**
- * 기록을 **지우거나 되돌릴** 수 있는가 — 마스터만.
+ * 기록을 **지우거나 되돌릴** 수 있는가 — 리더만.
  *
  * 앞 판이 뒷 판의 대진을 정하는 구조라 한 판을 지우면 뒤가 전부 어긋난다.
  * 넣는 것은 다시 넣으면 되지만 지우는 것은 그렇지 않아 문을 좁혔다.
@@ -431,7 +431,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 146;
+const APP_VERSION = 147;
 let toldToRefresh = false;
 
 /**
@@ -3328,11 +3328,11 @@ function renderKoUndo() {
   const last = tourEditable() ? koLastGame() : null;
   box.hidden = !last;
   if (!last) return;
-  // 되돌리기는 마스터만. 관리자에게 단추만 숨기면 왜 안 되는지 몰라 헤매므로 까닭을 적는다.
+  // 되돌리기는 리더만. 웹마스터에게 단추만 숨기면 왜 안 되는지 몰라 헤매므로 까닭을 적는다.
   box.innerHTML = `<span class="ko-undo-t">방금 기록 · <b>${esc(koGameText(last))}</b></span>`
     + (tourDeletable()
         ? `<button type="button" class="btn-mini btn-reject" data-koundo="${last.id}">되돌리기</button>`
-        : `<span class="ko-undo-no">되돌리기는 마스터만 할 수 있습니다</span>`);
+        : `<span class="ko-undo-no">되돌리기는 리더만 할 수 있습니다</span>`);
 }
 
 /** 경기 기록 */
@@ -3749,7 +3749,9 @@ window.closeModal = closeModal;
 
 /* ---------- 권한 ---------- */
 
-const ROLE_LABEL = { member: '일반', admin: '관리자', master: '마스터' };
+/* 보이는 이름만 바꿨다(2026-11). 속값은 member·admin·master 그대로다 —
+   데이터베이스와 지난 기록이 그 값으로 적혀 있다. 서버의 api/_lib.js 와 같아야 한다. */
+const ROLE_LABEL = { member: '관리자', admin: '웹마스터', master: '리더' };
 const ROLE_RANK = { member: 1, admin: 2, master: 3 };
 
 function isLoggedIn() { return !!me; }
@@ -3761,7 +3763,7 @@ function isMaster()   { return !!me && me.role === 'master'; }
 function renderAuthBar() {
   const bar = document.getElementById('authBar');
   bar.innerHTML = me
-    ? `<span class="auth-user">${esc(ROLE_LABEL[me.role] || '일반')} · ${esc(me.handle)}</span>
+    ? `<span class="auth-user">${esc(ROLE_LABEL[me.role] || ROLE_LABEL.member)} · ${esc(me.handle)}</span>
        <button class="auth-btn" id="btnChangePw">비밀번호 변경</button>
        <button class="auth-btn" id="btnLogout">로그아웃</button>`
     : `<button class="auth-btn" id="btnSignup">회원가입</button>
@@ -3957,7 +3959,7 @@ function showSignupModal() {
     <label>이메일 주소 *</label><input type="text" id="suEmail" maxlength="120" autocomplete="email" placeholder="예: name@example.com">
     <div class="modal-error" id="suErr"></div>
     <button class="btn" id="suSubmit">가입 신청</button>
-    <div class="foot-note">관리자가 승인하면 계정이 만들어집니다 · 초기 비밀번호는 1234입니다 ·
+    <div class="foot-note">웹마스터가 승인하면 계정이 만들어집니다 · 초기 비밀번호는 1234입니다 ·
       이메일은 비밀번호를 잊었을 때 본인 확인에 씁니다.</div>`);
   document.getElementById('suSubmit').addEventListener('click', doSignup);
 }
@@ -3972,7 +3974,7 @@ async function doSignup() {
   try {
     await apiPost('/api/account', { action: 'signup', id, clan, email });
     closeModal();
-    showToast('가입 신청을 보냈습니다. 관리자 승인을 기다려주세요.');
+    showToast('가입 신청을 보냈습니다. 웹마스터 승인을 기다려주세요.');
     await refreshAll();
   } catch (e) { err.textContent = e.message; }
 }
@@ -3990,7 +3992,7 @@ function showFindPwModal() {
     <label>이메일 주소</label><input type="text" id="fpEmail" maxlength="120" autocomplete="email">
     <div class="modal-error" id="fpErr"></div>
     <button class="btn" id="fpSubmit">다음</button>
-    <div class="foot-note">비밀번호를 찾지 못할 경우 관리자에게 문의하세요.</div>`);
+    <div class="foot-note">비밀번호를 찾지 못할 경우 웹마스터에게 문의하세요.</div>`);
   document.getElementById('fpSubmit').addEventListener('click', doCheckIdentity);
   document.getElementById('fpEmail').addEventListener('keydown', e => {
     if (e.key === 'Enter') doCheckIdentity();
@@ -4070,13 +4072,13 @@ async function doChangePassword() {
 
 /**
  * 권한 칸.
- * 관리자는 일반과 관리자 사이만 바꿀 수 있다. 마스터가 걸린 자리는
- * 주는 것도 거두는 것도 마스터의 몫이라, 관리자에게는 이름표만 보여준다.
+ * 웹마스터는 관리자와 웹마스터 사이만 바꿀 수 있다. 리더가 걸린 자리는
+ * 주는 것도 거두는 것도 리더의 몫이라, 웹마스터에게는 이름표만 보여준다.
  */
 function roleCell(a) {
   const canPick = isMaster() || (isAdmin() && a.role !== 'master');
   if (!canPick) {
-    return `<span class="role-tag ${esc(a.role)}">${esc(ROLE_LABEL[a.role] || '일반')}</span>`;
+    return `<span class="role-tag ${esc(a.role)}">${esc(ROLE_LABEL[a.role] || ROLE_LABEL.member)}</span>`;
   }
   const options = isMaster() ? Object.keys(ROLE_LABEL) : ['member', 'admin'];
   return `<select class="role-select" data-role="${esc(a.handle)}">${
@@ -4092,7 +4094,7 @@ const ROLE_COL = {
   clan:   { label: 'Clan',   first:  1 },
   email:  { label: '이메일',  first:  1 },
   record: { label: '전적',    first: -1 },   // 숫자는 큰 것부터
-  role:   { label: '권한',    first: -1 },   // 권한은 마스터부터
+  role:   { label: '권한',    first: -1 },   // 권한은 리더부터
 };
 
 /** 줄 세울 때 쓰는 값. 비어 있으면 null — 방향과 상관없이 뒤로 보낸다. */
@@ -4120,7 +4122,7 @@ function renderRoleHead() {
   });
 }
 
-/** 자기 계정은 지울 수 없고, 마스터 계정은 마스터만 지울 수 있다 (서버도 같이 막는다) */
+/** 자기 계정은 지울 수 없고, 리더 계정은 리더만 지울 수 있다 (서버도 같이 막는다) */
 function canDelete(a) {
   if (me && me.handle === a.handle) return false;
   if (a.role === 'master' && !isMaster()) return false;
@@ -4209,8 +4211,8 @@ function renderAccounts() {
 
   note.innerHTML = '회원 정보를 추가·수정·삭제하고 권한을 정합니다 · 한 일은 아래 계정 로그에 남습니다'
     + (isMaster()
-      ? ' · <b>마스터 권한을 주고 거두는 것은 마스터만 할 수 있습니다.</b>'
-      : ' · 일반·관리자 권한은 바꿀 수 있고, <b>마스터 권한은 마스터만 주고 거둘 수 있습니다.</b>');
+      ? ' · <b>리더 권한을 주고 거두는 것은 리더만 할 수 있습니다.</b>'
+      : ' · 관리자·웹마스터 권한은 바꿀 수 있고, <b>리더 권한은 리더만 주고 거둘 수 있습니다.</b>');
 
   const search = document.getElementById('roleSearch');
   const query = search ? search.value.trim().toLowerCase() : '';
@@ -4412,7 +4414,7 @@ function bindPager(boxId, key, set, redraw) {
   });
 }
 
-/* ---------- 팀 편성하기 (마스터 전용) ---------- */
+/* ---------- 팀 편성하기 (리더 전용) ---------- */
 
 /** api/account.js 의 TEAM_OPTIONS 와 같아야 한다. 서버가 준 값으로 덮인다. */
 let teamOptions = {
@@ -4479,7 +4481,7 @@ function renderTmHead() {
 function renderTeamPanel() {
   const panel = document.getElementById('teamPanel');
   if (!panel) return;
-  // 마스터가 아니면 판 자체를 보여주지 않는다
+  // 리더가 아니면 판 자체를 보여주지 않는다
   panel.style.display = isMaster() ? '' : 'none';
   if (!isMaster()) return;
 
@@ -6173,7 +6175,7 @@ async function hostSetupFlow(info) {
     }
     if (!cancelled && state) {
       state.textContent = '아직 준비가 끝나지 않았습니다.';
-      if (hint) hint.innerHTML = '준비 창에 오류가 있었다면 그 화면을 관리자에게 보내 주세요 · '
+      if (hint) hint.innerHTML = '준비 창에 오류가 있었다면 그 화면을 웹마스터에게 보내 주세요 · '
         + '<code>C:\\R6Clan\\r6host.log</code> 에 기록이 남습니다. 실행하기를 다시 누르면 처음부터 다시 합니다.';
     }
   } finally {
@@ -6880,7 +6882,7 @@ async function rlReport(i, winner) {
   if (!p || p.result) return;
   const size = (name) => ((rlDraw.teams.find(t => t.name === name) || { order: [] }).order.length);
   const which = rlDraw.pairs.length > 1 ? `${i + 1}경기 · ` : '';
-  if (!confirm(`${which}${winner} Team 승리로 기록합니다.\n${size(p.a)}:${size(p.b)} · 점수가 바로 반영되고 되돌리려면 관리자가 취소해야 합니다.\n계속할까요?`)) return;
+  if (!confirm(`${which}${winner} Team 승리로 기록합니다.\n${size(p.a)}:${size(p.b)} · 점수가 바로 반영되고 되돌리려면 웹마스터가 취소해야 합니다.\n계속할까요?`)) return;
 
   rlBusy = true;
   rlShowResult(i);
@@ -7030,7 +7032,7 @@ async function rlReportFromLog(btn) {
   if (!confirm(`${which}${winner} Team 승리로 기록합니다.\n`
     + `${size(p.a)}:${size(p.b)} · ${formatDateTime(row.ts)} 에 나눈 판입니다.\n`
     + (late ? '\n※ 달이 바뀌었습니다. 경기 일시는 오늘로 찍혀 이번 달 성적에 들어갑니다.\n' : '')
-    + `\n점수가 바로 반영되고 되돌리려면 관리자가 취소해야 합니다. 계속할까요?`)) return;
+    + `\n점수가 바로 반영되고 되돌리려면 웹마스터가 취소해야 합니다. 계속할까요?`)) return;
 
   btn.disabled = true;
   try {

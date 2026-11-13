@@ -779,7 +779,7 @@ tr.fl-pinned td:first-child{ box-shadow:inset 3px 0 0 var(--danger); }
   .vote-table th.v-n, .vote-table td.v-n{ width:62px; }
 }
 
-/* ---------- 팀 편성하기 (마스터 전용) ---------- */
+/* ---------- 팀 편성하기 (리더 전용) ---------- */
 .master-only{
   font-size:var(--fs-footnote); font-weight:var(--fw-bold);
   padding:2px var(--sp-3); border-radius:var(--radius-pill);
@@ -1239,7 +1239,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .ko-undo-t{ font-size:var(--fs-footnote); color:var(--text-secondary); }
 .ko-undo-t b{ color:var(--text-primary); font-weight:var(--fw-bold); }
 .ko-undo .btn-mini{ margin-left:auto; }
-/* 관리자에게는 단추 대신 이 줄이 뜬다 — 권한이 없다는 안내지 경고는 아니다 */
+/* 웹마스터에게는 단추 대신 이 줄이 뜬다 — 권한이 없다는 안내지 경고는 아니다 */
 .ko-undo-no{
   margin-left:auto; font-size:var(--fs-footnote);
   color:var(--text-tertiary); white-space:nowrap;
@@ -1587,7 +1587,7 @@ body.rule-v2 #standingTable .streak-txt{ display:none; }
 .rl-log-win.rl-log-manual:hover:not(:disabled){
   border-color:var(--warning); background:var(--warning-bg); color:var(--warning-strong);
 }
-/* 수기작성 표시를 지우는 단추 — 점수가 걸려 있지 않아 누구나(적은 사람·관리자) 되돌린다 */
+/* 수기작성 표시를 지우는 단추 — 점수가 걸려 있지 않아 적은 사람·웹마스터가 되돌린다 */
 .rl-log-undo{
   margin-left:var(--sp-2); font-family:inherit; white-space:nowrap;
   font-size:var(--fs-footnote); font-weight:var(--fw-bold);
@@ -1598,7 +1598,7 @@ body.rule-v2 #standingTable .streak-txt{ display:none; }
 .rl-log-undo:hover:not(:disabled){ border-color:var(--text-secondary); color:var(--text-primary); }
 .rl-log-undo:disabled{ color:var(--text-disabled); cursor:not-allowed; }
 .rl-log-undo:focus-visible{ outline:none; box-shadow:var(--shadow-focus); }
-/* 시험 삼아 돌려본 기록을 치우는 길. 관리자에게만 보인다. */
+/* 시험 삼아 돌려본 기록을 치우는 길. 웹마스터에게만 보인다. */
 .rl-log-wipe{ border-color:var(--danger); color:var(--danger-strong); }
 /* 잘못 돌린 판 하나만 없애는 단추 — 호스트 자격도 같이 풀린다 */
 .rl-log-void{
@@ -3082,7 +3082,7 @@ button.room-n:hover{ color:var(--accent); text-decoration:underline; }
 ::-webkit-scrollbar-thumb{ background:var(--border-strong); border-radius:var(--radius-pill); }
 ::-webkit-scrollbar-track{ background:transparent; }
 
-/* ---------- 우측 상단 (관리자 · 화면 밝기 전환) ---------- */
+/* ---------- 우측 상단 (운영 · 화면 밝기 전환) ---------- */
 .head-right{ display:flex; flex-direction:column; align-items:flex-end; gap:var(--sp-3); }
 .head-top{ display:flex; gap:var(--sp-2); flex-wrap:wrap; justify-content:flex-end; }
 .admin-btn.active{
@@ -3280,7 +3280,7 @@ if (/[?&]room=\d+/.test(location.search)) {
           <span class="jump-t" id="roomJumpText"></span>
           <span class="jump-n" id="roomJumpN" hidden></span>
         </button>
-        <button type="button" class="admin-btn" data-tab="admin">관리자</button>
+        <button type="button" class="admin-btn" data-tab="admin">운영</button>
         <button type="button" class="theme-btn" id="themeToggle"
                 aria-label="밝은 화면과 어두운 화면 전환">
           <span class="to-dark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a7 7 0 1 0 10.5 10.5z"></path></svg>다크 모드</span>
@@ -3424,8 +3424,8 @@ if (/[?&]room=\d+/.test(location.search)) {
   <!-- ADMIN -->
   <div class="tab-panel" id="tab-admin">
     <div class="panel hud-corner" id="adminLocked">
-      <h2>관리자 전용 · Admin Only</h2>
-      <div class="foot-note" style="margin-top:0;margin-bottom:14px;">이 페이지는 관리자 로그인 후에만 이용할 수 있습니다.</div>
+      <h2>운영 전용 · Admin Only</h2>
+      <div class="foot-note" style="margin-top:0;margin-bottom:14px;">이 페이지는 웹마스터 이상만 이용할 수 있습니다.</div>
       <button class="btn btn-center" id="adminLockedLoginBtn">로그인</button>
     </div>
 
@@ -3474,11 +3474,11 @@ if (/[?&]room=\d+/.test(location.search)) {
         <div class="pager" id="acctLogPager" style="display:none;"></div>
       </div>
 
-      <!-- 팀 편성하기 — 마스터만 -->
+      <!-- 팀 편성하기 — 리더만 -->
       <div class="panel hud-corner" id="teamPanel" style="display:none;">
         <div class="panel-head">
           <h2>팀 편성하기</h2>
-          <span class="master-only">마스터 전용</span>
+          <span class="master-only">리더 전용</span>
         </div>
         <div class="foot-note" style="margin-top:0;margin-bottom:12px;">
           회원마다 등급 · 참석률 · 접속시간 · 포지션을 정해두면,
@@ -3902,7 +3902,7 @@ if (/[?&]room=\d+/.test(location.search)) {
         <div class="tsec">
           <div class="tsec-h">■ 대진표 · 결과 등록</div>
           <div class="tsec-sub" id="koHint">모든 경기가 3판 2선승이므로 <b>한 판씩</b> 기록합니다 · 먼저 2승하면 그 경기가 끝나고 다음 경기의 두 팀이 정해집니다</div>
-          <!-- 잘못 누른 마지막 한 판을 되돌리는 자리 (관리자에게만 보인다) -->
+          <!-- 잘못 누른 마지막 한 판을 되돌리는 자리 (웹마스터에게만 보인다) -->
           <div class="ko-undo" id="koUndo" hidden></div>
           <div class="ko-board" id="koBoard"></div>
         </div>
@@ -3992,7 +3992,7 @@ if (/[?&]room=\d+/.test(location.search)) {
         <div class="tsec-h">■ 대회 경기 기록</div>
         <div class="tsec-sub">예선 순위는 여기 기록된 결과로 자동 계산됩니다</div>
 
-        <div id="tFormHint" class="log-empty">관리자 로그인 후 경기를 기록할 수 있습니다.</div>
+        <div id="tFormHint" class="log-empty">웹마스터 로그인 후 경기를 기록할 수 있습니다.</div>
 
         <div id="tForm" style="display:none;">
           <div class="t-form-grid">
@@ -4238,7 +4238,7 @@ if (/[?&]room=\d+/.test(location.search)) {
         설치 파일 · 패치 · 스킨 · 타겟을 한자리에 모읍니다 ·
         <b>3MB 이하 파일은 여기에 바로 담기고</b>, 그보다 큰 설치 파일은
         구글 드라이브 · MEGA 같은 곳에 올린 뒤 받는 주소를 적어주세요 ·
-        올리는 것은 로그인한 회원 누구나, 지우는 것은 올린 사람과 관리자만 할 수 있습니다.
+        올리는 것은 로그인한 회원 누구나, 지우는 것은 올린 사람과 웹마스터만 할 수 있습니다.
       </div>
 
       <!-- 로그인하지 않은 사람에게 보이는 안내 -->
@@ -4342,7 +4342,7 @@ if (/[?&]room=\d+/.test(location.search)) {
       </div>
       <div class="foot-note" style="margin-top:0;margin-bottom:14px;">
         경기 장면과 모임 사진을 모아둡니다 · 사진을 누르면 제목 · 내용 · 댓글을 볼 수 있습니다 ·
-        올리는 것은 로그인한 회원 누구나, 고치고 지우는 것은 올린 사람과 관리자만 할 수 있습니다.
+        올리는 것은 로그인한 회원 누구나, 고치고 지우는 것은 올린 사람과 웹마스터만 할 수 있습니다.
       </div>
 
       <!-- 로그인하지 않은 사람에게 보이는 안내 -->

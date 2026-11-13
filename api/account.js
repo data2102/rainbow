@@ -7,7 +7,7 @@ import {
 
 /**
  * 계정. 선수 명단(players)이 곧 계정 목록이다.
- * 권한은 일반 < 관리자 < 마스터 셋이고, 권한을 바꾸는 것은 마스터만 할 수 있다.
+ * 권한은 관리자 < 웹마스터 < 리더 셋이고, 리더를 세우고 내리는 것은 리더만 할 수 있다.
  */
 
 const MIN_PW = 4;
@@ -218,7 +218,7 @@ async function list(req, res) {
 }
 
 /**
- * 팀을 나눌 때 쓰는 네 가지. 마스터가 회원마다 골라 둔다.
+ * 팀을 나눌 때 쓰는 네 가지. 리더가 회원마다 골라 둔다.
  * 참석률에 D 가 없는 것은 오타가 아니라 정해준 그대로다.
  */
 export const TEAM_OPTIONS = {
@@ -254,13 +254,13 @@ async function ensureTeamCols() {
 }
 
 /**
- * 팀 나누기에 쓰는 값을 정한다. 마스터만 손댈 수 있다 —
- * 등급은 사람을 줄 세우는 값이라 관리자 여럿이 고치면 서로 어긋난다.
+ * 팀 나누기에 쓰는 값을 정한다. 리더만 손댈 수 있다 —
+ * 등급은 사람을 줄 세우는 값이라 여럿이 고치면 서로 어긋난다.
  */
 async function setTeamInfo(req, res) {
   const actor = await currentUser(req);
   if (!actor || actor.role !== 'master') {
-    return res.status(403).json({ error: '마스터만 팀 등급을 정할 수 있습니다.' });
+    return res.status(403).json({ error: '리더만 팀 등급을 정할 수 있습니다.' });
   }
   await ensureTeamCols();
 
@@ -280,9 +280,9 @@ async function setTeamInfo(req, res) {
 
 /**
  * 권한 변경.
- * 관리자는 일반과 관리자 사이를 오가게 할 수 있다.
- * 마스터를 세우고 내리는 일만 마스터에게 남겨둔다. 관리자끼리 서로 마스터를
- * 만들어 줄 수 있으면 마스터를 따로 둔 뜻이 없어진다.
+ * 웹마스터는 관리자와 웹마스터 사이를 오가게 할 수 있다.
+ * 리더를 세우고 내리는 일만 리더에게 남겨둔다. 웹마스터끼리 서로 리더를
+ * 만들어 줄 수 있으면 리더를 따로 둔 뜻이 없어진다.
  */
 async function setRole(req, res) {
   const actor = await requireAdmin(req, res);
@@ -296,16 +296,16 @@ async function setRole(req, res) {
   const before = rows[0].role || 'member';
   if (before === role) return res.status(200).json({ ok: true, handle, role });
 
-  // 마스터가 걸린 자리는 마스터만 건드린다. 주는 것도, 거두는 것도.
+  // 리더가 걸린 자리는 리더만 건드린다. 주는 것도, 거두는 것도.
   if ((before === 'master' || role === 'master') && me.role !== 'master') {
-    return res.status(403).json({ error: '마스터 권한은 마스터만 주고 거둘 수 있습니다.' });
+    return res.status(403).json({ error: '리더 권한은 리더만 주고 거둘 수 있습니다.' });
   }
 
-  // 마스터가 하나도 남지 않으면 아무도 권한을 되돌릴 수 없게 된다
+  // 리더가 하나도 남지 않으면 아무도 권한을 되돌릴 수 없게 된다
   if (before === 'master' && role !== 'master') {
     const masters = await q(`SELECT count(*)::int AS n FROM players WHERE role = 'master'`);
     if (masters[0].n <= 1) {
-      return res.status(400).json({ error: '마스터가 최소 한 명은 있어야 합니다.' });
+      return res.status(400).json({ error: '리더가 최소 한 명은 있어야 합니다.' });
     }
   }
 

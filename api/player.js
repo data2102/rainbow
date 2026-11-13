@@ -5,7 +5,7 @@ import {
 import { ensureSeason } from './_season.js';
 
 /**
- * 회원(=계정) 정보를 관리자가 직접 손보는 곳.
+ * 회원(=계정) 정보를 웹마스터가 직접 손보는 곳.
  * '요청 → 승인' 절차를 거치지 않는 즉시 처리이므로 관리자 이상만 호출할 수 있다.
  * 경기 기록(matches)은 지우지 않는다. 지난 기록까지 사라지면 랭킹 이력이 어긋난다.
  */
@@ -177,11 +177,11 @@ async function remove(req, res) {
   const target = await q(`SELECT role FROM players WHERE handle = $1`, [handle]);
   if (target.length && (target[0].role || 'member') === 'master') {
     if (me.role !== 'master') {
-      return res.status(403).json({ error: '마스터 계정은 마스터만 삭제할 수 있습니다.' });
+      return res.status(403).json({ error: '리더 계정은 리더만 삭제할 수 있습니다.' });
     }
     const masters = await q(`SELECT count(*)::int AS n FROM players WHERE role = 'master'`);
     if (masters[0].n <= 1) {
-      return res.status(400).json({ error: '마스터가 최소 한 명은 있어야 합니다.' });
+      return res.status(400).json({ error: '리더가 최소 한 명은 있어야 합니다.' });
     }
   }
 

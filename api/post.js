@@ -749,7 +749,7 @@ async function findMyPhoto(req, res) {
   if (!rows.length) { res.status(404).json({ error: '이미 지워진 사진입니다.' }); return null; }
   const admin = await currentAdmin(req);
   if (!isFileAuthor(me, rows[0]) && !admin) {
-    res.status(403).json({ error: '올린 사람과 관리자만 고치거나 지울 수 있습니다.' });
+    res.status(403).json({ error: '올린 사람과 웹마스터만 고치거나 지울 수 있습니다.' });
     return null;
   }
   return { row: rows[0], me, admin };

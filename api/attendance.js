@@ -297,7 +297,7 @@ async function setSchedule(res, handle, slots) {
  */
 const poolShim = { query: async (text, params) => ({ rows: await q(text, params) }) };
 
-/** 지금 누구에게 걸려 있는지 — 관리자만 본다 */
+/** 지금 누구에게 걸려 있는지 — 웹마스터만 본다 */
 async function listDefaults(req, res) {
   const me = await requireAdmin(req, res);
   if (!me) return;
@@ -320,7 +320,7 @@ async function listDefaults(req, res) {
 }
 
 /**
- * 걸거나 푼다 — 관리자만.
+ * 걸거나 푼다 — 웹마스터만.
  *
  * slot 이 없으면 해제한다. 오늘 이미 대신 눌러준 뒤에 풀더라도 오늘 칸은
  * 그대로 둔다 — 본인이 보고 고칠 수 있는 상태이고, 말없이 지우면
@@ -359,7 +359,7 @@ async function setDefault(req, res) {
   res.status(200).json({ ok: true, handle: real, slot, appliedToday: today > 0 });
 }
 
-/** 잘못 찍힌 기록 지우기 — 관리자만 */
+/** 잘못 찍힌 기록 지우기 — 웹마스터만 */
 async function remove(req, res, id) {
   const me = await requireAdmin(req, res);
   if (!me) return;

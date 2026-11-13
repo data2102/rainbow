@@ -779,7 +779,7 @@ tr.fl-pinned td:first-child{ box-shadow:inset 3px 0 0 var(--danger); }
   .vote-table th.v-n, .vote-table td.v-n{ width:62px; }
 }
 
-/* ---------- 팀 편성하기 (마스터 전용) ---------- */
+/* ---------- 팀 편성하기 (리더 전용) ---------- */
 .master-only{
   font-size:var(--fs-footnote); font-weight:var(--fw-bold);
   padding:2px var(--sp-3); border-radius:var(--radius-pill);
@@ -1239,7 +1239,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .ko-undo-t{ font-size:var(--fs-footnote); color:var(--text-secondary); }
 .ko-undo-t b{ color:var(--text-primary); font-weight:var(--fw-bold); }
 .ko-undo .btn-mini{ margin-left:auto; }
-/* 관리자에게는 단추 대신 이 줄이 뜬다 — 권한이 없다는 안내지 경고는 아니다 */
+/* 웹마스터에게는 단추 대신 이 줄이 뜬다 — 권한이 없다는 안내지 경고는 아니다 */
 .ko-undo-no{
   margin-left:auto; font-size:var(--fs-footnote);
   color:var(--text-tertiary); white-space:nowrap;
@@ -1587,7 +1587,7 @@ body.rule-v2 #standingTable .streak-txt{ display:none; }
 .rl-log-win.rl-log-manual:hover:not(:disabled){
   border-color:var(--warning); background:var(--warning-bg); color:var(--warning-strong);
 }
-/* 수기작성 표시를 지우는 단추 — 점수가 걸려 있지 않아 누구나(적은 사람·관리자) 되돌린다 */
+/* 수기작성 표시를 지우는 단추 — 점수가 걸려 있지 않아 적은 사람·웹마스터가 되돌린다 */
 .rl-log-undo{
   margin-left:var(--sp-2); font-family:inherit; white-space:nowrap;
   font-size:var(--fs-footnote); font-weight:var(--fw-bold);
@@ -1598,7 +1598,7 @@ body.rule-v2 #standingTable .streak-txt{ display:none; }
 .rl-log-undo:hover:not(:disabled){ border-color:var(--text-secondary); color:var(--text-primary); }
 .rl-log-undo:disabled{ color:var(--text-disabled); cursor:not-allowed; }
 .rl-log-undo:focus-visible{ outline:none; box-shadow:var(--shadow-focus); }
-/* 시험 삼아 돌려본 기록을 치우는 길. 관리자에게만 보인다. */
+/* 시험 삼아 돌려본 기록을 치우는 길. 웹마스터에게만 보인다. */
 .rl-log-wipe{ border-color:var(--danger); color:var(--danger-strong); }
 /* 잘못 돌린 판 하나만 없애는 단추 — 호스트 자격도 같이 풀린다 */
 .rl-log-void{
@@ -3082,7 +3082,7 @@ button.room-n:hover{ color:var(--accent); text-decoration:underline; }
 ::-webkit-scrollbar-thumb{ background:var(--border-strong); border-radius:var(--radius-pill); }
 ::-webkit-scrollbar-track{ background:transparent; }
 
-/* ---------- 우측 상단 (관리자 · 화면 밝기 전환) ---------- */
+/* ---------- 우측 상단 (운영 · 화면 밝기 전환) ---------- */
 .head-right{ display:flex; flex-direction:column; align-items:flex-end; gap:var(--sp-3); }
 .head-top{ display:flex; gap:var(--sp-2); flex-wrap:wrap; justify-content:flex-end; }
 .admin-btn.active{
@@ -3280,7 +3280,7 @@ if (/[?&]room=\d+/.test(location.search)) {
           <span class="jump-t" id="roomJumpText"></span>
           <span class="jump-n" id="roomJumpN" hidden></span>
         </button>
-        <button type="button" class="admin-btn" data-tab="admin">관리자</button>
+        <button type="button" class="admin-btn" data-tab="admin">운영</button>
         <button type="button" class="theme-btn" id="themeToggle"
                 aria-label="밝은 화면과 어두운 화면 전환">
           <span class="to-dark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a7 7 0 1 0 10.5 10.5z"></path></svg>다크 모드</span>
@@ -3424,8 +3424,8 @@ if (/[?&]room=\d+/.test(location.search)) {
   <!-- ADMIN -->
   <div class="tab-panel" id="tab-admin">
     <div class="panel hud-corner" id="adminLocked">
-      <h2>관리자 전용 · Admin Only</h2>
-      <div class="foot-note" style="margin-top:0;margin-bottom:14px;">이 페이지는 관리자 로그인 후에만 이용할 수 있습니다.</div>
+      <h2>운영 전용 · Admin Only</h2>
+      <div class="foot-note" style="margin-top:0;margin-bottom:14px;">이 페이지는 웹마스터 이상만 이용할 수 있습니다.</div>
       <button class="btn btn-center" id="adminLockedLoginBtn">로그인</button>
     </div>
 
@@ -3474,11 +3474,11 @@ if (/[?&]room=\d+/.test(location.search)) {
         <div class="pager" id="acctLogPager" style="display:none;"></div>
       </div>
 
-      <!-- 팀 편성하기 — 마스터만 -->
+      <!-- 팀 편성하기 — 리더만 -->
       <div class="panel hud-corner" id="teamPanel" style="display:none;">
         <div class="panel-head">
           <h2>팀 편성하기</h2>
-          <span class="master-only">마스터 전용</span>
+          <span class="master-only">리더 전용</span>
         </div>
         <div class="foot-note" style="margin-top:0;margin-bottom:12px;">
           회원마다 등급 · 참석률 · 접속시간 · 포지션을 정해두면,
@@ -3902,7 +3902,7 @@ if (/[?&]room=\d+/.test(location.search)) {
         <div class="tsec">
           <div class="tsec-h">■ 대진표 · 결과 등록</div>
           <div class="tsec-sub" id="koHint">모든 경기가 3판 2선승이므로 <b>한 판씩</b> 기록합니다 · 먼저 2승하면 그 경기가 끝나고 다음 경기의 두 팀이 정해집니다</div>
-          <!-- 잘못 누른 마지막 한 판을 되돌리는 자리 (관리자에게만 보인다) -->
+          <!-- 잘못 누른 마지막 한 판을 되돌리는 자리 (웹마스터에게만 보인다) -->
           <div class="ko-undo" id="koUndo" hidden></div>
           <div class="ko-board" id="koBoard"></div>
         </div>
@@ -3992,7 +3992,7 @@ if (/[?&]room=\d+/.test(location.search)) {
         <div class="tsec-h">■ 대회 경기 기록</div>
         <div class="tsec-sub">예선 순위는 여기 기록된 결과로 자동 계산됩니다</div>
 
-        <div id="tFormHint" class="log-empty">관리자 로그인 후 경기를 기록할 수 있습니다.</div>
+        <div id="tFormHint" class="log-empty">웹마스터 로그인 후 경기를 기록할 수 있습니다.</div>
 
         <div id="tForm" style="display:none;">
           <div class="t-form-grid">
@@ -4238,7 +4238,7 @@ if (/[?&]room=\d+/.test(location.search)) {
         설치 파일 · 패치 · 스킨 · 타겟을 한자리에 모읍니다 ·
         <b>3MB 이하 파일은 여기에 바로 담기고</b>, 그보다 큰 설치 파일은
         구글 드라이브 · MEGA 같은 곳에 올린 뒤 받는 주소를 적어주세요 ·
-        올리는 것은 로그인한 회원 누구나, 지우는 것은 올린 사람과 관리자만 할 수 있습니다.
+        올리는 것은 로그인한 회원 누구나, 지우는 것은 올린 사람과 웹마스터만 할 수 있습니다.
       </div>
 
       <!-- 로그인하지 않은 사람에게 보이는 안내 -->
@@ -4342,7 +4342,7 @@ if (/[?&]room=\d+/.test(location.search)) {
       </div>
       <div class="foot-note" style="margin-top:0;margin-bottom:14px;">
         경기 장면과 모임 사진을 모아둡니다 · 사진을 누르면 제목 · 내용 · 댓글을 볼 수 있습니다 ·
-        올리는 것은 로그인한 회원 누구나, 고치고 지우는 것은 올린 사람과 관리자만 할 수 있습니다.
+        올리는 것은 로그인한 회원 누구나, 고치고 지우는 것은 올린 사람과 웹마스터만 할 수 있습니다.
       </div>
 
       <!-- 로그인하지 않은 사람에게 보이는 안내 -->
@@ -4566,9 +4566,9 @@ let players = [];
 let matches = [];
 let requests = [];
 let me = null;              // 로그인한 계정 { handle, role }
-let accounts = [];          // 계정 권한 목록 (관리자 이상)
+let accounts = [];          // 계정 권한 목록 (웹마스터 이상)
 let acctLogs = [];          // 계정 로그
-let defSlots = [];          // 기본 출석 시간대가 걸린 회원 (관리자 이상)
+let defSlots = [];          // 기본 출석 시간대가 걸린 회원 (웹마스터 이상)
 let defSlotDay = '';        // 그 목록을 받아온 날
 let tMatches = [];          // 대회 경기 기록
 let posts = [];             // 게시판 글
@@ -4747,7 +4747,7 @@ function tourLive() { return tourEdition === TOURNAMENT_LATEST; }
 /** 지금 화면에서 결과를 **등록**할 수 있는가 (관리자 이상) */
 function tourEditable() { return isAdmin() && tourLive(); }
 /**
- * 기록을 **지우거나 되돌릴** 수 있는가 — 마스터만.
+ * 기록을 **지우거나 되돌릴** 수 있는가 — 리더만.
  *
  * 앞 판이 뒷 판의 대진을 정하는 구조라 한 판을 지우면 뒤가 전부 어긋난다.
  * 넣는 것은 다시 넣으면 되지만 지우는 것은 그렇지 않아 문을 좁혔다.
@@ -4991,7 +4991,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 146;
+const APP_VERSION = 147;
 let toldToRefresh = false;
 
 /**
@@ -7888,11 +7888,11 @@ function renderKoUndo() {
   const last = tourEditable() ? koLastGame() : null;
   box.hidden = !last;
   if (!last) return;
-  // 되돌리기는 마스터만. 관리자에게 단추만 숨기면 왜 안 되는지 몰라 헤매므로 까닭을 적는다.
+  // 되돌리기는 리더만. 웹마스터에게 단추만 숨기면 왜 안 되는지 몰라 헤매므로 까닭을 적는다.
   box.innerHTML = `<span class="ko-undo-t">방금 기록 · <b>${esc(koGameText(last))}</b></span>`
     + (tourDeletable()
         ? `<button type="button" class="btn-mini btn-reject" data-koundo="${last.id}">되돌리기</button>`
-        : `<span class="ko-undo-no">되돌리기는 마스터만 할 수 있습니다</span>`);
+        : `<span class="ko-undo-no">되돌리기는 리더만 할 수 있습니다</span>`);
 }
 
 /** 경기 기록 */
@@ -8309,7 +8309,9 @@ window.closeModal = closeModal;
 
 /* ---------- 권한 ---------- */
 
-const ROLE_LABEL = { member: '일반', admin: '관리자', master: '마스터' };
+/* 보이는 이름만 바꿨다(2026-11). 속값은 member·admin·master 그대로다 —
+   데이터베이스와 지난 기록이 그 값으로 적혀 있다. 서버의 api/_lib.js 와 같아야 한다. */
+const ROLE_LABEL = { member: '관리자', admin: '웹마스터', master: '리더' };
 const ROLE_RANK = { member: 1, admin: 2, master: 3 };
 
 function isLoggedIn() { return !!me; }
@@ -8321,7 +8323,7 @@ function isMaster()   { return !!me && me.role === 'master'; }
 function renderAuthBar() {
   const bar = document.getElementById('authBar');
   bar.innerHTML = me
-    ? `<span class="auth-user">${esc(ROLE_LABEL[me.role] || '일반')} · ${esc(me.handle)}</span>
+    ? `<span class="auth-user">${esc(ROLE_LABEL[me.role] || ROLE_LABEL.member)} · ${esc(me.handle)}</span>
        <button class="auth-btn" id="btnChangePw">비밀번호 변경</button>
        <button class="auth-btn" id="btnLogout">로그아웃</button>`
     : `<button class="auth-btn" id="btnSignup">회원가입</button>
@@ -8517,7 +8519,7 @@ function showSignupModal() {
     <label>이메일 주소 *</label><input type="text" id="suEmail" maxlength="120" autocomplete="email" placeholder="예: name@example.com">
     <div class="modal-error" id="suErr"></div>
     <button class="btn" id="suSubmit">가입 신청</button>
-    <div class="foot-note">관리자가 승인하면 계정이 만들어집니다 · 초기 비밀번호는 1234입니다 ·
+    <div class="foot-note">웹마스터가 승인하면 계정이 만들어집니다 · 초기 비밀번호는 1234입니다 ·
       이메일은 비밀번호를 잊었을 때 본인 확인에 씁니다.</div>`);
   document.getElementById('suSubmit').addEventListener('click', doSignup);
 }
@@ -8532,7 +8534,7 @@ async function doSignup() {
   try {
     await apiPost('/api/account', { action: 'signup', id, clan, email });
     closeModal();
-    showToast('가입 신청을 보냈습니다. 관리자 승인을 기다려주세요.');
+    showToast('가입 신청을 보냈습니다. 웹마스터 승인을 기다려주세요.');
     await refreshAll();
   } catch (e) { err.textContent = e.message; }
 }
@@ -8550,7 +8552,7 @@ function showFindPwModal() {
     <label>이메일 주소</label><input type="text" id="fpEmail" maxlength="120" autocomplete="email">
     <div class="modal-error" id="fpErr"></div>
     <button class="btn" id="fpSubmit">다음</button>
-    <div class="foot-note">비밀번호를 찾지 못할 경우 관리자에게 문의하세요.</div>`);
+    <div class="foot-note">비밀번호를 찾지 못할 경우 웹마스터에게 문의하세요.</div>`);
   document.getElementById('fpSubmit').addEventListener('click', doCheckIdentity);
   document.getElementById('fpEmail').addEventListener('keydown', e => {
     if (e.key === 'Enter') doCheckIdentity();
@@ -8630,13 +8632,13 @@ async function doChangePassword() {
 
 /**
  * 권한 칸.
- * 관리자는 일반과 관리자 사이만 바꿀 수 있다. 마스터가 걸린 자리는
- * 주는 것도 거두는 것도 마스터의 몫이라, 관리자에게는 이름표만 보여준다.
+ * 웹마스터는 관리자와 웹마스터 사이만 바꿀 수 있다. 리더가 걸린 자리는
+ * 주는 것도 거두는 것도 리더의 몫이라, 웹마스터에게는 이름표만 보여준다.
  */
 function roleCell(a) {
   const canPick = isMaster() || (isAdmin() && a.role !== 'master');
   if (!canPick) {
-    return `<span class="role-tag ${esc(a.role)}">${esc(ROLE_LABEL[a.role] || '일반')}</span>`;
+    return `<span class="role-tag ${esc(a.role)}">${esc(ROLE_LABEL[a.role] || ROLE_LABEL.member)}</span>`;
   }
   const options = isMaster() ? Object.keys(ROLE_LABEL) : ['member', 'admin'];
   return `<select class="role-select" data-role="${esc(a.handle)}">${
@@ -8652,7 +8654,7 @@ const ROLE_COL = {
   clan:   { label: 'Clan',   first:  1 },
   email:  { label: '이메일',  first:  1 },
   record: { label: '전적',    first: -1 },   // 숫자는 큰 것부터
-  role:   { label: '권한',    first: -1 },   // 권한은 마스터부터
+  role:   { label: '권한',    first: -1 },   // 권한은 리더부터
 };
 
 /** 줄 세울 때 쓰는 값. 비어 있으면 null — 방향과 상관없이 뒤로 보낸다. */
@@ -8680,7 +8682,7 @@ function renderRoleHead() {
   });
 }
 
-/** 자기 계정은 지울 수 없고, 마스터 계정은 마스터만 지울 수 있다 (서버도 같이 막는다) */
+/** 자기 계정은 지울 수 없고, 리더 계정은 리더만 지울 수 있다 (서버도 같이 막는다) */
 function canDelete(a) {
   if (me && me.handle === a.handle) return false;
   if (a.role === 'master' && !isMaster()) return false;
@@ -8769,8 +8771,8 @@ function renderAccounts() {
 
   note.innerHTML = '회원 정보를 추가·수정·삭제하고 권한을 정합니다 · 한 일은 아래 계정 로그에 남습니다'
     + (isMaster()
-      ? ' · <b>마스터 권한을 주고 거두는 것은 마스터만 할 수 있습니다.</b>'
-      : ' · 일반·관리자 권한은 바꿀 수 있고, <b>마스터 권한은 마스터만 주고 거둘 수 있습니다.</b>');
+      ? ' · <b>리더 권한을 주고 거두는 것은 리더만 할 수 있습니다.</b>'
+      : ' · 관리자·웹마스터 권한은 바꿀 수 있고, <b>리더 권한은 리더만 주고 거둘 수 있습니다.</b>');
 
   const search = document.getElementById('roleSearch');
   const query = search ? search.value.trim().toLowerCase() : '';
@@ -8972,7 +8974,7 @@ function bindPager(boxId, key, set, redraw) {
   });
 }
 
-/* ---------- 팀 편성하기 (마스터 전용) ---------- */
+/* ---------- 팀 편성하기 (리더 전용) ---------- */
 
 /** api/account.js 의 TEAM_OPTIONS 와 같아야 한다. 서버가 준 값으로 덮인다. */
 let teamOptions = {
@@ -9039,7 +9041,7 @@ function renderTmHead() {
 function renderTeamPanel() {
   const panel = document.getElementById('teamPanel');
   if (!panel) return;
-  // 마스터가 아니면 판 자체를 보여주지 않는다
+  // 리더가 아니면 판 자체를 보여주지 않는다
   panel.style.display = isMaster() ? '' : 'none';
   if (!isMaster()) return;
 
@@ -10733,7 +10735,7 @@ async function hostSetupFlow(info) {
     }
     if (!cancelled && state) {
       state.textContent = '아직 준비가 끝나지 않았습니다.';
-      if (hint) hint.innerHTML = '준비 창에 오류가 있었다면 그 화면을 관리자에게 보내 주세요 · '
+      if (hint) hint.innerHTML = '준비 창에 오류가 있었다면 그 화면을 웹마스터에게 보내 주세요 · '
         + '<code>C:\\R6Clan\\r6host.log</code> 에 기록이 남습니다. 실행하기를 다시 누르면 처음부터 다시 합니다.';
     }
   } finally {
@@ -11440,7 +11442,7 @@ async function rlReport(i, winner) {
   if (!p || p.result) return;
   const size = (name) => ((rlDraw.teams.find(t => t.name === name) || { order: [] }).order.length);
   const which = rlDraw.pairs.length > 1 ? `${i + 1}경기 · ` : '';
-  if (!confirm(`${which}${winner} Team 승리로 기록합니다.\n${size(p.a)}:${size(p.b)} · 점수가 바로 반영되고 되돌리려면 관리자가 취소해야 합니다.\n계속할까요?`)) return;
+  if (!confirm(`${which}${winner} Team 승리로 기록합니다.\n${size(p.a)}:${size(p.b)} · 점수가 바로 반영되고 되돌리려면 웹마스터가 취소해야 합니다.\n계속할까요?`)) return;
 
   rlBusy = true;
   rlShowResult(i);
@@ -11590,7 +11592,7 @@ async function rlReportFromLog(btn) {
   if (!confirm(`${which}${winner} Team 승리로 기록합니다.\n`
     + `${size(p.a)}:${size(p.b)} · ${formatDateTime(row.ts)} 에 나눈 판입니다.\n`
     + (late ? '\n※ 달이 바뀌었습니다. 경기 일시는 오늘로 찍혀 이번 달 성적에 들어갑니다.\n' : '')
-    + `\n점수가 바로 반영되고 되돌리려면 관리자가 취소해야 합니다. 계속할까요?`)) return;
+    + `\n점수가 바로 반영되고 되돌리려면 웹마스터가 취소해야 합니다. 계속할까요?`)) return;
 
   btn.disabled = true;
   try {

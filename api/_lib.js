@@ -77,13 +77,17 @@ export function isLegacyHash(stored) {
 
 /**
  * 계정은 곧 선수 명단이다. players 한 줄이 로그인 계정 하나다.
- * 권한은 일반(member) < 관리자(admin) < 마스터(master) 셋뿐이다.
+ * 권한은 관리자(member) < 웹마스터(admin) < 리더(master) 셋뿐이다.
+ *
+ * 속값(member·admin·master)은 2026-11 의 이름 바꾸기 때도 그대로 두었다.
+ * 데이터베이스와 지난 기록이 모두 이 값으로 적혀 있어서, 보이는 이름만
+ * 바꾸는 편이 안전하다. 화면에 나가는 말은 ROLE_LABEL 하나로 모은다.
  */
 export const ROLES = ['member', 'admin', 'master'];
-export const ROLE_LABEL = { member: '일반', admin: '관리자', master: '마스터' };
+export const ROLE_LABEL = { member: '관리자', admin: '웹마스터', master: '리더' };
 const RANK = { member: 1, admin: 2, master: 3 };
 
-/** 처음 마스터 권한을 가지는 계정 */
+/** 처음 리더 권한을 가지는 계정 */
 export const MASTER_HANDLE = 'LOTUS_TeaRs';
 
 /** 계정 제도를 처음 켤 때 한 번만 도는 정리 작업 */
@@ -193,7 +197,7 @@ export async function currentUser(req) {
   return rows.length ? { handle: rows[0].handle, role: rows[0].role || 'member' } : null;
 }
 
-/** 관리자 이상이면 그 아이디를, 아니면 null (권한 없이 조용히 넘어가는 곳에 쓴다) */
+/** 웹마스터 이상이면 그 아이디를, 아니면 null (권한 없이 조용히 넘어가는 곳에 쓴다) */
 export async function currentAdmin(req) {
   const me = await currentUser(req);
   return me && RANK[me.role] >= RANK.admin ? me.handle : null;
@@ -212,11 +216,11 @@ async function gate(req, res, need) {
   return me.handle;
 }
 
-/** 로그인만 하면 된다 (일반 이상) */
+/** 로그인만 하면 된다 (관리자 이상) */
 export function requireUser(req, res) { return gate(req, res, 'member'); }
-/** 관리자 이상 */
+/** 웹마스터 이상 */
 export function requireAdmin(req, res) { return gate(req, res, 'admin'); }
-/** 마스터만. 되돌릴 수 없는 일(대회 기록 삭제 등)에 쓴다 — 관리자는 넣을 수만 있다. */
+/** 리더만. 되돌릴 수 없는 일(대회 기록 삭제 등)에 쓴다 — 웹마스터는 넣을 수만 있다. */
 export function requireMaster(req, res) { return gate(req, res, 'master'); }
 
 /** 누가 무엇을 했는지 남긴다. ts 는 audit_log 가 자동으로 찍는다. */
@@ -312,7 +316,7 @@ export function normalizeMatch(m) {
  * 새 규칙이 시작되는 시각 — 2026년 11월 1일 0시 (한국 시각).
  *
  * 이 시각을 **경기가 기록된 때**(`ts`)와 견준다. "지금"과 견주지 않는 까닭:
- * 관리자가 경기를 하나 취소하면 `replay()` 가 그 달 경기를 처음부터 다시
+ * 웹마스터가 경기를 하나 취소하면 `replay()` 가 그 달 경기를 처음부터 다시
  * 계산하는데, 그때 '지금'을 쓰면 **10월 경기까지 새 점수로 다시 매겨져**
  * 지난 순위가 소리 없이 바뀐다. 기록된 때로 재면 10월 경기는 10월 규칙,
  * 11월 경기는 11월 규칙으로 영원히 고정된다.
@@ -450,7 +454,7 @@ export function cleanReason(v) {
  * 호스트 뽑기로 팀을 나누면 늦게 온 사람도 어느 한 팀에 들어가므로
  * 지각 팀이라는 칸 자체가 어긋났다(2026-10). 그래서 리폿에서 칸을 뺐다.
  *
- * 이 함수는 **지난 기록을 다시 셀 때만** 남아 있다. 관리자가 경기 하나를
+ * 이 함수는 **지난 기록을 다시 셀 때만** 남아 있다. 웹마스터가 경기 하나를
  * 취소하면 그 달 기록을 처음부터 다시 세는데, 거기서 이 점수를 빼면
  * 예전에 받은 점수가 소리 없이 사라져 순위가 달라진다.
  */
@@ -510,14 +514,14 @@ export async function attendedOn(c, day) {
 /**
  * 기본 출석 시간대(고정 출석).
  *
- * 매일 빠짐없이 오는 사람이 매일 같은 칸을 누르는 것은 품만 든다. 관리자가
+ * 매일 빠짐없이 오는 사람이 매일 같은 칸을 누르는 것은 품만 든다. 웹마스터가
  * 기본 시간대를 걸어두면 날이 바뀐 뒤 **한 번만** 그 칸을 대신 눌러준다.
  *
  * 한 번만인 것이 중요하다. 본인이 오늘 불참으로 바꾸거나 아예 지워도
  * 다시 채워 넣지 않는다 — 그러면 본인이 고칠 수 없는 칸이 된다.
  * '이 날 이 사람에게 넣었다'를 play_default_log 에 남겨 그것을 막는다.
  *
- * 숨기지 않는다. 관리자 화면에 누구에게 걸려 있는지 그대로 보이고,
+ * 숨기지 않는다. 운영 화면에 누구에게 걸려 있는지 그대로 보이고,
  * 걸고 푸는 것은 계정 로그에 남는다.
  */
 let defaultsReady = false;
@@ -726,7 +730,7 @@ export async function replay(c, seasonId) {
     }
 
     // 지각 팀은 없앴지만, 그 칸이 있던 시절의 기록은 여기서 그대로 되살린다.
-    // 빼버리면 관리자가 경기 하나를 취소하는 순간 지난 달에 받은 점수까지
+    // 빼버리면 웹마스터가 경기 하나를 취소하는 순간 지난 달에 받은 점수까지
     // 소리 없이 사라져 순위가 달라진다. 새 기록에는 이 칸이 비어 있다.
     for (const h of (Array.isArray(m.late) ? m.late : [])) {
       if (!h) continue;

@@ -9,13 +9,13 @@ import { ensureSeason, ensureRescore } from './_season.js';
 /**
  * GET  /api/match?host=1&page=N        호스트 뽑기 기록 (누구나 볼 수 있다)
  * POST /api/match                      경기 기록 (로그인한 회원 누구나)
- * POST /api/match {action:'void'}      기록 취소  (관리자 이상)
- * POST /api/match {action:'restore'}   취소 되돌리기 (관리자 이상)
+ * POST /api/match {action:'void'}      기록 취소  (웹마스터 이상)
+ * POST /api/match {action:'restore'}   취소 되돌리기 (웹마스터 이상)
  * POST /api/match {action:'host'}      팀 나누기 + 팀별 호스트 뽑기
  * POST /api/match {action:'hostResult'} 그 판의 승패 등록
  * POST /api/match {action:'hostManual'}  그 판은 리폿에서 손으로 썼다고 표시
- * POST /api/match {action:'hostVoid'}   그 판 하나만 무효 (관리자 이상)
- * POST /api/match {action:'hostClear'}  뽑기 기록 비우기 (관리자 이상)
+ * POST /api/match {action:'hostVoid'}   그 판 하나만 무효 (웹마스터 이상)
+ * POST /api/match {action:'hostClear'}  뽑기 기록 비우기 (웹마스터 이상)
  *
  * 호스트 뽑기가 여기 얹혀 있는 까닭: Vercel Hobby 는 서버리스 함수가 12개까지다.
  * 지금 11개라 새 파일을 만들 수 없다. 경기와 한 몸인 기능이라 여기에 둔다.
@@ -633,8 +633,8 @@ const MAX_MANUAL = 100;
  * 올리지 마라' 는 표시를 남긴다.
  *
  * **점수는 건드리지 않는다.** 경기도 만들지 않는다. 표시일 뿐이다.
- * 잘못 눌렀으면 적은 사람이나 관리자가 지울 수 있다 — 점수가 걸려 있지 않으니
- * 되돌리는 데 관리자를 기다릴 까닭이 없다.
+ * 잘못 눌렀으면 적은 사람이나 웹마스터가 지울 수 있다 — 점수가 걸려 있지 않으니
+ * 되돌리는 데 웹마스터를 기다릴 까닭이 없다.
  */
 async function hostManual(req, res, b) {
   const me = await requireUser(req, res);
@@ -671,7 +671,7 @@ async function hostManual(req, res, b) {
       if (clear) {
         if (!pair.manual) throw new Error('수기작성으로 표시된 경기가 아닙니다.');
         if (pair.manual.by !== me && !admin) {
-          throw new Error('적은 사람이나 관리자만 지울 수 있습니다.');
+          throw new Error('적은 사람이나 웹마스터만 지울 수 있습니다.');
         }
       } else if (pair.manual) {
         throw new Error('이미 수기작성으로 표시된 경기입니다.');

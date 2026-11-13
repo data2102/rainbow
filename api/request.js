@@ -63,7 +63,7 @@ async function resolve(req, res, action) {
         await q(`DELETE FROM requests WHERE id = $1`, [id]);
         return res.status(400).json({ error: '이미 존재하는 ID라 요청을 삭제했습니다.' });
       }
-      // 승인과 동시에 로그인할 수 있는 계정이 된다. 권한은 일반부터.
+      // 승인과 동시에 로그인할 수 있는 계정이 된다. 권한은 관리자부터.
       const parsed = parseHandle(r.new_id);
       await q(
         `INSERT INTO players (handle, clan, name, email, pw_hash, role)

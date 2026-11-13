@@ -30,7 +30,7 @@ export const MAX_TITLE = 24;
 export const PING_VERSION = 3;
 
 /** 사이트가 바뀌었는지 브라우저가 알아채는 표. 배포할 때마다 올린다. */
-export const APP_VERSION = 146;
+export const APP_VERSION = 147;
 
 /** 이 시간 동안 아무 신호가 없으면 나간 것으로 본다 (브라우저를 그냥 닫는 경우) */
 const IDLE_MS = 3 * 60 * 1000;
@@ -776,7 +776,7 @@ async function relayToken(req, res) {
   const me = await requireUser(req, res);
   if (!me) return;
   if (!relayEnabled()) {
-    return res.status(400).json({ error: '중계 서버 연결이 아직 설정되지 않았습니다. 관리자에게 알려주세요.' });
+    return res.status(400).json({ error: '중계 서버 연결이 아직 설정되지 않았습니다. 웹마스터에게 알려주세요.' });
   }
   res.status(200).json({ token: makeRegisterToken(me), name: relayName(me) });
 }

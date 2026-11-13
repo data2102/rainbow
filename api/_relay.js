@@ -3,11 +3,11 @@ import crypto from 'node:crypto';
 /**
  * 중계 서버(relay/r6relay.sh 의 agent)를 부른다.
  *
- * 방장 지정(use)과 방장 등록(register)을 사이트가 대신 한다 — 예전에는 관리자가
+ * 방장 지정(use)과 방장 등록(register)을 사이트가 대신 한다 — 예전에는 웹마스터가
  * 매번 ssh 로 `r6relay use` 를 쳤고, 방장이 바뀔 때마다 그게 어긋나 접속이 꼬였다.
  *
  * Vercel 환경변수 RELAY_SECRET 이 없으면 아무것도 하지 않는다(enabled() false).
- * 그 사이에는 예전처럼 관리자가 손으로 지정하면 된다.
+ * 그 사이에는 예전처럼 웹마스터가 손으로 지정하면 된다.
  */
 const URL_ = process.env.RELAY_URL || 'http://158.247.243.55:8723';
 const SECRET = process.env.RELAY_SECRET || '';
@@ -26,7 +26,7 @@ export function relayName(handle) {
 }
 
 export async function relayCall(action, payload = {}) {
-  if (!SECRET) throw new Error('중계 서버 연결이 아직 설정되지 않았습니다. 관리자에게 알려주세요.');
+  if (!SECRET) throw new Error('중계 서버 연결이 아직 설정되지 않았습니다. 웹마스터에게 알려주세요.');
   const raw = JSON.stringify({ ...payload, action, ts: Date.now() / 1000 });
   const sig = crypto.createHmac('sha256', SECRET).update(raw).digest('hex');
   const ctl = new AbortController();

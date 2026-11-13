@@ -85,7 +85,7 @@ async function importAll(req, res, me) {
       );
     }
 
-    // 관리자 계정은 비밀번호가 포함된 경우에만 새로 추가 (기존 계정은 건드리지 않음)
+    // 운영 계정은 비밀번호가 포함된 경우에만 새로 추가 (기존 계정은 건드리지 않음)
     for (const a of (payload.admins || [])) {
       if (!a.id) continue;
       await c.query(
