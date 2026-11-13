@@ -3518,15 +3518,6 @@ if (/[?&]room=\d+/.test(location.search)) {
         <div id="tmResult"></div>
       </div>
 
-      <div class="panel hud-corner">
-        <h2>데이터 관리</h2>
-        <button class="btn-ghost" id="resetBtn">전체 기록 초기화</button>
-        <button class="btn-ghost" id="exportBtn" style="margin-left:8px;margin-top:0;">⇩ 데이터 내보내기 (JSON)</button>
-        <button class="btn-ghost" id="importBtn" style="margin-left:8px;margin-top:0;">⇧ 데이터 가져오기 (JSON)</button>
-        <input type="file" id="importFile" accept="application/json" style="display:none;">
-        <div class="foot-note">모든 데이터는 서버 DB에 저장됩니다. 정기적으로 내보내기(JSON)로 백업해두세요. 내보내기 파일에는 비밀번호가 포함되지 않습니다.</div>
-      </div>
-
       <!-- 고정 출석. 숨기지 않는다 — 누구에게 걸려 있는지 여기서 다 보이고,
            걸고 푼 기록은 아래 계정 로그에 남는다. -->
       <div class="panel hud-corner" id="defSlotPanel">
@@ -3542,6 +3533,15 @@ if (/[?&]room=\d+/.test(location.search)) {
           <button class="btn-mini btn-edit" id="defSlotAdd">걸기</button>
         </div>
         <div id="defSlotList"><div class="log-empty">걸려 있는 회원이 없습니다.</div></div>
+      </div>
+
+      <div class="panel hud-corner">
+        <h2>데이터 관리</h2>
+        <button class="btn-ghost" id="resetBtn">전체 기록 초기화</button>
+        <button class="btn-ghost" id="exportBtn" style="margin-left:8px;margin-top:0;">⇩ 데이터 내보내기 (JSON)</button>
+        <button class="btn-ghost" id="importBtn" style="margin-left:8px;margin-top:0;">⇧ 데이터 가져오기 (JSON)</button>
+        <input type="file" id="importFile" accept="application/json" style="display:none;">
+        <div class="foot-note">모든 데이터는 서버 DB에 저장됩니다. 정기적으로 내보내기(JSON)로 백업해두세요. 내보내기 파일에는 비밀번호가 포함되지 않습니다.</div>
       </div>
     </div>
   </div>
@@ -4988,7 +4988,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 144;
+const APP_VERSION = 145;
 let toldToRefresh = false;
 
 /**
