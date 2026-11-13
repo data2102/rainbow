@@ -325,13 +325,26 @@ const LOG_ACTIONS = [
   'set_default_slot',
 ];
 
+/**
+ * 리더·웹마스터에게만 보이는 줄.
+ *
+ * 기본 출석은 그 둘만 걸고 풀 수 있는데, 걸었다는 기록이 로그에 남으면
+ * 누가 자동 출석을 받고 있는지 관리자 모두가 알게 된다. 문을 좁혀 놓고
+ * 기록으로 새어 나가면 좁힌 뜻이 없다.
+ */
+const ADMIN_ONLY_ACTIONS = ['set_default_slot'];
+
 async function logs(req, res) {
   const me = await requireStaff(req, res);
   if (!me) return;
+  const seeAll = !!(await currentAdmin(req));
+  const actions = seeAll
+    ? LOG_ACTIONS
+    : LOG_ACTIONS.filter(a => !ADMIN_ONLY_ACTIONS.includes(a));
   const rows = await q(
     `SELECT admin_id, action, detail, ts FROM audit_log
       WHERE action = ANY($1) ORDER BY ts DESC LIMIT 200`,
-    [LOG_ACTIONS]
+    [actions]
   );
   res.status(200).json({
     logs: rows.map(r => ({
