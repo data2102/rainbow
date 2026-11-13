@@ -325,6 +325,7 @@ const LOG_ACTIONS = [
   'approve_add', 'approve_remove', 'reject_request',
   'create_player', 'update_player', 'remove_player', 'restore_player', 'set_role',
   'void_match', 'restore_match',
+  'set_default_slot',
 ];
 
 async function logs(req, res) {

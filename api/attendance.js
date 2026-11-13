@@ -1,6 +1,6 @@
 import {
   q, tx, body, methodGuard, currentUser, requireUser, requireAdmin, audit,
-  ruleV2, attendRule, kstHour, nightDay, ATTEND_CLOSE_HOUR,
+  ruleV2, attendRule, kstHour, nightDay, ATTEND_CLOSE_HOUR, applyPlayDefaults,
 } from './_lib.js';
 import { syncSeason } from './_season.js';
 
@@ -137,6 +137,10 @@ export default async function handler(req, res) {
       // 리폿은 '이 밤'의 출석을 본다. 새벽 2시에는 오늘(day)이 아니라
       // 어젯밤(night)의 체크가 기준이므로 그쪽 명단도 함께 내려보낸다.
       const night = nightDay();
+      // 읽기 전에 오늘 치 기본값을 채운다. 날이 바뀌고 처음 들어온
+      // 사람이 누구든, 그 한 번이 고정 출석을 세워준다.
+      try { await applyPlayDefaults(poolShim, day); }
+      catch { /* 표가 아직 없으면 없는 대로 */ }
       const [rows, picks, nightPicks] = await Promise.all([
         id ? q(`SELECT * FROM attendance WHERE season = $1 ORDER BY clock_in ASC`, [id]) : [],
         q(`SELECT handle, slot FROM play_schedule WHERE day = $1 ORDER BY handle, slot`, [day]),
@@ -182,6 +186,8 @@ export default async function handler(req, res) {
     }
     if (action === 'remove') return await remove(req, res, id);
     if (action === 'voteStats') return await voteStats(req, res);
+    if (action === 'defaults') return await listDefaults(req, res);
+    if (action === 'setDefault') return await setDefault(req, res);
     return res.status(400).json({ error: '알 수 없는 요청입니다.' });
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -281,6 +287,76 @@ async function setSchedule(res, handle, slots) {
     }
   });
   res.status(200).json({ ok: true, day, handle, slots: picked });
+}
+
+/* ---------- 기본 출석 시간대(고정 출석) ---------- */
+
+/**
+ * applyPlayDefaults 는 트랜잭션 클라이언트(`{ rows }` 를 돌려주는 것)를
+ * 받는다. 여기서는 트랜잭션이 필요 없으므로 q() 를 그 모양으로 감싼다.
+ */
+const poolShim = { query: async (text, params) => ({ rows: await q(text, params) }) };
+
+/** 지금 누구에게 걸려 있는지 — 관리자만 본다 */
+async function listDefaults(req, res) {
+  const me = await requireAdmin(req, res);
+  if (!me) return;
+  const rows = await q(
+    `SELECT handle, slot, set_by, ts FROM play_default ORDER BY handle`
+  );
+  const day = playDay();
+  const done = await q(`SELECT handle FROM play_default_log WHERE day = $1`, [day]);
+  const filled = new Set(done.map(r => r.handle));
+  res.status(200).json({
+    day,
+    defaults: rows.map(r => ({
+      handle: r.handle,
+      slot: r.slot,
+      by: r.set_by,
+      ts: r.ts == null ? null : Number(r.ts),
+      filledToday: filled.has(r.handle),
+    })),
+  });
+}
+
+/**
+ * 걸거나 푼다 — 관리자만.
+ *
+ * slot 이 없으면 해제한다. 오늘 이미 대신 눌러준 뒤에 풀더라도 오늘 칸은
+ * 그대로 둔다 — 본인이 보고 고칠 수 있는 상태이고, 말없이 지우면
+ * '눌렀는데 사라졌다'가 된다.
+ */
+async function setDefault(req, res) {
+  const me = await requireAdmin(req, res);
+  if (!me) return;
+  const b = body(req);
+  const handle = String(b.handle || '').trim();
+  if (!handle) return res.status(400).json({ error: '아이디가 없습니다.' });
+
+  const rows = await q(`SELECT handle FROM players WHERE handle = $1`, [handle]);
+  if (!rows.length) return res.status(404).json({ error: '명단에 없는 선수입니다: ' + handle });
+  const real = rows[0].handle;
+
+  if (b.slot === null || b.slot === undefined || b.slot === '') {
+    await q(`DELETE FROM play_default WHERE handle = $1`, [real]);
+    await audit(me, 'set_default_slot', { handle: real, slot: null });
+    return res.status(200).json({ ok: true, handle: real, slot: null });
+  }
+
+  const slot = Number(b.slot);
+  if (!SLOTS.includes(slot)) return res.status(400).json({ error: '없는 시간대입니다.' });
+  await q(
+    `INSERT INTO play_default (handle, slot, set_by, ts) VALUES ($1,$2,$3,$4)
+     ON CONFLICT (handle) DO UPDATE SET slot = $2, set_by = $3, ts = $4`,
+    [real, slot, me, Date.now()]
+  );
+  await audit(me, 'set_default_slot', { handle: real, slot });
+
+  // 오늘 아직 안 눌렀으면 지금 바로 눌러준다 — 내일까지 기다릴 까닭이 없다.
+  let today = 0;
+  try { today = await applyPlayDefaults(poolShim, playDay()); }
+  catch { /* noop */ }
+  res.status(200).json({ ok: true, handle: real, slot, appliedToday: today > 0 });
 }
 
 /** 잘못 찍힌 기록 지우기 — 관리자만 */

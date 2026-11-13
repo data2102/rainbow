@@ -507,6 +507,72 @@ export async function attendedOn(c, day) {
  * 이 경기에서 출석 체크가 없어 점수를 못 받을 사람들을 골라낸다.
  * 11월 2일 전 경기에는 빈 목록을 돌려준다 — 그때는 이 규칙이 없었다.
  */
+/**
+ * 기본 출석 시간대(고정 출석).
+ *
+ * 매일 빠짐없이 오는 사람이 매일 같은 칸을 누르는 것은 품만 든다. 관리자가
+ * 기본 시간대를 걸어두면 날이 바뀐 뒤 **한 번만** 그 칸을 대신 눌러준다.
+ *
+ * 한 번만인 것이 중요하다. 본인이 오늘 불참으로 바꾸거나 아예 지워도
+ * 다시 채워 넣지 않는다 — 그러면 본인이 고칠 수 없는 칸이 된다.
+ * '이 날 이 사람에게 넣었다'를 play_default_log 에 남겨 그것을 막는다.
+ *
+ * 숨기지 않는다. 관리자 화면에 누구에게 걸려 있는지 그대로 보이고,
+ * 걸고 푸는 것은 계정 로그에 남는다.
+ */
+let defaultsReady = false;
+async function ensurePlayDefaults(c) {
+  if (defaultsReady) return;
+  await c.query(`
+    CREATE TABLE IF NOT EXISTS play_default (
+      handle TEXT PRIMARY KEY,
+      slot   INTEGER NOT NULL,
+      set_by TEXT,
+      ts     BIGINT
+    )`);
+  await c.query(`
+    CREATE TABLE IF NOT EXISTS play_default_log (
+      day    TEXT NOT NULL,
+      handle TEXT NOT NULL,
+      PRIMARY KEY (day, handle)
+    )`);
+  defaultsReady = true;
+}
+
+/**
+ * 그 날짜의 기본값을 아직 안 넣었으면 넣는다. 여러 번 불려도 한 번만 들어간다.
+ *
+ * 출석 화면과 리폿(점수 계산) 양쪽에서 부른다. 화면 쪽에서만 부르면,
+ * 아무도 출석 탭을 안 연 날 밤에는 기본값이 없는 채로 점수가 매겨진다 —
+ * 하필 그게 제일 중요한 순간이다.
+ *
+ * day 는 '지금'에 해당하는 날짜여야 한다. 지난 날짜를 넣으면 이미 끝난
+ * 날의 투표율이 뒤늦게 바뀐다.
+ */
+export async function applyPlayDefaults(c, day) {
+  await ensurePlayDefaults(c);
+  const { rows: has } = await c.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'play_schedule'`
+  );
+  if (!has.length) return 0;
+  const { rows } = await c.query(
+    `WITH todo AS (
+       INSERT INTO play_default_log (day, handle)
+       SELECT $1, d.handle FROM play_default d
+       ON CONFLICT (day, handle) DO NOTHING
+       RETURNING handle
+     )
+     INSERT INTO play_schedule (day, handle, slot)
+     SELECT $1, t.handle, d.slot
+       FROM todo t JOIN play_default d ON d.handle = t.handle
+       WHERE EXISTS (SELECT 1 FROM players p WHERE p.handle = d.handle)
+     ON CONFLICT (day, handle) DO NOTHING
+     RETURNING handle`,
+    [day]
+  );
+  return rows.length;
+}
+
 export async function noScoreFor(c, handles, ts) {
   if (!attendRule(ts)) return [];
   // play_schedule 표가 아직 없는 데이터베이스일 수 있다 ('출석' 을 한 번도
@@ -515,6 +581,11 @@ export async function noScoreFor(c, handles, ts) {
     `SELECT 1 FROM information_schema.tables WHERE table_name = 'play_schedule'`
   );
   if (!has.length) return [];
+  // 지금 벌어지는 경기일 때만 채운다. 지난 경기를 다시 계산할 때
+  // 그 날의 기본값을 뒤늦게 만들어 넣으면 안 된다.
+  if (Math.abs(Date.now() - ts) < 36 * 60 * 60 * 1000) {
+    try { await applyPlayDefaults(c, nightDay(ts)); } catch { /* 없으면 없는 대로 */ }
+  }
   const came = await attendedOn(c, nightDay(ts));
   return handles.filter(h => !came.has(String(h).toLowerCase()));
 }

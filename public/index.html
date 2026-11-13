@@ -3456,6 +3456,23 @@ if (/[?&]room=\d+/.test(location.search)) {
         <div class="foot-note" id="memberCount"></div>
       </div>
 
+      <!-- 고정 출석. 숨기지 않는다 — 누구에게 걸려 있는지 여기서 다 보이고,
+           걸고 푼 기록은 아래 계정 로그에 남는다. -->
+      <div class="panel hud-corner" id="defSlotPanel">
+        <h2>기본 출석 시간대</h2>
+        <div class="foot-note" style="margin-top:0;margin-bottom:12px;">
+          매일 빠짐없이 오는 회원을 위해 <b>날이 바뀌면 그 칸을 한 번만 대신 눌러줍니다.</b>
+          본인이 오늘 다른 칸으로 바꾸거나 불참으로 돌리면 그대로 두고 다시 채우지 않습니다 ·
+          걸고 푼 기록은 아래 <b>계정 로그</b>에 남습니다.
+        </div>
+        <div class="search-row">
+          <input type="text" id="defSlotId" autocomplete="off" placeholder="아이디">
+          <select id="defSlotPick" aria-label="기본 시간대"></select>
+          <button class="btn-mini btn-edit" id="defSlotAdd">걸기</button>
+        </div>
+        <div id="defSlotList"><div class="log-empty">걸려 있는 회원이 없습니다.</div></div>
+      </div>
+
       <div class="panel hud-corner">
         <h2>계정 로그</h2>
         <div class="foot-note" style="margin-top:0;margin-bottom:12px;">
@@ -4548,6 +4565,8 @@ let requests = [];
 let me = null;              // 로그인한 계정 { handle, role }
 let accounts = [];          // 계정 권한 목록 (관리자 이상)
 let acctLogs = [];          // 계정 로그
+let defSlots = [];          // 기본 출석 시간대가 걸린 회원 (관리자 이상)
+let defSlotDay = '';        // 그 목록을 받아온 날
 let tMatches = [];          // 대회 경기 기록
 let posts = [];             // 게시판 글
 let files = [];             // 자료실 · 중요글 먼저, 그 다음 최신순 (서버가 맞춰 준다)
@@ -4969,7 +4988,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 142;
+const APP_VERSION = 143;
 let toldToRefresh = false;
 
 /**
@@ -5094,6 +5113,11 @@ async function loadAccounts() {
     const d = await apiPost('/api/account', { action: 'logs' });
     acctLogs = d.logs || [];
   } catch { acctLogs = []; }
+  try {
+    const d = await apiPost('/api/attendance', { action: 'defaults' });
+    defSlots = d.defaults || [];
+    defSlotDay = d.day || '';
+  } catch { defSlots = []; }
 }
 
 /* ---------- 계산 ---------- */
@@ -6035,6 +6059,7 @@ function renderAll() {
   renderHistory();
   renderPending();
   renderAccounts();
+  renderDefSlots();
   renderAcctLogs();
   renderTeamPanel();
   renderTournament();
@@ -8330,6 +8355,8 @@ function renderGates() {
 
   const rolePanel = document.getElementById('rolePanel');
   if (rolePanel) rolePanel.style.display = isAdmin() ? 'block' : 'none';
+  const defPanel = document.getElementById('defSlotPanel');
+  if (defPanel) defPanel.style.display = isAdmin() ? 'block' : 'none';
 }
 
 /* ---------- 로그인 · 회원가입 · 비밀번호 ---------- */
@@ -8658,6 +8685,79 @@ function canDelete(a) {
 }
 
 /** 회원 정보(명단)와 계정 권한을 한 표에서 다룬다 */
+/* ---------- 기본 출석 시간대(고정 출석) ---------- */
+
+/**
+ * 누구에게 걸려 있는지 그대로 보여준다. 숨기지 않는다.
+ *
+ * '오늘 대신 눌러줌' 표시를 같이 둔다. 걸어놨는데 오늘 안 들어갔다면
+ * 본인이 직접 고쳤다는 뜻이고, 그건 관리자가 알아야 할 일이다.
+ */
+function renderDefSlots() {
+  const box = document.getElementById('defSlotList');
+  if (!box) return;
+
+  // 출석 화면을 아직 안 열었으면 playSlots 가 비어 있다. 그때도 고를 수
+  // 있도록 같은 칸을 여기서 한 벌 들고 있는다 (api/attendance.js 의 SLOTS).
+  const slots = playSlots.length ? playSlots : [6, 7, 8, 9, 10, 11, 12, 1, 0, -1];
+  const pick = document.getElementById('defSlotPick');
+  if (pick && pick.options.length !== slots.length) {
+    const keep = pick.value;
+    pick.innerHTML = slots.map(sl => `<option value="${sl}">${slotLabel(sl)}</option>`).join('');
+    pick.value = keep && slots.includes(Number(keep)) ? keep : '10';
+  }
+
+  if (!defSlots.length) {
+    box.innerHTML = '<div class="log-empty">걸려 있는 회원이 없습니다.</div>';
+    return;
+  }
+  box.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>ID</th><th>기본 시간대</th><th>오늘</th><th>걸어둔 사람</th><th>관리</th></tr></thead>
+    <tbody>${defSlots.map(d => `<tr>
+      <td><span class="who-id" data-pcard="${esc(d.handle)}" role="button" tabindex="0">${esc(d.handle)}</span></td>
+      <td><b>${slotLabel(Number(d.slot))}</b></td>
+      <td>${d.filledToday
+            ? '<span class="win-txt">대신 눌러줌</span>'
+            : '<span class="hint">본인이 고침</span>'}</td>
+      <td class="hint">${esc(d.by || '-')}${d.ts ? ' · ' + formatDateTime(Number(d.ts)).slice(0, 10) : ''}</td>
+      <td><button class="btn-mini btn-del" data-defoff="${esc(d.handle)}">해제</button></td>
+    </tr>`).join('')}</tbody></table></div>`;
+}
+
+/** 걸거나 푼다 */
+async function setDefSlot(handle, slot) {
+  try {
+    const d = await apiPost('/api/attendance', { action: 'setDefault', handle, slot });
+    await loadAccounts();
+    renderDefSlots();
+    if (slot === null) {
+      showToast(`${d.handle} 님의 기본 출석을 해제했습니다.`);
+    } else {
+      showToast(`${d.handle} 님 기본 출석 ${slotLabel(Number(slot))}`
+        + (d.appliedToday ? ' · 오늘 치도 바로 넣었습니다.' : ' · 오늘은 이미 체크가 있어 그대로 둡니다.'));
+      await loadAttendance();
+      renderChecklists();
+    }
+  } catch (e) { showToast(e.message); }
+}
+
+function initDefSlots() {
+  const add = document.getElementById('defSlotAdd');
+  if (add) add.addEventListener('click', () => {
+    const idEl = document.getElementById('defSlotId');
+    const pick = document.getElementById('defSlotPick');
+    const handle = (idEl.value || '').trim();
+    if (!handle) return showToast('아이디를 적어주세요.');
+    setDefSlot(handle, Number(pick.value));
+    idEl.value = '';
+  });
+  const list = document.getElementById('defSlotList');
+  if (list) list.addEventListener('click', (e) => {
+    const off = e.target.closest('[data-defoff]');
+    if (off) setDefSlot(off.dataset.defoff, null);
+  });
+}
+
 function renderAccounts() {
   const tbody = document.querySelector('#roleTable tbody');
   const note = document.getElementById('roleNote');
@@ -8815,6 +8915,7 @@ const ACCT_ACTION_LABEL = {
   remove_player: '계정 삭제',
   restore_player: '계정 되살림',
   set_role: '권한 변경',
+  set_default_slot: '기본 출석',
   void_match: '기록 취소',
   restore_match: '취소 되돌림',
 };
@@ -9210,6 +9311,10 @@ function renderAcctLogs() {
       const w = (d.winners || []).join(', ');
       const lo = (d.losers || []).join(', ');
       extra = ` (승 ${w || '-'} / 패 ${lo || '-'})` + (d.reason ? ` · ${d.reason}` : '');
+    } else if (l.action === 'set_default_slot') {
+      extra = d.slot === null || d.slot === undefined
+        ? ' (해제)'
+        : ` (${slotLabel(Number(d.slot))})`;
     } else if (l.action === 'set_role' && d.from) {
       extra = ` (${ROLE_LABEL[d.from] || d.from} → ${ROLE_LABEL[d.to] || d.to})`;
     } else if (l.action === 'update_player') {
@@ -11972,6 +12077,7 @@ async function boot() {
   initFileEvents();
   initPhotoEvents();
   initAdminPagers();
+  initDefSlots();
   initVoteStats();
   initWhoCard();
   initRouletteEvents();
