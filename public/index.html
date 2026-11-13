@@ -5006,7 +5006,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 157;
+const APP_VERSION = 158;
 let toldToRefresh = false;
 
 /**
@@ -11619,7 +11619,8 @@ function renderRlLog() {
   }).join('');
 
   const wipe = document.getElementById('rlLogWipe');
-  if (wipe) wipe.hidden = !canStaff() || !(d && d.total > 0);
+  // 뽑기 기록을 통째로 지우는 단추다. 되돌릴 수 없으니 리더·웹마스터에게만 보인다.
+  if (wipe) wipe.hidden = !isAdmin() || !(d && d.total > 0);
 
   const pages = (d && d.pages) || 1;
   const total = (d && d.total) || 0;

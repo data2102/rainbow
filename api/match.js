@@ -1,6 +1,6 @@
 import { randomInt } from 'node:crypto';
 import {
-  q, tx, body, methodGuard, requireUser, currentStaff, requireStaff, currentUser, audit,
+  q, tx, body, methodGuard, requireUser, currentStaff, requireStaff, requireAdmin, currentUser, audit,
   winGain, lossGain, cleanReason, ensureMatchVoid, noScoreFor,
   ensureHostDraws, rowToDraw, TEAM_NAMES, replay, nightStart,
 } from './_lib.js';
@@ -772,7 +772,9 @@ async function hostVoid(req, res, b) {
  * 취소해야 한다. 여기서 같이 지우면 지운 줄 모르고 순위가 틀어진다.
  */
 async function hostClear(req, res, b) {
-  const me = await requireStaff(req, res);
+  // 되돌릴 수 없는 일이라 리더·웹마스터만. 화면에서 단추를 감추는 것만으로는
+  // 요청이 그대로 통한다.
+  const me = await requireAdmin(req, res);
   if (!me) return;
 
   try {
