@@ -3545,7 +3545,7 @@ if (/[?&]room=\d+/.test(location.search)) {
           걸고 푼 기록은 아래 <b>계정 로그</b>에 남습니다.
         </div>
         <div class="search-row">
-          <input type="text" id="defSlotId" autocomplete="off" placeholder="아이디">
+          <select id="defSlotId" aria-label="회원 고르기"></select>
           <select id="defSlotPick" aria-label="기본 시간대"></select>
           <button class="btn-mini btn-edit" id="defSlotAdd">걸기</button>
         </div>
@@ -5006,7 +5006,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 156;
+const APP_VERSION = 157;
 let toldToRefresh = false;
 
 /**
@@ -8745,6 +8745,21 @@ function renderDefSlots() {
   const box = document.getElementById('defSlotList');
   if (!box) return;
 
+  // 회원은 적는 것이 아니라 고른다 — 아이디를 한 글자 틀리면 '명단에 없는
+  // 선수입니다' 만 돌아오고, 대소문자까지 맞춰 적어야 했다.
+  // 이미 걸려 있는 사람도 목록에 둔다. 다시 걸면 시간대만 바뀐다.
+  const who = document.getElementById('defSlotId');
+  if (who) {
+    const list = (accounts.length ? accounts : players)
+      .map(a => ({ handle: a.handle, clan: a.clan || '' }))
+      .sort((x, y) => x.handle.localeCompare(y.handle));
+    const keep = who.value;
+    who.innerHTML = '<option value="">회원 고르기…</option>'
+      + list.map(a => `<option value="${esc(a.handle)}">${esc(a.handle)}`
+        + `${a.clan ? ` · ${esc(a.clan)}` : ''}</option>`).join('');
+    if (keep && list.some(a => a.handle === keep)) who.value = keep;
+  }
+
   // 출석 화면을 아직 안 열었으면 playSlots 가 비어 있다. 그때도 고를 수
   // 있도록 같은 칸을 여기서 한 벌 들고 있는다 (api/attendance.js 의 SLOTS).
   const slots = playSlots.length ? playSlots : [6, 7, 8, 9, 10, 11, 12, 1, 0, -1];
@@ -8793,7 +8808,7 @@ function initDefSlots() {
     const idEl = document.getElementById('defSlotId');
     const pick = document.getElementById('defSlotPick');
     const handle = (idEl.value || '').trim();
-    if (!handle) return showToast('아이디를 적어주세요.');
+    if (!handle) return showToast('회원을 골라주세요.');
     setDefSlot(handle, Number(pick.value));
     idEl.value = '';
   });
