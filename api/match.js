@@ -404,45 +404,7 @@ function hostOrder(handles, today) {
  * 쪽으로 제비를 몰아준다(`seen`). 여전히 제비뽑기지만, 방금 한 편이었던
  * 사람과 또 묶이는 조합은 뒤로 빠진다.
  */
-/**
- * 같은 팀으로 묶어 둔 짝.
- *
- * 시험 삼아 걸어 둔 것이라 적어 둔 때가 지나면 저절로 풀린다. 손으로
- * 풀려면 이 배열을 비우면 된다. 묶인 판은 host_draws.pinned 에 남고
- * 룰렛 기록 줄에도 '묶음'으로 적힌다 — 뒤에서 조용히 바꾸는 것이
- * 아니라는 것이 기록으로 보여야 한다.
- */
-const PINNED_PAIRS = [
-  { a: 'LOTUS_NaiLaRt', b: 'LOTUS_TeaRs', until: Date.parse('2026-11-13T23:59:59+09:00') },
-];
-
-/** 지금 살아 있는 묶음만 [[a, b], ...] 로 */
-function activePins(ts = Date.now()) {
-  return PINNED_PAIRS
-    .filter(p => ts <= p.until)
-    .map(p => [p.a, p.b]);
-}
-
-/**
- * 묶인 짝이 서로 다른 팀에 떨어졌으면 한 명씩 맞바꿔 같은 팀으로 보낸다.
- * 맞바꾸기라 팀 인원은 그대로다. 묶이지 않은 사람 중에서 내준다.
- */
-function joinPinned(parts, pins) {
-  const tied = new Set(pins.flat());
-  for (const [a, b] of pins) {
-    const ia = parts.findIndex(part => part.some(p => p.handle === a));
-    const ib = parts.findIndex(part => part.some(p => p.handle === b));
-    if (ia < 0 || ib < 0 || ia === ib) continue;
-    const pa = parts[ia], pb = parts[ib];
-    const jb = pb.findIndex(p => p.handle === b);
-    const ja = pa.findIndex(p => !tied.has(p.handle));
-    if (ja < 0) continue;              // 내줄 사람이 없으면 그대로 둔다
-    [pa[ja], pb[jb]] = [pb[jb], pa[ja]];
-  }
-  return parts;
-}
-
-function splitTeams(rows, sizes, seen = new Map(), pins = []) {
+function splitTeams(rows, sizes, seen = new Map()) {
   const total = rows.reduce((n, p) => n + p.point, 0);
   // 점수가 전부 0인 달(새 시즌 첫날)에도 멈추지 않도록 바닥을 둔다
   const slack = Math.max(2, Math.round((total / sizes.length) * SPLIT_SLACK));
@@ -453,7 +415,6 @@ function splitTeams(rows, sizes, seen = new Map(), pins = []) {
     const parts = [];
     let at = 0;
     for (const n of sizes) { parts.push(mix.slice(at, at + n)); at += n; }
-    if (pins.length) joinPinned(parts, pins);
 
     // 맞붙는 두 팀끼리만 견준다. 6명 팀과 5명 팀의 합을 맞대는 것은 뜻이 없고,
     // 어차피 한 경기 안의 두 팀은 인원이 같다.
@@ -556,8 +517,7 @@ async function hostDraw(req, res, b) {
       // 그래도 안 되면 3순위가 맡는다. 이 밤에 이미 맡은 사람은 뒤로 민다.
       // 최근에 같은 편이었던 짝은 덜 묶이게 한다
       const seen = await recentTeammates(c);
-      const pins = activePins().filter(([a, b]) => found.has(a) && found.has(b));
-      const parts = splitTeams(rows, sizes, seen, pins);
+      const parts = splitTeams(rows, sizes, seen);
       const names = TEAM_NAMES.slice(0, teams);
       const today = await hostCountToday(c);
       const teamRows = parts.map((handles, i) => ({ name: names[i], order: hostOrder(handles, today) }));
@@ -576,21 +536,19 @@ async function hostDraw(req, res, b) {
       const ts = Date.now();
       const ins = await c.query(
         `INSERT INTO host_draws
-           (ts, size, team_a, team_b, host_a, host_b, first_team, drawn_by, season, teams, pairs, pinned)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+           (ts, size, team_a, team_b, host_a, host_b, first_team, drawn_by, season, teams, pairs)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
         [ts, size,
          // 옛 칸은 비워둘 수 없다. 앞의 두 팀을 그대로 적어 둔다.
          JSON.stringify(teamRows[0].order), JSON.stringify(teamRows[1].order),
          teamRows[0].order[0], teamRows[1].order[0], pairs[0].first,
          me, season.current ? season.current.id : null,
-         JSON.stringify(teamRows), JSON.stringify(pairs),
-         pins.length ? JSON.stringify(pins) : null]
+         JSON.stringify(teamRows), JSON.stringify(pairs)]
       );
       return rowToDraw(ins.rows[0]);
     });
 
     await audit(me, 'host_draw', { id: out.id, size, teams, total, sizes, pairs: out.pairs,
-      pinned: out.pinned || undefined,
       order: out.teams.map(t => `${t.name}:${t.order.join('>')}`) });
     res.status(200).json({ ok: true, draw: out });
   } catch (e) {
