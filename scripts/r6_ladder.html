@@ -1468,6 +1468,8 @@ body.rule-v2 #standingTable .streak-txt{ display:none; }
 .rl-spin{ transform-box:view-box; transform-origin:100px 100px; }
 /* 조각은 다 같은 색이다. 가는 선으로만 나눈다. */
 .rl-slice{ fill:var(--rl-slice); stroke:var(--rl-line); stroke-width:1; }
+/* 같은 팀으로 묶어둔 짝이 있었던 판. 조용히 넘어가지 않도록 색을 준다. */
+.rl-pin{ color:var(--warning); font-weight:var(--fw-bold); }
 /* 멈추면 걸린 칸 하나만 켜진다. 도는 동안은 아무 칸도 켜져 있지 않다 —
    미리 켜지면 돌릴 까닭이 없다. */
 .rl-slice.won{ fill:var(--rl-won); stroke:var(--rl-won); }

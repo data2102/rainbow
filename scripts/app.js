@@ -431,7 +431,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 153;
+const APP_VERSION = 154;
 let toldToRefresh = false;
 
 /**
@@ -7017,7 +7017,7 @@ function renderRlLog() {
           + `${p.first === p.a ? ' <span class="first">(선)</span>' : ''}`
           + ` vs ${esc(p.b)} <b>${esc((by(p.b) || { order: [] }).order[0] || '')}</b>`
           + `${p.first === p.b ? ' <span class="first">(선)</span>' : ''}`).join(' &nbsp;/&nbsp; ')}</span>
-        <span class="rl-log-when">${esc(formatDateTime(r.ts))} · ${esc(r.by)}</span>
+        <span class="rl-log-when">${esc(formatDateTime(r.ts))} · ${esc(r.by)}${rlPinNote(r)}</span>
       </div>
       <div class="rl-log-team">
         ${r.teams.map(t => team(t, r.pairs.some(p => p.first === t.name))).join('')}
@@ -7034,6 +7034,16 @@ function renderRlLog() {
   const total = (d && d.total) || 0;
   const per = (d && d.per) || 10;
   renderPager('rlPager', 'rlpage', total, pages, rlLogPage, (rlLogPage - 1) * per, rows.length, '건');
+}
+
+/**
+ * 그 판에서 같은 팀으로 묶어둔 짝이 있었으면 기록 줄에 적는다.
+ * 묶어둔 것은 뒤에서 조용히 바꾸는 것이 아니라 기록에 남는 일이다.
+ */
+function rlPinNote(r) {
+  if (!r.pinned || !r.pinned.length) return '';
+  const txt = r.pinned.map(p => p.join(' + ')).join(' · ');
+  return ` · <span class="rl-pin">묶음 ${esc(txt)}</span>`;
 }
 
 /**

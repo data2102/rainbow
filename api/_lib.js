@@ -666,6 +666,8 @@ export async function ensureHostDraws() {
     CREATE INDEX IF NOT EXISTS idx_host_draws_ts ON host_draws (ts DESC);
     -- 팀이 둘뿐이 아닐 수 있다. [{name, order}] 와 [{a, b, first, result, ...}]
     ALTER TABLE host_draws ADD COLUMN IF NOT EXISTS teams JSONB;
+    -- 그 판에서 같은 팀으로 묶어둔 짝이 있었다면 적어 둔다. [[a, b], ...]
+    ALTER TABLE host_draws ADD COLUMN IF NOT EXISTS pinned JSONB;
     ALTER TABLE host_draws ADD COLUMN IF NOT EXISTS pairs JSONB;
   `);
   drawsReady = true;
@@ -688,10 +690,11 @@ export function rowToDraw(r) {
     by: r.drawn_by,
   };
   if (r.teams && r.teams.length) {
-    return { ...base, teams: r.teams, pairs: r.pairs || [] };
+    return { ...base, teams: r.teams, pairs: r.pairs || [], pinned: r.pinned || null };
   }
   return {
     ...base,
+    pinned: r.pinned || null,
     teams: [
       { name: 'A', order: r.team_a || [] },
       { name: 'B', order: r.team_b || [] },
