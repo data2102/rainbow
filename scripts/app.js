@@ -431,7 +431,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 150;
+const APP_VERSION = 151;
 let toldToRefresh = false;
 
 /**
@@ -4149,7 +4149,7 @@ function canDelete(a) {
 /**
  * 누구에게 걸려 있는지 그대로 보여준다. 숨기지 않는다.
  *
- * '오늘 대신 눌러줌' 표시를 같이 둔다. 걸어놨는데 오늘 안 들어갔다면
+ * '자동 출석' 표시를 같이 둔다. 걸어놨는데 오늘 안 들어갔다면
  * 본인이 직접 고쳤다는 뜻이고, 그건 관리자가 알아야 할 일이다.
  */
 function renderDefSlots() {
@@ -4176,7 +4176,7 @@ function renderDefSlots() {
       <td><span class="who-id" data-pcard="${esc(d.handle)}" role="button" tabindex="0">${esc(d.handle)}</span></td>
       <td><b>${slotLabel(Number(d.slot))}</b></td>
       <td>${d.filledToday
-            ? '<span class="win-txt">대신 눌러줌</span>'
+            ? '<span class="win-txt">자동 출석</span>'
             : '<span class="hint">본인이 고침</span>'}</td>
       <td class="hint">${esc(d.by || '-')}${d.ts ? ' · ' + formatDateTime(Number(d.ts)).slice(0, 10) : ''}</td>
       <td><button class="btn-mini btn-del" data-defoff="${esc(d.handle)}">해제</button></td>
