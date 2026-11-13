@@ -3456,23 +3456,6 @@ if (/[?&]room=\d+/.test(location.search)) {
         <div class="foot-note" id="memberCount"></div>
       </div>
 
-      <!-- 고정 출석. 숨기지 않는다 — 누구에게 걸려 있는지 여기서 다 보이고,
-           걸고 푼 기록은 아래 계정 로그에 남는다. -->
-      <div class="panel hud-corner" id="defSlotPanel">
-        <h2>기본 출석 시간대</h2>
-        <div class="foot-note" style="margin-top:0;margin-bottom:12px;">
-          매일 빠짐없이 오는 회원을 위해 <b>날이 바뀌면 그 칸을 한 번만 대신 눌러줍니다.</b>
-          본인이 오늘 다른 칸으로 바꾸거나 불참으로 돌리면 그대로 두고 다시 채우지 않습니다 ·
-          걸고 푼 기록은 아래 <b>계정 로그</b>에 남습니다.
-        </div>
-        <div class="search-row">
-          <input type="text" id="defSlotId" autocomplete="off" placeholder="아이디">
-          <select id="defSlotPick" aria-label="기본 시간대"></select>
-          <button class="btn-mini btn-edit" id="defSlotAdd">걸기</button>
-        </div>
-        <div id="defSlotList"><div class="log-empty">걸려 있는 회원이 없습니다.</div></div>
-      </div>
-
       <div class="panel hud-corner">
         <h2>계정 로그</h2>
         <div class="foot-note" style="margin-top:0;margin-bottom:12px;">
@@ -3542,6 +3525,23 @@ if (/[?&]room=\d+/.test(location.search)) {
         <button class="btn-ghost" id="importBtn" style="margin-left:8px;margin-top:0;">⇧ 데이터 가져오기 (JSON)</button>
         <input type="file" id="importFile" accept="application/json" style="display:none;">
         <div class="foot-note">모든 데이터는 서버 DB에 저장됩니다. 정기적으로 내보내기(JSON)로 백업해두세요. 내보내기 파일에는 비밀번호가 포함되지 않습니다.</div>
+      </div>
+
+      <!-- 고정 출석. 숨기지 않는다 — 누구에게 걸려 있는지 여기서 다 보이고,
+           걸고 푼 기록은 아래 계정 로그에 남는다. -->
+      <div class="panel hud-corner" id="defSlotPanel">
+        <h2>기본 출석 시간대</h2>
+        <div class="foot-note" style="margin-top:0;margin-bottom:12px;">
+          매일 빠짐없이 오는 회원을 위해 <b>날이 바뀌면 그 칸을 한 번만 대신 눌러줍니다.</b>
+          본인이 오늘 다른 칸으로 바꾸거나 불참으로 돌리면 그대로 두고 다시 채우지 않습니다 ·
+          걸고 푼 기록은 아래 <b>계정 로그</b>에 남습니다.
+        </div>
+        <div class="search-row">
+          <input type="text" id="defSlotId" autocomplete="off" placeholder="아이디">
+          <select id="defSlotPick" aria-label="기본 시간대"></select>
+          <button class="btn-mini btn-edit" id="defSlotAdd">걸기</button>
+        </div>
+        <div id="defSlotList"><div class="log-empty">걸려 있는 회원이 없습니다.</div></div>
       </div>
     </div>
   </div>
@@ -4988,7 +4988,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 143;
+const APP_VERSION = 144;
 let toldToRefresh = false;
 
 /**
