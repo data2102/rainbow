@@ -431,7 +431,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 145;
+const APP_VERSION = 146;
 let toldToRefresh = false;
 
 /**
@@ -6434,7 +6434,6 @@ const RL_SIZE_KEY = 'r6-host-total';
 const RL_TEAMS_KEY = 'r6-host-teams';
 /** 조각이 이보다 많으면 이름이 겹친다 — 그때는 적지 않는다 */
 const RL_NAME_MAX = 16;
-const RL_SLICE_COLORS = 8;   // 한 팀이 여덟 명까지라 같은 색이 겹치지 않는다
 const RL_SPIN_MS = 4600;
 
 let rlPicked = new Set();
@@ -6603,15 +6602,14 @@ function rlDrawWheel(name, list) {
     const a = (deg - 90) * Math.PI / 180;
     return [(C + r * Math.cos(a)).toFixed(2), (C + r * Math.sin(a)).toFixed(2)];
   };
-  const hue = (i) => (i % RL_SLICE_COLORS) + 1;
-
+  // 조각은 색으로 나누지 않는다. 색·선·걸린 칸은 모두 CSS 가 맡고,
+  // 여기서는 어느 조각이 누구인지만 data-i 로 적어 둔다.
   const parts = list.map((h, i) => {
-    const color = `var(--rl-${hue(i)})`;
-    if (n === 1) return `<circle class="rl-slice" cx="${C}" cy="${C}" r="${R}" fill="${color}"/>`;
+    if (n === 1) return `<circle class="rl-slice" data-i="0" cx="${C}" cy="${C}" r="${R}"/>`;
     const [x1, y1] = pt(i * step, R);
     const [x2, y2] = pt((i + 1) * step, R);
     const big = step > 180 ? 1 : 0;
-    return `<path class="rl-slice" d="M ${C} ${C} L ${x1} ${y1} A ${R} ${R} 0 ${big} 1 ${x2} ${y2} Z" fill="${color}"/>`;
+    return `<path class="rl-slice" data-i="${i}" d="M ${C} ${C} L ${x1} ${y1} A ${R} ${R} 0 ${big} 1 ${x2} ${y2} Z"/>`;
   });
 
   if (n <= RL_NAME_MAX) {
@@ -6625,11 +6623,23 @@ function rlDrawWheel(name, list) {
       const nm = h.length > 11 ? h.slice(0, 10) + '…' : h;
       parts.push(`<g transform="translate(${C},${C}) rotate(${rot.toFixed(2)})">`
         + `<text class="rl-name" x="${x}" y="0" font-size="${size.toFixed(1)}"`
-        + ` fill="var(--rl-${hue(i)}-ink)"`
         + ` text-anchor="${flip ? 'start' : 'end'}" dominant-baseline="central">${esc(nm)}</text></g>`);
     });
   }
   g.innerHTML = parts.join('');
+}
+
+/**
+ * 걸린 칸 하나를 켠다. 판이 멈춘 뒤에만 부른다 —
+ * 도는 동안 켜져 있으면 돌릴 까닭이 없다.
+ */
+function rlMarkWon(name, list, winner) {
+  const g = document.getElementById('rlSpin' + name);
+  if (!g) return;
+  const i = list.indexOf(winner);
+  g.querySelectorAll('.rl-slice').forEach(el => {
+    el.classList.toggle('won', Number(el.dataset.i) === i);
+  });
 }
 
 /** 그 사람이 바늘 아래 서도록 판을 돌린다 */
@@ -6739,6 +6749,7 @@ function rlStagePost() {
   if (!d) { renderRlPick(); return; }
 
   for (const t of d.teams) {
+    rlMarkWon(t.name, rlWheel[t.name] || t.order, t.order[0]);
     const el = document.getElementById('rlHost' + t.name);
     if (el) {
       el.textContent = t.order[0];

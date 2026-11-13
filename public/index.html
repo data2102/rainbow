@@ -201,21 +201,17 @@
   --kakao:       #fee500;
   --kakao-hover: #f2da00;
   --kakao-ink:   #191600;
-  /* 룰렛 조각 — 여덟 색. 한 팀이 여덟 명까지이므로 같은 판에 같은 색이 없다.
-     파랑·보라·청록·초록 네 가지를 진한 단과 연한 단으로 두 번씩 쓰고,
-     이웃끼리 밝기가 엇갈리게 늘어놓는다. 밝기 차이가 색 차이를 대신해주므로
-     채도를 낮춰도 조각이 구분된다 — 쨍한 원색 여덟 개는 촌스럽다는 말을 들었다.
-     이웃한 조각의 색 차이(OKLab ΔE)는 최소 27, 색각 이상에서도 25다.
-     글자색은 조각마다 따로 둔다. 진한 칸은 흰 글씨(대비 6.4 이상),
-     연한 칸은 짙은 남색(6.8 이상)이다. */
-  --rl-1: #3b4a5c;  --rl-1-ink: #ffffff;   /* 청회 진한 */
-  --rl-2: #9fb578;  --rl-2-ink: #1c1e18;   /* 올리브 연한 */
-  --rl-3: #70342b;  --rl-3-ink: #ffffff;   /* 적갈 진한 */
-  --rl-4: #c6b182;  --rl-4-ink: #1c1e18;   /* 모래 연한 */
-  --rl-5: #42542c;  --rl-5-ink: #ffffff;   /* 올리브 진한 */
-  --rl-6: #93a7bb;  --rl-6-ink: #1c1e18;   /* 청회 연한 */
-  --rl-7: #5e4a1f;  --rl-7-ink: #ffffff;   /* 황갈 진한 */
-  --rl-8: #cf9d95;  --rl-8-ink: #1c1e18;   /* 적갈 연한 */
+  /* 룰렛 조각 — 색으로 나누지 않는다.
+     조각은 다 같은 크기이고, 이름이 적혀 있고, 결과는 바늘이 가리킨다.
+     색은 그중 아무것도 하지 않는데 여덟 색을 고르느라 화면의 다른 색들과
+     계속 부딪혔다. 조각은 한 색으로 두고 가는 선으로만 나눈다. 멈추면
+     걸린 칸 하나만 빨갛게 켜진다 — 그게 룰렛이 할 말의 전부다.
+     두 테마가 같은 값을 쓴다. 흰 이름을 받아야 하므로 밝은 화면에서도
+     조각은 어둡다. */
+  --rl-slice: #2f332a;   /* 조각 바탕 */
+  --rl-ink:   #ffffff;   /* 이름 — 대비 11.6:1 */
+  --rl-line:  #5c6150;   /* 조각 사이 가는 선 */
+  --rl-won:   #c9201a;   /* 걸린 칸 */
 }
 
 /* ============================================================
@@ -289,19 +285,17 @@
   --kakao-hover: #ffef4d;
   --kakao-ink:   #191600;
 
-  /* 룰렛 조각 — 짜임은 밝은 쪽과 같다. 네 계열을 진한 단과 연한 단으로
-     두 번씩, 이웃끼리 밝기가 엇갈리게. 계열만 표지 쪽으로 옮겼다
-     (파랑→청회, 청록→올리브, 보라→적갈, 초록→황갈).
-     이웃 조각의 색 차이(OKLab ΔE)는 최소 30(기존 다크 22)이고,
-     글자 대비는 모든 조각에서 6.9 이상이다. */
-  --rl-1: #46566b;  --rl-1-ink: #ffffff;   /* 청회 진한 */
-  --rl-2: #a9bd83;  --rl-2-ink: #1c1e18;   /* 올리브 연한 */
-  --rl-3: #7c3b32;  --rl-3-ink: #ffffff;   /* 적갈 진한 */
-  --rl-4: #cdb98a;  --rl-4-ink: #1c1e18;   /* 모래 연한 */
-  --rl-5: #4a5c33;  --rl-5-ink: #ffffff;   /* 올리브 진한 */
-  --rl-6: #9fb0c2;  --rl-6-ink: #1c1e18;   /* 청회 연한 */
-  --rl-7: #6d5726;  --rl-7-ink: #ffffff;   /* 황갈 진한 */
-  --rl-8: #dcb0a4;  --rl-8-ink: #1c1e18;   /* 적갈 연한 */
+  /* 룰렛 조각 — 색으로 나누지 않는다.
+     조각은 다 같은 크기이고, 이름이 적혀 있고, 결과는 바늘이 가리킨다.
+     색은 그중 아무것도 하지 않는데 여덟 색을 고르느라 화면의 다른 색들과
+     계속 부딪혔다. 조각은 한 색으로 두고 가는 선으로만 나눈다. 멈추면
+     걸린 칸 하나만 빨갛게 켜진다 — 그게 룰렛이 할 말의 전부다.
+     두 테마가 같은 값을 쓴다. 흰 이름을 받아야 하므로 밝은 화면에서도
+     조각은 어둡다. */
+  --rl-slice: #2f332a;   /* 조각 바탕 */
+  --rl-ink:   #ffffff;   /* 이름 — 대비 11.6:1 */
+  --rl-line:  #5c6150;   /* 조각 사이 가는 선 */
+  --rl-won:   #c9201a;   /* 걸린 칸 */
 }
 
 /* ============================================================
@@ -1472,9 +1466,18 @@ body.rule-v2 #standingTable .streak-txt{ display:none; }
    한때 #rlSpinA, #rlSpinB 로 적어두었더니 네 팀으로 늘렸을 때 C·D 판이
    왼쪽 위 모서리를 축으로 돌아 화면 밖으로 날아갔다. 이름이 아니라 갈래로 건다. */
 .rl-spin{ transform-box:view-box; transform-origin:100px 100px; }
-.rl-slice{ stroke:var(--surface); stroke-width:1; }
-/* 글자색은 조각 색에 맞춰 그릴 때 하나씩 넣는다 */
-.rl-name{ font-family:var(--font-sans); font-weight:var(--fw-bold); pointer-events:none; }
+/* 조각은 다 같은 색이다. 가는 선으로만 나눈다. */
+.rl-slice{ fill:var(--rl-slice); stroke:var(--rl-line); stroke-width:1; }
+/* 멈추면 걸린 칸 하나만 켜진다. 도는 동안은 아무 칸도 켜져 있지 않다 —
+   미리 켜지면 돌릴 까닭이 없다. */
+.rl-slice.won{ fill:var(--rl-won); stroke:var(--rl-won); }
+@media (prefers-reduced-motion:no-preference){
+  .rl-slice{ transition:fill var(--dur-base) var(--ease-out); }
+}
+.rl-name{
+  font-family:var(--font-sans); font-weight:var(--fw-bold);
+  fill:var(--rl-ink); pointer-events:none;
+}
 .rl-host{
   display:flex; align-items:baseline; justify-content:center; gap:var(--sp-2);
   margin-top:var(--sp-3);
@@ -4988,7 +4991,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 145;
+const APP_VERSION = 146;
 let toldToRefresh = false;
 
 /**
@@ -10991,7 +10994,6 @@ const RL_SIZE_KEY = 'r6-host-total';
 const RL_TEAMS_KEY = 'r6-host-teams';
 /** 조각이 이보다 많으면 이름이 겹친다 — 그때는 적지 않는다 */
 const RL_NAME_MAX = 16;
-const RL_SLICE_COLORS = 8;   // 한 팀이 여덟 명까지라 같은 색이 겹치지 않는다
 const RL_SPIN_MS = 4600;
 
 let rlPicked = new Set();
@@ -11160,15 +11162,14 @@ function rlDrawWheel(name, list) {
     const a = (deg - 90) * Math.PI / 180;
     return [(C + r * Math.cos(a)).toFixed(2), (C + r * Math.sin(a)).toFixed(2)];
   };
-  const hue = (i) => (i % RL_SLICE_COLORS) + 1;
-
+  // 조각은 색으로 나누지 않는다. 색·선·걸린 칸은 모두 CSS 가 맡고,
+  // 여기서는 어느 조각이 누구인지만 data-i 로 적어 둔다.
   const parts = list.map((h, i) => {
-    const color = `var(--rl-${hue(i)})`;
-    if (n === 1) return `<circle class="rl-slice" cx="${C}" cy="${C}" r="${R}" fill="${color}"/>`;
+    if (n === 1) return `<circle class="rl-slice" data-i="0" cx="${C}" cy="${C}" r="${R}"/>`;
     const [x1, y1] = pt(i * step, R);
     const [x2, y2] = pt((i + 1) * step, R);
     const big = step > 180 ? 1 : 0;
-    return `<path class="rl-slice" d="M ${C} ${C} L ${x1} ${y1} A ${R} ${R} 0 ${big} 1 ${x2} ${y2} Z" fill="${color}"/>`;
+    return `<path class="rl-slice" data-i="${i}" d="M ${C} ${C} L ${x1} ${y1} A ${R} ${R} 0 ${big} 1 ${x2} ${y2} Z"/>`;
   });
 
   if (n <= RL_NAME_MAX) {
@@ -11182,11 +11183,23 @@ function rlDrawWheel(name, list) {
       const nm = h.length > 11 ? h.slice(0, 10) + '…' : h;
       parts.push(`<g transform="translate(${C},${C}) rotate(${rot.toFixed(2)})">`
         + `<text class="rl-name" x="${x}" y="0" font-size="${size.toFixed(1)}"`
-        + ` fill="var(--rl-${hue(i)}-ink)"`
         + ` text-anchor="${flip ? 'start' : 'end'}" dominant-baseline="central">${esc(nm)}</text></g>`);
     });
   }
   g.innerHTML = parts.join('');
+}
+
+/**
+ * 걸린 칸 하나를 켠다. 판이 멈춘 뒤에만 부른다 —
+ * 도는 동안 켜져 있으면 돌릴 까닭이 없다.
+ */
+function rlMarkWon(name, list, winner) {
+  const g = document.getElementById('rlSpin' + name);
+  if (!g) return;
+  const i = list.indexOf(winner);
+  g.querySelectorAll('.rl-slice').forEach(el => {
+    el.classList.toggle('won', Number(el.dataset.i) === i);
+  });
 }
 
 /** 그 사람이 바늘 아래 서도록 판을 돌린다 */
@@ -11296,6 +11309,7 @@ function rlStagePost() {
   if (!d) { renderRlPick(); return; }
 
   for (const t of d.teams) {
+    rlMarkWon(t.name, rlWheel[t.name] || t.order, t.order[0]);
     const el = document.getElementById('rlHost' + t.name);
     if (el) {
       el.textContent = t.order[0];
