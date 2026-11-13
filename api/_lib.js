@@ -218,9 +218,26 @@ async function gate(req, res, need) {
 
 /** 로그인만 하면 된다 (관리자 이상) */
 export function requireUser(req, res) { return gate(req, res, 'member'); }
-/** 웹마스터 이상 */
+/**
+ * 웹마스터 이상.
+ *
+ * 2026-11 부터 운영은 사실상 평평하다 — 로그인한 회원(관리자)이 거의
+ * 모든 일을 한다. 이 문은 리더·웹마스터에게만 남겨둔 여섯 가지에만 쓴다.
+ *   1. 대회 기록 삭제·되돌리기
+ *   2. 리더 권한 주고 거두기
+ *   3. 리더 계정 삭제
+ *   4. 팀 편성하기 (등급·참석률·접속시간·포지션)
+ *   5. 관리자 ↔ 웹마스터 권한 변경
+ *   6. 데이터 초기화·가져오기
+ * 리더와 웹마스터는 할 수 있는 일이 같다. 둘을 가르는 것은 이름뿐이다.
+ */
 export function requireAdmin(req, res) { return gate(req, res, 'admin'); }
-/** 리더만. 되돌릴 수 없는 일(대회 기록 삭제 등)에 쓴다 — 웹마스터는 넣을 수만 있다. */
+/**
+ * 리더만.
+ *
+ * 지금은 아무 데서도 쓰지 않는다. 리더와 웹마스터의 권한을 같게 두기로
+ * 했기 때문이다(2026-11). 다시 갈라야 할 때를 위해 남겨 둔다.
+ */
 export function requireMaster(req, res) { return gate(req, res, 'master'); }
 
 /** 누가 무엇을 했는지 남긴다. ts 는 audit_log 가 자동으로 찍는다. */

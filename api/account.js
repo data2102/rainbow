@@ -1,6 +1,6 @@
 import {
   q, body, methodGuard, audit, hashPw, verifyPw, createSession,
-  currentUser, requireAdmin, ensureAccounts,
+  currentUser, requireUser, requireAdmin, currentAdmin, ensureAccounts,
   genReqId, parseHandle, cleanEmail, ROLES, ROLE_LABEL, TEMP_PASSWORD,
   setSessionCookie, REMEMBER_DAYS, SESSION_HOURS,
 } from './_lib.js';
@@ -199,8 +199,11 @@ async function setEmail(req, res) {
 /* ---------- 권한 ---------- */
 
 async function list(req, res) {
-  const me = await requireAdmin(req, res);
+  const me = await requireUser(req, res);
   if (!me) return;
+  // 이메일은 리더·웹마스터에게만 보낸다. 명단은 모두가 봐야 하지만
+  // 남의 메일 주소까지 모두에게 돌릴 까닭은 없다.
+  const seeEmail = !!(await currentAdmin(req));
   await ensureTeamCols();
   const rows = await q(
     `SELECT handle, clan, email, role, grade, attend, playtime, position
@@ -208,7 +211,7 @@ async function list(req, res) {
   );
   res.status(200).json({
     accounts: rows.map(r => ({
-      handle: r.handle, clan: r.clan, email: r.email, role: r.role || 'member',
+      handle: r.handle, clan: r.clan, email: seeEmail ? r.email : null, role: r.role || 'member',
       grade: r.grade || '', attend: r.attend || '',
       playtime: r.playtime || '', position: r.position || '',
     })),
@@ -254,14 +257,12 @@ async function ensureTeamCols() {
 }
 
 /**
- * 팀 나누기에 쓰는 값을 정한다. 리더만 손댈 수 있다 —
+ * 팀 나누기에 쓰는 값을 정한다. 리더·웹마스터만 손댈 수 있다 —
  * 등급은 사람을 줄 세우는 값이라 여럿이 고치면 서로 어긋난다.
  */
 async function setTeamInfo(req, res) {
-  const actor = await currentUser(req);
-  if (!actor || actor.role !== 'master') {
-    return res.status(403).json({ error: '리더만 팀 등급을 정할 수 있습니다.' });
-  }
+  const actor = await requireAdmin(req, res);
+  if (!actor) return;
   await ensureTeamCols();
 
   const { handle, field, value } = body(req);
@@ -281,13 +282,14 @@ async function setTeamInfo(req, res) {
 /**
  * 권한 변경.
  * 웹마스터는 관리자와 웹마스터 사이를 오가게 할 수 있다.
- * 리더를 세우고 내리는 일만 리더에게 남겨둔다. 웹마스터끼리 서로 리더를
- * 만들어 줄 수 있으면 리더를 따로 둔 뜻이 없어진다.
+ * 리더와 웹마스터는 할 수 있는 일이 같다(2026-11). 그래서 리더를 세우고
+ * 내리는 것도 둘 다 할 수 있다 — 웹마스터가 스스로 리더가 될 수도 있다는
+ * 뜻이다. 두 이름은 권한이 아니라 자리를 가리킨다.
+ * 다만 리더가 하나도 남지 않는 것은 막는다.
  */
 async function setRole(req, res) {
   const actor = await requireAdmin(req, res);
   if (!actor) return;
-  const me = await currentUser(req);
   const { handle, role } = body(req);
   if (!ROLES.includes(role)) return res.status(400).json({ error: '없는 권한입니다.' });
 
@@ -295,11 +297,6 @@ async function setRole(req, res) {
   if (!rows.length) return res.status(404).json({ error: '없는 계정입니다: ' + handle });
   const before = rows[0].role || 'member';
   if (before === role) return res.status(200).json({ ok: true, handle, role });
-
-  // 리더가 걸린 자리는 리더만 건드린다. 주는 것도, 거두는 것도.
-  if ((before === 'master' || role === 'master') && me.role !== 'master') {
-    return res.status(403).json({ error: '리더 권한은 리더만 주고 거둘 수 있습니다.' });
-  }
 
   // 리더가 하나도 남지 않으면 아무도 권한을 되돌릴 수 없게 된다
   if (before === 'master' && role !== 'master') {
@@ -329,7 +326,7 @@ const LOG_ACTIONS = [
 ];
 
 async function logs(req, res) {
-  const me = await requireAdmin(req, res);
+  const me = await requireUser(req, res);
   if (!me) return;
   const rows = await q(
     `SELECT admin_id, action, detail, ts FROM audit_log

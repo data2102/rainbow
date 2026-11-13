@@ -1,6 +1,6 @@
 import { randomInt } from 'node:crypto';
 import {
-  q, tx, body, methodGuard, requireUser, requireAdmin, currentAdmin, audit,
+  q, tx, body, methodGuard, requireUser, currentUser, audit,
   winGain, lossGain, cleanReason, ensureMatchVoid, noScoreFor,
   ensureHostDraws, rowToDraw, TEAM_NAMES, replay, nightStart,
 } from './_lib.js';
@@ -9,13 +9,13 @@ import { ensureSeason, ensureRescore } from './_season.js';
 /**
  * GET  /api/match?host=1&page=N        호스트 뽑기 기록 (누구나 볼 수 있다)
  * POST /api/match                      경기 기록 (로그인한 회원 누구나)
- * POST /api/match {action:'void'}      기록 취소  (웹마스터 이상)
- * POST /api/match {action:'restore'}   취소 되돌리기 (웹마스터 이상)
+ * POST /api/match {action:'void'}      기록 취소  (로그인)
+ * POST /api/match {action:'restore'}   취소 되돌리기 (로그인)
  * POST /api/match {action:'host'}      팀 나누기 + 팀별 호스트 뽑기
  * POST /api/match {action:'hostResult'} 그 판의 승패 등록
  * POST /api/match {action:'hostManual'}  그 판은 리폿에서 손으로 썼다고 표시
- * POST /api/match {action:'hostVoid'}   그 판 하나만 무효 (웹마스터 이상)
- * POST /api/match {action:'hostClear'}  뽑기 기록 비우기 (웹마스터 이상)
+ * POST /api/match {action:'hostVoid'}   그 판 하나만 무효 (로그인)
+ * POST /api/match {action:'hostClear'}  뽑기 기록 비우기 (로그인)
  *
  * 호스트 뽑기가 여기 얹혀 있는 까닭: Vercel Hobby 는 서버리스 함수가 12개까지다.
  * 지금 11개라 새 파일을 만들 수 없다. 경기와 한 몸인 기능이라 여기에 둔다.
@@ -136,7 +136,7 @@ async function recordCore(c, me, winners, losers) {
 /* ---------- 취소 · 되돌리기 ---------- */
 
 async function voidMatch(req, res, b) {
-  const me = await requireAdmin(req, res);
+  const me = await requireUser(req, res);
   if (!me) return;
 
   let reason;
@@ -168,7 +168,7 @@ async function voidMatch(req, res, b) {
 }
 
 async function restoreMatch(req, res, b) {
-  const me = await requireAdmin(req, res);
+  const me = await requireUser(req, res);
   if (!me) return;
 
   const id = Number(b.id);
@@ -658,7 +658,7 @@ async function hostManual(req, res, b) {
 
   try {
     await ensureHostDraws();
-    const admin = await currentAdmin(req);
+    const admin = (await currentUser(req) || {}).handle || null;
     const out = await tx(async (c) => {
       const { rows } = await c.query(`SELECT * FROM host_draws WHERE id = $1 FOR UPDATE`, [id]);
       if (!rows.length) throw new Error('없는 판입니다.');
@@ -731,7 +731,7 @@ async function hostLog(req, res) {
  * 먼저 경기를 취소해야 한다.
  */
 async function hostVoid(req, res, b) {
-  const me = await requireAdmin(req, res);
+  const me = await requireUser(req, res);
   if (!me) return;
 
   const id = Number(b.id);
@@ -772,7 +772,7 @@ async function hostVoid(req, res, b) {
  * 취소해야 한다. 여기서 같이 지우면 지운 줄 모르고 순위가 틀어진다.
  */
 async function hostClear(req, res, b) {
-  const me = await requireAdmin(req, res);
+  const me = await requireUser(req, res);
   if (!me) return;
 
   try {

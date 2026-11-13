@@ -1,4 +1,4 @@
-import { q, body, methodGuard, requireAdmin, requireMaster, audit } from './_lib.js';
+import { q, body, methodGuard, requireUser, requireAdmin, audit } from './_lib.js';
 
 /**
  * 회차마다 참가 팀도 경기 방식도 다르다. 화면(app.js)의 TOURNAMENT_EDITIONS 와
@@ -204,7 +204,7 @@ async function listMatches(res) {
 }
 
 async function record(req, res) {
-  const me = await requireAdmin(req, res);
+  const me = await requireUser(req, res);
   if (!me) return;
 
   const { stage, teamA, teamB, winner, note } = body(req);
@@ -283,13 +283,13 @@ async function record(req, res) {
 }
 
 /**
- * 기록 삭제·되돌리기는 **리더만** 한다 (등록은 웹마스터도 된다).
+ * 기록 삭제·되돌리기는 **리더·웹마스터**가 한다.
  *
  * 토너먼트는 앞 판이 뒷 판의 대진을 정해서, 한 판을 지우면 그 뒤가 전부 어긋난다.
  * 넣는 것은 다시 넣으면 그만이지만 지우는 것은 그렇지 않아 문을 좁혔다.
  */
 async function remove(req, res) {
-  const me = await requireMaster(req, res);
+  const me = await requireAdmin(req, res);
   if (!me) return;
 
   const { id } = body(req);

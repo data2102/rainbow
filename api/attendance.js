@@ -1,5 +1,5 @@
 import {
-  q, tx, body, methodGuard, currentUser, requireUser, requireAdmin, audit,
+  q, tx, body, methodGuard, currentUser, requireUser, audit,
   ruleV2, attendRule, kstHour, nightDay, ATTEND_CLOSE_HOUR, applyPlayDefaults,
 } from './_lib.js';
 import { syncSeason } from './_season.js';
@@ -297,9 +297,9 @@ async function setSchedule(res, handle, slots) {
  */
 const poolShim = { query: async (text, params) => ({ rows: await q(text, params) }) };
 
-/** 지금 누구에게 걸려 있는지 — 웹마스터만 본다 */
+/** 지금 누구에게 걸려 있는지 */
 async function listDefaults(req, res) {
-  const me = await requireAdmin(req, res);
+  const me = await requireUser(req, res);
   if (!me) return;
   const rows = await q(
     `SELECT handle, slot, set_by, ts FROM play_default ORDER BY handle`
@@ -320,14 +320,14 @@ async function listDefaults(req, res) {
 }
 
 /**
- * 걸거나 푼다 — 웹마스터만.
+ * 걸거나 푼다 — 로그인한 회원 누구나.
  *
  * slot 이 없으면 해제한다. 오늘 이미 대신 눌러준 뒤에 풀더라도 오늘 칸은
  * 그대로 둔다 — 본인이 보고 고칠 수 있는 상태이고, 말없이 지우면
  * '눌렀는데 사라졌다'가 된다.
  */
 async function setDefault(req, res) {
-  const me = await requireAdmin(req, res);
+  const me = await requireUser(req, res);
   if (!me) return;
   const b = body(req);
   const handle = String(b.handle || '').trim();
@@ -359,9 +359,9 @@ async function setDefault(req, res) {
   res.status(200).json({ ok: true, handle: real, slot, appliedToday: today > 0 });
 }
 
-/** 잘못 찍힌 기록 지우기 — 웹마스터만 */
+/** 잘못 찍힌 기록 지우기 */
 async function remove(req, res, id) {
-  const me = await requireAdmin(req, res);
+  const me = await requireUser(req, res);
   if (!me) return;
   const rows = await q(`DELETE FROM attendance WHERE id = $1 RETURNING handle`, [Number(id)]);
   if (!rows.length) return res.status(404).json({ error: '이미 지워진 기록입니다.' });

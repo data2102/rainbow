@@ -1,11 +1,11 @@
 import {
-  q, tx, body, methodGuard, requireAdmin, currentUser, audit, parseHandle,
+  q, tx, body, methodGuard, requireUser, currentAdmin, audit, parseHandle,
   cleanEmail, hashPw, TEMP_PASSWORD, replay,
 } from './_lib.js';
 import { ensureSeason } from './_season.js';
 
 /**
- * 회원(=계정) 정보를 웹마스터가 직접 손보는 곳.
+ * 회원(=계정) 정보를 손보는 곳.
  * '요청 → 승인' 절차를 거치지 않는 즉시 처리이므로 관리자 이상만 호출할 수 있다.
  * 경기 기록(matches)은 지우지 않는다. 지난 기록까지 사라지면 랭킹 이력이 어긋난다.
  */
@@ -132,7 +132,7 @@ async function renameEverywhere(c, oldHandle, newHandle) {
  * 비밀번호는 임시 비밀번호로 시작하고, 본인이 처음 로그인할 때 바꾸게 된다.
  */
 async function create(req, res) {
-  const me = await requireAdmin(req, res);
+  const me = await requireUser(req, res);
   if (!me) return;
 
   const handle = String(body(req).handle || '').trim();
@@ -164,9 +164,8 @@ async function create(req, res) {
 /* ---------- 삭제 ---------- */
 
 async function remove(req, res) {
-  const admin = await requireAdmin(req, res);
-  if (!admin) return;
-  const me = await currentUser(req);
+  const me = await requireUser(req, res);
+  if (!me) return;
 
   const handle = String(body(req).handle || '').trim();
   if (!handle) return res.status(400).json({ error: '삭제할 회원을 선택해주세요.' });
@@ -174,10 +173,11 @@ async function remove(req, res) {
     return res.status(400).json({ error: '자신의 계정은 삭제할 수 없습니다.' });
   }
 
+  // 리더 계정을 지우는 것만 리더·웹마스터의 몫이다 (그 밖의 계정은 누구나).
   const target = await q(`SELECT role FROM players WHERE handle = $1`, [handle]);
   if (target.length && (target[0].role || 'member') === 'master') {
-    if (me.role !== 'master') {
-      return res.status(403).json({ error: '리더 계정은 리더만 삭제할 수 있습니다.' });
+    if (!(await currentAdmin(req))) {
+      return res.status(403).json({ error: '리더 계정은 리더·웹마스터만 삭제할 수 있습니다.' });
     }
     const masters = await q(`SELECT count(*)::int AS n FROM players WHERE role = 'master'`);
     if (masters[0].n <= 1) {
@@ -197,7 +197,7 @@ async function remove(req, res) {
   if (!removed) return res.status(404).json({ error: '이미 삭제된 회원입니다.' });
 
   // 되살릴 때 쓸 값은 여기 남는 것이 전부다. 이메일·권한도 같이 적어 둔다.
-  await audit(admin, 'remove_player', {
+  await audit(me, 'remove_player', {
     handle, clan: removed.clan, point: removed.point, wins: removed.wins, losses: removed.losses,
     email: removed.email || '', role: removed.role || 'member',
   });
@@ -216,7 +216,7 @@ async function remove(req, res) {
  * 되돌릴 수 없는 것은 비밀번호뿐이다. 임시 비밀번호로 시작한다.
  */
 async function restore(req, res) {
-  const me = await requireAdmin(req, res);
+  const me = await requireUser(req, res);
   if (!me) return;
 
   const handle = String(body(req).handle || '').trim();
@@ -272,7 +272,7 @@ async function restore(req, res) {
  * email 은 보내지 않으면 건드리지 않는다. 빈 문자열을 보내면 지운다.
  */
 async function update(req, res) {
-  const me = await requireAdmin(req, res);
+  const me = await requireUser(req, res);
   if (!me) return;
 
   const oldHandle = String(body(req).handle || '').trim();
