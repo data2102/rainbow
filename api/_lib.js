@@ -229,6 +229,7 @@ export function requireUser(req, res) { return gate(req, res, 'member'); }
  *   4. 팀 편성하기 (등급·참석률·접속시간·포지션)
  *   5. 관리자 ↔ 웹마스터 권한 변경
  *   6. 데이터 초기화·가져오기
+ *   7. 기본 출석 시간대 걸고 풀기
  * 리더와 웹마스터는 할 수 있는 일이 같다. 둘을 가르는 것은 이름뿐이다.
  */
 export function requireAdmin(req, res) { return gate(req, res, 'admin'); }

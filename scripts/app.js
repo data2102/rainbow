@@ -431,7 +431,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 148;
+const APP_VERSION = 149;
 let toldToRefresh = false;
 
 /**
@@ -3809,7 +3809,7 @@ function renderGates() {
   const rolePanel = document.getElementById('rolePanel');
   if (rolePanel) rolePanel.style.display = canStaff() ? 'block' : 'none';
   const defPanel = document.getElementById('defSlotPanel');
-  if (defPanel) defPanel.style.display = canStaff() ? 'block' : 'none';
+  if (defPanel) defPanel.style.display = isAdmin() ? 'block' : 'none';
   // 되돌릴 수 없는 일(전체 초기화·가져오기)이라 리더·웹마스터에게만 연다
   const dataPanel = document.getElementById('dataPanel');
   if (dataPanel) dataPanel.style.display = isAdmin() ? 'block' : 'none';

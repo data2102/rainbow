@@ -3082,7 +3082,7 @@ button.room-n:hover{ color:var(--accent); text-decoration:underline; }
 ::-webkit-scrollbar-thumb{ background:var(--border-strong); border-radius:var(--radius-pill); }
 ::-webkit-scrollbar-track{ background:transparent; }
 
-/* ---------- 우측 상단 (운영 · 화면 밝기 전환) ---------- */
+/* ---------- 우측 상단 (관리자 · 화면 밝기 전환) ---------- */
 .head-right{ display:flex; flex-direction:column; align-items:flex-end; gap:var(--sp-3); }
 .head-top{ display:flex; gap:var(--sp-2); flex-wrap:wrap; justify-content:flex-end; }
 .admin-btn.active{
@@ -3280,7 +3280,7 @@ if (/[?&]room=\d+/.test(location.search)) {
           <span class="jump-t" id="roomJumpText"></span>
           <span class="jump-n" id="roomJumpN" hidden></span>
         </button>
-        <button type="button" class="admin-btn" data-tab="admin">운영</button>
+        <button type="button" class="admin-btn" data-tab="admin">관리자</button>
         <button type="button" class="theme-btn" id="themeToggle"
                 aria-label="밝은 화면과 어두운 화면 전환">
           <span class="to-dark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a7 7 0 1 0 10.5 10.5z"></path></svg>다크 모드</span>
@@ -3424,7 +3424,7 @@ if (/[?&]room=\d+/.test(location.search)) {
   <!-- ADMIN -->
   <div class="tab-panel" id="tab-admin">
     <div class="panel hud-corner" id="adminLocked">
-      <h2>운영 · Admin</h2>
+      <h2>관리자 · Admin</h2>
       <div class="foot-note" style="margin-top:0;margin-bottom:14px;">이 페이지는 로그인 후에만 이용할 수 있습니다.</div>
       <button class="btn btn-center" id="adminLockedLoginBtn">로그인</button>
     </div>
@@ -3523,8 +3523,9 @@ if (/[?&]room=\d+/.test(location.search)) {
 
       <!-- 고정 출석. 숨기지 않는다 — 누구에게 걸려 있는지 여기서 다 보이고,
            걸고 푼 기록은 아래 계정 로그에 남는다. -->
-      <div class="panel hud-corner" id="defSlotPanel">
-        <h2>기본 출석 시간대</h2>
+      <!-- 기본 출석 — 리더·웹마스터만 -->
+      <div class="panel hud-corner" id="defSlotPanel" style="display:none;">
+        <h2>기본 출석 시간대 <span class="master-only">리더 · 웹마스터 전용</span></h2>
         <div class="foot-note" style="margin-top:0;margin-bottom:12px;">
           매일 빠짐없이 오는 회원을 위해 <b>날이 바뀌면 그 칸을 한 번만 대신 눌러줍니다.</b>
           본인이 오늘 다른 칸으로 바꾸거나 불참으로 돌리면 그대로 두고 다시 채우지 않습니다 ·
@@ -4992,7 +4993,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 148;
+const APP_VERSION = 149;
 let toldToRefresh = false;
 
 /**
@@ -8370,7 +8371,7 @@ function renderGates() {
   const rolePanel = document.getElementById('rolePanel');
   if (rolePanel) rolePanel.style.display = canStaff() ? 'block' : 'none';
   const defPanel = document.getElementById('defSlotPanel');
-  if (defPanel) defPanel.style.display = canStaff() ? 'block' : 'none';
+  if (defPanel) defPanel.style.display = isAdmin() ? 'block' : 'none';
   // 되돌릴 수 없는 일(전체 초기화·가져오기)이라 리더·웹마스터에게만 연다
   const dataPanel = document.getElementById('dataPanel');
   if (dataPanel) dataPanel.style.display = isAdmin() ? 'block' : 'none';
