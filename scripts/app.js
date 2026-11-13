@@ -431,7 +431,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 151;
+const APP_VERSION = 152;
 let toldToRefresh = false;
 
 /**
@@ -4149,9 +4149,23 @@ function canDelete(a) {
 /**
  * 누구에게 걸려 있는지 그대로 보여준다. 숨기지 않는다.
  *
- * '자동 출석' 표시를 같이 둔다. 걸어놨는데 오늘 안 들어갔다면
- * 본인이 직접 고쳤다는 뜻이고, 그건 관리자가 알아야 할 일이다.
+ * 오늘 칸에 '자동 출석'과 '직접 출석'을 가려 적는다. 걸어놨는데
+ * '직접 출석'이면 본인이 그날 손으로 고쳤다는 뜻이고, 그건 걸어둔
+ * 쪽이 알아야 할 일이다.
  */
+/**
+ * 오늘 칸이 어떻게 채워졌는지 한마디로.
+ *
+ * '자동으로 넣어봤다'는 기록만으로는 모자란다 — 본인이 먼저 체크해 둔
+ * 날에도 그 기록은 남기 때문이다. 오늘 실제로 들어가 있는 칸이 기본값과
+ * 같고, 우리가 넣은 날일 때만 '자동 출석'이라 적는다.
+ */
+function defToday(d) {
+  if (d.todaySlot == null) return '<span class="hint">없음</span>';
+  if (d.filledToday && d.todaySlot === d.slot) return '<span class="win-txt">자동 출석</span>';
+  return `<span class="hint">직접 출석 · ${slotLabel(Number(d.todaySlot))}</span>`;
+}
+
 function renderDefSlots() {
   const box = document.getElementById('defSlotList');
   if (!box) return;
@@ -4175,9 +4189,7 @@ function renderDefSlots() {
     <tbody>${defSlots.map(d => `<tr>
       <td><span class="who-id" data-pcard="${esc(d.handle)}" role="button" tabindex="0">${esc(d.handle)}</span></td>
       <td><b>${slotLabel(Number(d.slot))}</b></td>
-      <td>${d.filledToday
-            ? '<span class="win-txt">자동 출석</span>'
-            : '<span class="hint">본인이 고침</span>'}</td>
+      <td>${defToday(d)}</td>
       <td class="hint">${esc(d.by || '-')}${d.ts ? ' · ' + formatDateTime(Number(d.ts)).slice(0, 10) : ''}</td>
       <td><button class="btn-mini btn-del" data-defoff="${esc(d.handle)}">해제</button></td>
     </tr>`).join('')}</tbody></table></div>`;

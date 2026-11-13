@@ -305,8 +305,15 @@ async function listDefaults(req, res) {
     `SELECT handle, slot, set_by, ts FROM play_default ORDER BY handle`
   );
   const day = playDay();
-  const done = await q(`SELECT handle FROM play_default_log WHERE day = $1`, [day]);
+  // '오늘 어떻게 됐는지'는 기록 한 줄만으로는 알 수 없다. play_default_log 는
+  // '넣어보려 했다'만 남기므로, 본인이 먼저 체크해 둔 날에도 줄이 생긴다.
+  // 그래서 오늘 실제로 어느 칸에 들어가 있는지를 같이 보고 가른다.
+  const [done, today] = await Promise.all([
+    q(`SELECT handle FROM play_default_log WHERE day = $1`, [day]),
+    q(`SELECT handle, slot FROM play_schedule WHERE day = $1`, [day]),
+  ]);
   const filled = new Set(done.map(r => r.handle));
+  const now = new Map(today.map(r => [r.handle, r.slot]));
   res.status(200).json({
     day,
     defaults: rows.map(r => ({
@@ -315,6 +322,7 @@ async function listDefaults(req, res) {
       by: r.set_by,
       ts: r.ts == null ? null : Number(r.ts),
       filledToday: filled.has(r.handle),
+      todaySlot: now.has(r.handle) ? now.get(r.handle) : null,
     })),
   });
 }
