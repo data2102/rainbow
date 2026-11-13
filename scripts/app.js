@@ -431,7 +431,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 154;
+const APP_VERSION = 155;
 let toldToRefresh = false;
 
 /**
@@ -7017,11 +7017,12 @@ function renderRlLog() {
           + `${p.first === p.a ? ' <span class="first">(선)</span>' : ''}`
           + ` vs ${esc(p.b)} <b>${esc((by(p.b) || { order: [] }).order[0] || '')}</b>`
           + `${p.first === p.b ? ' <span class="first">(선)</span>' : ''}`).join(' &nbsp;/&nbsp; ')}</span>
-        <span class="rl-log-when">${esc(formatDateTime(r.ts))} · ${esc(r.by)}${rlPinNote(r)}</span>
+        <span class="rl-log-when">${esc(formatDateTime(r.ts))} · ${esc(r.by)}</span>
       </div>
       <div class="rl-log-team">
         ${r.teams.map(t => team(t, r.pairs.some(p => p.first === t.name))).join('')}
       </div>
+      ${rlPinNote(r)}
       ${r.pairs.map((p, i) => rlLogResult(r, p, i, many)).join(' ')}
       ${rlVoidBtn(r)}
     </div>`;
@@ -7042,8 +7043,8 @@ function renderRlLog() {
  */
 function rlPinNote(r) {
   if (!r.pinned || !r.pinned.length) return '';
-  const txt = r.pinned.map(p => p.join(' + ')).join(' · ');
-  return ` · <span class="rl-pin">묶음 ${esc(txt)}</span>`;
+  const txt = r.pinned.map(p => p.map(esc).join(' + ')).join(' · ');
+  return `<div class="rl-tied">같은 팀으로 묶음 · ${txt}</div>`;
 }
 
 /**

@@ -1468,8 +1468,19 @@ body.rule-v2 #standingTable .streak-txt{ display:none; }
 .rl-spin{ transform-box:view-box; transform-origin:100px 100px; }
 /* 조각은 다 같은 색이다. 가는 선으로만 나눈다. */
 .rl-slice{ fill:var(--rl-slice); stroke:var(--rl-line); stroke-width:1; }
-/* 같은 팀으로 묶어둔 짝이 있었던 판. 조용히 넘어가지 않도록 색을 준다. */
-.rl-pin{ color:var(--warning); font-weight:var(--fw-bold); }
+/* 같은 팀으로 묶어둔 짝이 있었던 판. 조용히 넘어가지 않도록 한 줄을 준다.
+   머리글 줄에 붙였더니 길어져 오른쪽이 잘렸다 — 제 줄로 뺀다.
+   이름을 rl-pin 으로 두었더니 룰렛 바늘(.rl-pin)의 width:0 을 물려받아
+   보이지 않았다. 바늘과 겹치지 않는 이름으로 둔다. */
+.rl-tied{
+  /* 제 줄을 차지해야 한다. inline-block 으로 두었더니 뒤따르는 결과
+     단추들과 한 줄에 서서 단추처럼 보였다. */
+  display:block; width:fit-content; max-width:100%;
+  margin:var(--sp-2) 0;
+  font-size:var(--fs-footnote); font-weight:var(--fw-bold);
+  color:var(--warning); background:var(--warning-bg);
+  border-radius:var(--radius-sm); padding:3px var(--sp-2);
+}
 /* 멈추면 걸린 칸 하나만 켜진다. 도는 동안은 아무 칸도 켜져 있지 않다 —
    미리 켜지면 돌릴 까닭이 없다. */
 .rl-slice.won{ fill:var(--rl-won); stroke:var(--rl-won); }
