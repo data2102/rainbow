@@ -1,4 +1,4 @@
-import { q, body, methodGuard, requireUser, requireAdmin, audit } from './_lib.js';
+import { q, body, methodGuard, requireUser, requireStaff, requireAdmin, audit } from './_lib.js';
 
 /**
  * 회차마다 참가 팀도 경기 방식도 다르다. 화면(app.js)의 TOURNAMENT_EDITIONS 와
@@ -204,7 +204,7 @@ async function listMatches(res) {
 }
 
 async function record(req, res) {
-  const me = await requireUser(req, res);
+  const me = await requireStaff(req, res);
   if (!me) return;
 
   const { stage, teamA, teamB, winner, note } = body(req);

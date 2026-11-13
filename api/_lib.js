@@ -77,15 +77,22 @@ export function isLegacyHash(stored) {
 
 /**
  * 계정은 곧 선수 명단이다. players 한 줄이 로그인 계정 하나다.
- * 권한은 관리자(member) < 웹마스터(admin) < 리더(master) 셋뿐이다.
+ * 권한은 일반(member) < 관리자(staff) < 웹마스터(admin) < 리더(master) 넷이다.
  *
- * 속값(member·admin·master)은 2026-11 의 이름 바꾸기 때도 그대로 두었다.
- * 데이터베이스와 지난 기록이 모두 이 값으로 적혀 있어서, 보이는 이름만
- * 바꾸는 편이 안전하다. 화면에 나가는 말은 ROLE_LABEL 하나로 모은다.
+ * 속값은 손대지 않는다. 데이터베이스와 지난 기록이 모두 이 값으로 적혀
+ * 있어서, 보이는 이름만 바꾸는 편이 안전하다. 특히 member 는 처음부터
+ * '일반'이었다 — 2026-11 에 이름만 '관리자'로 바꿨다가 되돌렸으므로,
+ * 지금 member 인 회원은 그때나 지금이나 일반이다.
+ *
+ * staff 는 그때 새로 만든 가운데 칸이다. 예전 '관리자'가 하던 일
+ * (기록 취소, 승인, 계정 손보기 …)이 여기로 온다.
+ * 화면에 나가는 말은 ROLE_LABEL 하나로 모은다.
  */
-export const ROLES = ['member', 'admin', 'master'];
-export const ROLE_LABEL = { member: '관리자', admin: '웹마스터', master: '리더' };
-const RANK = { member: 1, admin: 2, master: 3 };
+export const ROLES = ['member', 'staff', 'admin', 'master'];
+export const ROLE_LABEL = {
+  member: '일반', staff: '관리자', admin: '웹마스터', master: '리더',
+};
+const RANK = { member: 1, staff: 2, admin: 3, master: 4 };
 
 /** 처음 리더 권한을 가지는 계정 */
 export const MASTER_HANDLE = 'LOTUS_TeaRs';
@@ -197,6 +204,12 @@ export async function currentUser(req) {
   return rows.length ? { handle: rows[0].handle, role: rows[0].role || 'member' } : null;
 }
 
+/** 관리자 이상이면 그 아이디를, 아니면 null (권한 없이 조용히 넘어가는 곳에 쓴다) */
+export async function currentStaff(req) {
+  const me = await currentUser(req);
+  return me && RANK[me.role] >= RANK.staff ? me.handle : null;
+}
+
 /** 웹마스터 이상이면 그 아이디를, 아니면 null (권한 없이 조용히 넘어가는 곳에 쓴다) */
 export async function currentAdmin(req) {
   const me = await currentUser(req);
@@ -216,8 +229,16 @@ async function gate(req, res, need) {
   return me.handle;
 }
 
-/** 로그인만 하면 된다 (관리자 이상) */
+/** 로그인만 하면 된다 (일반 이상) */
 export function requireUser(req, res) { return gate(req, res, 'member'); }
+/**
+ * 관리자 이상.
+ *
+ * 예전 '관리자'가 하던 일이 여기로 온다 — 기록 취소·되돌리기, 가입 승인,
+ * 계정 손보기, 남의 글 지우기, 대회 기록 등록. 일반 회원은 못 한다.
+ */
+export function requireStaff(req, res) { return gate(req, res, 'staff'); }
+
 /**
  * 웹마스터 이상.
  *
@@ -230,6 +251,8 @@ export function requireUser(req, res) { return gate(req, res, 'member'); }
  *   5. 관리자 ↔ 웹마스터 권한 변경
  *   6. 데이터 초기화·가져오기
  *   7. 기본 출석 시간대 걸고 풀기
+ *
+ * 그 아래 '관리자'(staff) 가 하는 일은 requireStaff 를 보라.
  * 리더와 웹마스터는 할 수 있는 일이 같다. 둘을 가르는 것은 이름뿐이다.
  */
 export function requireAdmin(req, res) { return gate(req, res, 'admin'); }

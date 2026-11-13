@@ -1,5 +1,5 @@
 import {
-  q, tx, body, methodGuard, currentUser, requireUser, requireAdmin, audit,
+  q, tx, body, methodGuard, currentUser, requireUser, requireStaff, requireAdmin, audit,
   ruleV2, attendRule, kstHour, nightDay, ATTEND_CLOSE_HOUR, applyPlayDefaults,
 } from './_lib.js';
 import { syncSeason } from './_season.js';
@@ -361,7 +361,7 @@ async function setDefault(req, res) {
 
 /** 잘못 찍힌 기록 지우기 */
 async function remove(req, res, id) {
-  const me = await requireUser(req, res);
+  const me = await requireStaff(req, res);
   if (!me) return;
   const rows = await q(`DELETE FROM attendance WHERE id = $1 RETURNING handle`, [Number(id)]);
   if (!rows.length) return res.status(404).json({ error: '이미 지워진 기록입니다.' });

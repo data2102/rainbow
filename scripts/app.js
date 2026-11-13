@@ -185,7 +185,7 @@ function koBracket() {
 /** 지금 보고 있는 회차가 진행 중인 대회인가 (끝난 회차는 손대지 않는다) */
 function tourLive() { return tourEdition === TOURNAMENT_LATEST; }
 /** 지금 화면에서 결과를 **등록**할 수 있는가 (관리자 이상) */
-function tourEditable() { return isLoggedIn() && tourLive(); }
+function tourEditable() { return canStaff() && tourLive(); }
 /**
  * 기록을 **지우거나 되돌릴** 수 있는가 — 리더·웹마스터만.
  *
@@ -431,7 +431,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 149;
+const APP_VERSION = 150;
 let toldToRefresh = false;
 
 /**
@@ -1310,7 +1310,7 @@ function renderHistory() {
     // "#12 경기"라고 주고받은 말이 어긋난다.
     const no = all.length - i;
     const voided = !!m.voidedAt;
-    const canManage = isLoggedIn() && isLiveView() && m.id != null;
+    const canManage = canStaff() && isLiveView() && m.id != null;
 
     const cancelBtn = (canManage && !voided)
       ? `<div><button class="btn-mini btn-void" data-void="${m.id}" data-do="void">기록 취소</button></div>`
@@ -1783,7 +1783,7 @@ async function savePhotos() {
 
 /** 올린 사람과 관리자만 고치고 지울 수 있다. 서버도 같은 것을 다시 본다. */
 function myPhoto(p) {
-  return !!p && !!me && (String(p.author).toLowerCase() === me.handle.toLowerCase() || isLoggedIn());
+  return !!p && !!me && (String(p.author).toLowerCase() === me.handle.toLowerCase() || canStaff());
 }
 
 function openPhotoView(id) {
@@ -1842,7 +1842,7 @@ function renderPhotoView() {
     const t = new Date(c.createdAt);
     const when = `${t.getFullYear()}-${pad2(t.getMonth() + 1)}-${pad2(t.getDate())} ` +
                  `${pad2(t.getHours())}:${pad2(t.getMinutes())}`;
-    const canDrop = !!me;
+    const canDrop = me && (String(c.author).toLowerCase() === me.handle.toLowerCase() || canStaff());
     return `<div class="pv-cmt">
       <span class="pv-cmt-who who-id" data-pcard="${esc(c.author)}" role="button" tabindex="0">${esc(c.author)}</span>
       <span class="pv-cmt-b">${esc(c.body)}</span>
@@ -2113,7 +2113,7 @@ function renderFiles() {
 
   tbody.innerHTML = shown.map(f => {
     const mine = isLoggedIn() && me.handle.toLowerCase() === String(f.author).toLowerCase();
-    const canManage = mine || isLoggedIn();
+    const canManage = mine || canStaff();
     const d = new Date(f.createdAt);
     const when = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 
@@ -3541,7 +3541,7 @@ function renderBoard() {
   const bar = document.getElementById('postAdminBar');
   if (!list || !count || !bar) return;
 
-  bar.style.display = isLoggedIn() && posts.length ? 'flex' : 'none';
+  bar.style.display = canStaff() && posts.length ? 'flex' : 'none';
   const meBox = document.getElementById('postMe');
   if (meBox && me) meBox.textContent = me.handle;
   const checkAll = document.getElementById('postCheckAll');
@@ -3557,13 +3557,13 @@ function renderBoard() {
   list.innerHTML = posts.map(p => `
     <div class="post" data-post="${p.id}">
       <div class="post-head">
-        ${isLoggedIn() ? `<input type="checkbox" class="post-pick" value="${p.id}">` : ''}
+        ${canStaff() ? `<input type="checkbox" class="post-pick" value="${p.id}">` : ''}
         <span class="post-author">${esc(p.author)}</span>
         <span class="post-date">${formatDateTime(p.createdAt)}</span>
         ${p.updatedAt ? '<span class="post-edited">수정됨</span>' : ''}
         <span class="post-actions">
           ${isMine(p) ? `<button class="btn-mini btn-edit" data-edit="${p.id}">수정</button>` : ''}
-          ${isMine(p) || isLoggedIn() ? `<button class="btn-mini btn-reject" data-del="${p.id}">삭제</button>` : ''}
+          ${isMine(p) || canStaff() ? `<button class="btn-mini btn-reject" data-del="${p.id}">삭제</button>` : ''}
         </span>
       </div>
       <div class="post-body">${esc(p.body)}</div>
@@ -3581,7 +3581,7 @@ function renderComments(post) {
         <span class="cmt-author">${esc(c.author)}</span>
         <span class="cmt-date">${formatDateTime(c.createdAt)}</span>
         <span class="cmt-actions">
-          ${isMine(c) || isLoggedIn() ? `<button class="btn-mini btn-reject" data-cdel="${c.id}">삭제</button>` : ''}
+          ${isMine(c) || canStaff() ? `<button class="btn-mini btn-reject" data-cdel="${c.id}">삭제</button>` : ''}
         </span>
       </div>
       <div class="cmt-body">${esc(c.body)}</div>
@@ -3749,10 +3749,13 @@ window.closeModal = closeModal;
 
 /* ---------- 권한 ---------- */
 
-/* 보이는 이름만 바꿨다(2026-11). 속값은 member·admin·master 그대로다 —
-   데이터베이스와 지난 기록이 그 값으로 적혀 있다. 서버의 api/_lib.js 와 같아야 한다. */
-const ROLE_LABEL = { member: '관리자', admin: '웹마스터', master: '리더' };
-const ROLE_RANK = { member: 1, admin: 2, master: 3 };
+/* 네 단이다: 일반 < 관리자 < 웹마스터 < 리더.
+   속값은 데이터베이스에 적힌 그대로 두고 보이는 이름만 여기서 정한다.
+   서버의 api/_lib.js 와 같아야 한다. */
+const ROLE_LABEL = {
+  member: '일반', staff: '관리자', admin: '웹마스터', master: '리더',
+};
+const ROLE_RANK = { member: 1, staff: 2, admin: 3, master: 4 };
 
 function isLoggedIn() { return !!me; }
 /**
@@ -3763,8 +3766,8 @@ function isLoggedIn() { return !!me; }
  * requireAdmin 과 같은 목록이다).
  */
 function isAdmin()    { return !!me && ROLE_RANK[me.role] >= ROLE_RANK.admin; }
-/** 운영 화면에 들어갈 수 있는가 — 이제는 로그인하면 된다 */
-function canStaff()   { return isLoggedIn(); }
+/** 관리자 이상인가 — 관리자 화면에 들어갈 수 있는 사람 */
+function canStaff()   { return !!me && ROLE_RANK[me.role] >= ROLE_RANK.staff; }
 
 /* ---------- 인증 UI ---------- */
 
@@ -6835,7 +6838,7 @@ function rlShowResult(i) {
 /** 수기작성 표시는 적은 사람이나 관리자가 지울 수 있다 (서버도 같은 자리에서 본다) */
 function rlCanUnmark(p) {
   if (!me || !p.manual) return false;
-  return p.manual.by === me.handle || isLoggedIn();
+  return p.manual.by === me.handle || canStaff();
 }
 
 /** 수기작성 사유를 묻는다. 비우면 그만둔다. */
@@ -6970,7 +6973,7 @@ function rlLogResult(r, p, i, many) {
  * 지우면 순위가 왜 그런지 설명할 길이 없어진다. 서버도 같은 자리에서 막는다.
  */
 function rlVoidBtn(r) {
-  if (!isLoggedIn()) return '';
+  if (!canStaff()) return '';
   if (r.pairs.some(p => p.result)) return '';
   return `<button type="button" class="rl-log-void" data-rlvoid="${r.id}">이 판 무효</button>`;
 }
@@ -7013,7 +7016,7 @@ function renderRlLog() {
   }).join('');
 
   const wipe = document.getElementById('rlLogWipe');
-  if (wipe) wipe.hidden = !isLoggedIn() || !(d && d.total > 0);
+  if (wipe) wipe.hidden = !canStaff() || !(d && d.total > 0);
 
   const pages = (d && d.pages) || 1;
   const total = (d && d.total) || 0;

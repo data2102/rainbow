@@ -1,5 +1,5 @@
 import {
-  q, body, methodGuard, requireUser, audit, genReqId, parseHandle,
+  q, body, methodGuard, requireUser, requireStaff, audit, genReqId, parseHandle,
   hashPw, TEMP_PASSWORD,
 } from './_lib.js';
 
@@ -49,7 +49,7 @@ async function createRemove(req, res) {
 }
 
 async function resolve(req, res, action) {
-  const me = await requireUser(req, res);
+  const me = await requireStaff(req, res);
   if (!me) return;
   const { id } = body(req);
   const rows = await q(`SELECT * FROM requests WHERE id = $1`, [id]);

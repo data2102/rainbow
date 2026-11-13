@@ -1,4 +1,4 @@
-import { q, body, methodGuard, currentUser, requireUser, audit } from './_lib.js';
+import { q, body, methodGuard, currentUser, requireUser, currentStaff, requireStaff, audit } from './_lib.js';
 
 const MAX_BODY = 1000;
 const MAX_COMMENT = 300;
@@ -220,7 +220,7 @@ async function removeComment(req, res) {
   if (!rows.length) return res.status(404).json({ error: '이미 삭제된 댓글입니다.' });
   const comment = rows[0];
 
-  const admin = (await currentUser(req) || {}).handle || null;
+  const admin = await currentStaff(req);
   if (!admin && !isAuthor(me, comment)) {
     return res.status(403).json({ error: '내가 쓴 댓글만 삭제할 수 있습니다.' });
   }
@@ -261,7 +261,7 @@ async function authorize(req, res, id, { allowAdmin = true } = {}) {
   const post = rows[0];
 
   if (isAuthor(me, post)) return post;
-  if (allowAdmin && await currentUser(req)) return post;
+  if (allowAdmin && await currentStaff(req)) return post;
 
   res.status(403).json({
     error: allowAdmin ? '내가 쓴 글만 삭제할 수 있습니다.' : '내가 쓴 글만 수정할 수 있습니다.',
@@ -296,13 +296,13 @@ async function remove(req, res) {
   if (!post) return;
 
   await q(`DELETE FROM posts WHERE id = $1`, [post.id]);
-  const admin = (await currentUser(req) || {}).handle || null;
+  const admin = await currentStaff(req);
   if (admin) await audit(admin, 'delete_post', { id: post.id, author: post.author });
   res.status(200).json({ ok: true });
 }
 
 async function removeMany(req, res) {
-  const me = await requireUser(req, res);
+  const me = await requireStaff(req, res);
   if (!me) return;
 
   const ids = (body(req).ids || []).map(Number).filter(Number.isInteger);
@@ -314,7 +314,7 @@ async function removeMany(req, res) {
 }
 
 async function clear(req, res) {
-  const me = await requireUser(req, res);
+  const me = await requireStaff(req, res);
   if (!me) return;
 
   const rows = await q(`DELETE FROM posts RETURNING id`);
@@ -518,7 +518,7 @@ async function findMyFile(req, res) {
     res.status(404).json({ error: '이미 삭제된 자료입니다.' });
     return null;
   }
-  const admin = (await currentUser(req) || {}).handle || null;
+  const admin = await currentStaff(req);
   if (!admin && !isFileAuthor(me, rows[0])) {
     res.status(403).json({ error: '내가 올린 자료만 고치거나 지울 수 있습니다.' });
     return null;
@@ -747,7 +747,7 @@ async function findMyPhoto(req, res) {
   if (!Number.isInteger(id)) { res.status(400).json({ error: '사진을 찾을 수 없습니다.' }); return null; }
   const rows = await q(`SELECT id, author FROM photos WHERE id = $1`, [id]);
   if (!rows.length) { res.status(404).json({ error: '이미 지워진 사진입니다.' }); return null; }
-  const admin = (await currentUser(req) || {}).handle || null;
+  const admin = await currentStaff(req);
   if (!isFileAuthor(me, rows[0]) && !admin) {
     res.status(403).json({ error: '올린 사람이나 로그인한 회원만 고치거나 지울 수 있습니다.' });
     return null;
@@ -806,7 +806,7 @@ async function photoCommentRemove(req, res) {
   const rows = await q(`SELECT * FROM photo_comments WHERE id = $1`, [Number(id)]);
   if (!rows.length) return res.status(404).json({ error: '이미 삭제된 댓글입니다.' });
 
-  const admin = (await currentUser(req) || {}).handle || null;
+  const admin = await currentStaff(req);
   if (!admin && !isFileAuthor(me, rows[0])) {
     return res.status(403).json({ error: '내가 쓴 댓글만 삭제할 수 있습니다.' });
   }

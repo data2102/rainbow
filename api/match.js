@@ -1,6 +1,6 @@
 import { randomInt } from 'node:crypto';
 import {
-  q, tx, body, methodGuard, requireUser, currentUser, audit,
+  q, tx, body, methodGuard, requireUser, currentStaff, requireStaff, currentUser, audit,
   winGain, lossGain, cleanReason, ensureMatchVoid, noScoreFor,
   ensureHostDraws, rowToDraw, TEAM_NAMES, replay, nightStart,
 } from './_lib.js';
@@ -136,7 +136,7 @@ async function recordCore(c, me, winners, losers) {
 /* ---------- 취소 · 되돌리기 ---------- */
 
 async function voidMatch(req, res, b) {
-  const me = await requireUser(req, res);
+  const me = await requireStaff(req, res);
   if (!me) return;
 
   let reason;
@@ -168,7 +168,7 @@ async function voidMatch(req, res, b) {
 }
 
 async function restoreMatch(req, res, b) {
-  const me = await requireUser(req, res);
+  const me = await requireStaff(req, res);
   if (!me) return;
 
   const id = Number(b.id);
@@ -658,7 +658,7 @@ async function hostManual(req, res, b) {
 
   try {
     await ensureHostDraws();
-    const admin = (await currentUser(req) || {}).handle || null;
+    const admin = await currentStaff(req);
     const out = await tx(async (c) => {
       const { rows } = await c.query(`SELECT * FROM host_draws WHERE id = $1 FOR UPDATE`, [id]);
       if (!rows.length) throw new Error('없는 판입니다.');
@@ -731,7 +731,7 @@ async function hostLog(req, res) {
  * 먼저 경기를 취소해야 한다.
  */
 async function hostVoid(req, res, b) {
-  const me = await requireUser(req, res);
+  const me = await requireStaff(req, res);
   if (!me) return;
 
   const id = Number(b.id);
@@ -772,7 +772,7 @@ async function hostVoid(req, res, b) {
  * 취소해야 한다. 여기서 같이 지우면 지운 줄 모르고 순위가 틀어진다.
  */
 async function hostClear(req, res, b) {
-  const me = await requireUser(req, res);
+  const me = await requireStaff(req, res);
   if (!me) return;
 
   try {

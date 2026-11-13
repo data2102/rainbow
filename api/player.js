@@ -1,5 +1,5 @@
 import {
-  q, tx, body, methodGuard, requireUser, currentAdmin, audit, parseHandle,
+  q, tx, body, methodGuard, requireUser, requireStaff, currentAdmin, audit, parseHandle,
   cleanEmail, hashPw, TEMP_PASSWORD, replay,
 } from './_lib.js';
 import { ensureSeason } from './_season.js';
@@ -132,7 +132,7 @@ async function renameEverywhere(c, oldHandle, newHandle) {
  * 비밀번호는 임시 비밀번호로 시작하고, 본인이 처음 로그인할 때 바꾸게 된다.
  */
 async function create(req, res) {
-  const me = await requireUser(req, res);
+  const me = await requireStaff(req, res);
   if (!me) return;
 
   const handle = String(body(req).handle || '').trim();
@@ -164,7 +164,7 @@ async function create(req, res) {
 /* ---------- 삭제 ---------- */
 
 async function remove(req, res) {
-  const me = await requireUser(req, res);
+  const me = await requireStaff(req, res);
   if (!me) return;
 
   const handle = String(body(req).handle || '').trim();
@@ -216,7 +216,7 @@ async function remove(req, res) {
  * 되돌릴 수 없는 것은 비밀번호뿐이다. 임시 비밀번호로 시작한다.
  */
 async function restore(req, res) {
-  const me = await requireUser(req, res);
+  const me = await requireStaff(req, res);
   if (!me) return;
 
   const handle = String(body(req).handle || '').trim();
@@ -272,7 +272,7 @@ async function restore(req, res) {
  * email 은 보내지 않으면 건드리지 않는다. 빈 문자열을 보내면 지운다.
  */
 async function update(req, res) {
-  const me = await requireUser(req, res);
+  const me = await requireStaff(req, res);
   if (!me) return;
 
   const oldHandle = String(body(req).handle || '').trim();

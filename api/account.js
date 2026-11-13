@@ -1,6 +1,6 @@
 import {
   q, body, methodGuard, audit, hashPw, verifyPw, createSession,
-  currentUser, requireUser, requireAdmin, currentAdmin, ensureAccounts,
+  currentUser, requireUser, requireStaff, requireAdmin, currentAdmin, ensureAccounts,
   genReqId, parseHandle, cleanEmail, ROLES, ROLE_LABEL, TEMP_PASSWORD,
   setSessionCookie, REMEMBER_DAYS, SESSION_HOURS,
 } from './_lib.js';
@@ -199,7 +199,7 @@ async function setEmail(req, res) {
 /* ---------- 권한 ---------- */
 
 async function list(req, res) {
-  const me = await requireUser(req, res);
+  const me = await requireStaff(req, res);
   if (!me) return;
   // 이메일은 리더·웹마스터에게만 보낸다. 명단은 모두가 봐야 하지만
   // 남의 메일 주소까지 모두에게 돌릴 까닭은 없다.
@@ -326,7 +326,7 @@ const LOG_ACTIONS = [
 ];
 
 async function logs(req, res) {
-  const me = await requireUser(req, res);
+  const me = await requireStaff(req, res);
   if (!me) return;
   const rows = await q(
     `SELECT admin_id, action, detail, ts FROM audit_log
