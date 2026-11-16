@@ -431,7 +431,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 160;
+const APP_VERSION = 161;
 let toldToRefresh = false;
 
 /**
@@ -7333,6 +7333,393 @@ function initRouletteEvents() {
   bindPager('rlPager', 'rlpage', n => { rlLogPage = n; }, () => loadRlLog());
 }
 
+
+/* ---------- 사다리 타기 ----------
+ *
+ * 경기가 돌아가는 중에 뒤늦게 두세 사람이 들어오면 어느 팀에 넣을지가
+ * 매번 말이 된다. 그때 쓰는 자리다.
+ *
+ * 사다리는 꾸밈이 아니라 뽑는 방법 그 자체다. 가로줄을 긋는 것도, 따라
+ * 내려가 어느 칸에 닿는지 읽는 것도 서버가 한다. 화면은 서버가 보낸
+ * 가로줄을 그대로 그리고 그 길을 덧그릴 뿐이다 — 화면이 다시 계산하면
+ * 둘이 어긋날 수 있고, 그러면 '눈으로 따라가 확인할 수 있다'는 말이
+ * 거짓이 된다.
+ */
+
+/** api/match.js 의 LADDER_SIZES 와 같아야 한다. */
+const LD_SIZES = [2, 4, 6, 8];
+const LD_PICK_KEY = 'r6-ladder-pick';
+const LD_SIZE_KEY = 'r6-ladder-size';
+
+let ldSize = 2;
+let ldPicked = new Set();
+let ldDraw = null;        // 지금 화면에 올라와 있는 사다리
+let ldBusy = false;       // 서버에 묻는 중
+let ldLogPage = 1;
+let ldLogData = null;
+
+function ldSavePicked() { writeKey(LD_PICK_KEY, JSON.stringify([...ldPicked]), true); }
+
+/** 체크해둔 사람 중 지금도 명단에 있는 사람만 — 탈퇴한 사람은 빠진다 */
+function ldEntries() {
+  return rlRanked().filter(p => ldPicked.has(p.handle)).map(p => p.handle);
+}
+
+/** 화면에 보여줄 사람 — 검색어가 있으면 거기 걸리는 사람만 */
+function ldShown() {
+  const el = document.getElementById('ldSearch');
+  const term = (el ? el.value : '').trim().toLowerCase();
+  const all = rlRanked();
+  if (!term) return all;
+  return all.filter(p => p.handle.toLowerCase().includes(term)
+    || String(p.clan || '').toLowerCase().includes(term));
+}
+
+function renderLdSizes() {
+  const box = document.getElementById('ldSizes');
+  if (!box) return;
+  box.innerHTML = LD_SIZES.map(n =>
+    `<button type="button" class="rl-size${n === ldSize ? ' on' : ''}" data-ldsize="${n}"
+       aria-pressed="${n === ldSize}">${n}명<span class="rl-size-n">${n / 2}:${n / 2}</span></button>`
+  ).join('');
+}
+
+function renderLdList() {
+  const list = document.getElementById('ldList');
+  if (!list) return;
+  // 한 명 체크할 때마다 명단을 다시 지으므로, 그대로 두면 43명 목록이
+  // 매번 맨 위로 튀어 올라 여덟 명을 고르기가 괴롭다. 보던 자리를 지킨다.
+  const keepScroll = list.scrollTop;
+  const shown = ldShown();
+  const rank = new Map(rlRanked().map((p, i) => [p.handle, i + 1]));
+  const n = ldEntries().length;
+  const full = n >= ldSize;
+  list.innerHTML = shown.length
+    ? shown.map(p => {
+        const on = ldPicked.has(p.handle);
+        // 정원이 찼으면 더 고르지 못하게 막는다 — 눌러본 뒤 거절당하지 않도록
+        const off = !on && full;
+        return `<label class="check-item${off ? ' full' : ''}">
+          <input type="checkbox" value="${esc(p.handle)}" ${on ? 'checked' : ''} ${off ? 'disabled' : ''}>
+          <span>${esc(p.handle)}</span> <span class="clan-mini">${esc(p.clan)}</span>
+          <span class="rl-rk">${rank.get(p.handle)}위 · ${p.point}점</span>
+        </label>`;
+      }).join('')
+    : '<div class="rl-empty">찾는 아이디가 없습니다.</div>';
+  list.scrollTop = keepScroll;
+}
+
+/** 고르는 화면 전체 */
+function renderLadder() {
+  const n = ldEntries().length;
+
+  const cnt = document.getElementById('ldCount');
+  if (cnt) { cnt.textContent = `${n} / ${ldSize}명`; cnt.classList.toggle('on', n > 0); }
+
+  const clear = document.getElementById('ldNone');
+  if (clear) { clear.hidden = !n; clear.textContent = `✕ 전체 해제 ${n}명`; }
+
+  const note = document.getElementById('ldNote');
+  if (note) {
+    note.textContent =
+      !isLoggedIn() ? '로그인하면 사다리를 탈 수 있습니다.'
+      : n === ldSize ? `${ldSize}명을 ${ldSize / 2}:${ldSize / 2} 로 나눕니다.`
+      : n < ldSize   ? `${ldSize - n}명 더 고르세요.`
+      : `${n - ldSize}명이 많습니다 — 인원을 다시 고르거나 체크를 지우세요.`;
+  }
+
+  const go = document.getElementById('ldGo');
+  if (go) {
+    go.disabled = ldBusy || !isLoggedIn() || n !== ldSize;
+    go.textContent = ldBusy ? '타는 중…' : '사다리 타기';
+  }
+
+  renderLdSizes();
+  renderLdList();
+}
+
+/**
+ * 사다리를 그린다.
+ *
+ * 세로줄은 사람 수만큼, 가로줄은 서버가 보낸 자리에만 긋는다. 따라 내려간
+ * 길은 미리 다 그려 두고 stroke-dasharray 로 감춰 두었다가 dashoffset 을
+ * 0 으로 밀어 차오르게 한다 — 선이 자라는 것처럼 보이지만 실은 처음부터
+ * 끝까지 그려져 있다.
+ */
+function ldRenderSvg(draw, animate) {
+  const svg = document.getElementById('ldSvg');
+  if (!svg || !draw || !draw.legs.length) return;
+  const n = draw.legs.length;
+  const rows = draw.rungs.reduce((m, r) => Math.max(m, r[0]), -1) + 1;
+
+  const GAP = n <= 4 ? 96 : 76;    // 세로줄 사이
+  const PAD = 56;                  // 위아래 이름 자리
+  const STEP = 22;                 // 가로줄 사이
+  const EDGE = 48;                 // 좌우 여백
+  const W = GAP * (n - 1) + EDGE * 2;
+  const H = PAD * 2 + STEP * (rows + 1);
+  const x = (c) => EDGE + GAP * c;
+  const y = (r) => PAD + STEP * (r + 1);
+
+  const parts = [];
+  for (let c = 0; c < n; c++) {
+    parts.push(`<line class="ld-leg" x1="${x(c)}" y1="${PAD}" x2="${x(c)}" y2="${H - PAD}"/>`);
+  }
+  for (const [r, c] of draw.rungs) {
+    parts.push(`<line class="ld-rung" x1="${x(c)}" y1="${y(r)}" x2="${x(c + 1)}" y2="${y(r)}"/>`);
+  }
+
+  // 위에는 이름, 아래에는 팀표. 팀표도 서버가 섞어 보낸 그대로다.
+  draw.legs.forEach((h, i) => {
+    const nm = h.length > 10 ? h.slice(0, 9) + '…' : h;
+    parts.push(`<text class="ld-name" data-handle="${esc(h)}" x="${x(i)}" y="${PAD - 14}"
+      text-anchor="middle">${esc(nm)}<title>${esc(h)}</title></text>`);
+  });
+  (draw.labels || []).forEach((t, i) => {
+    parts.push(`<text class="ld-slot ${String(t).toLowerCase()}" x="${x(i)}" y="${H - PAD + 26}"
+      text-anchor="middle">${esc(t)} Team</text>`);
+  });
+
+  // 따라 내려간 길 — 한 사람씩. 걷는 규칙은 서버의 walk() 와 같다.
+  //
+  // 길을 사다리 위에 그대로 포개면 네 사람의 선이 같은 자리에 겹쳐 서로를
+  // 가리고, 사다리 뼈대까지 덮어 버린다. 처음 그려보니 색칠한 미로처럼
+  // 보여 누가 어디로 갔는지 따라갈 수가 없었다. 그래서 사람마다 길을 조금씩
+  // 어긋나게 그린다 — 겹치는 구간에서도 선이 나란히 서서 둘 다 보인다.
+  const SHIFT = n <= 4 ? 3.4 : 2.6;
+  draw.result.forEach((r, k) => {
+    const start = draw.legs.indexOf(r.handle);
+    if (start < 0) return;
+    const off = (k - (draw.result.length - 1) / 2) * SHIFT;
+    const px = (c) => x(c) + off;
+    const py = (v) => v + off;
+    const pts = [[px(start), PAD]];
+    let at = start;
+    for (let row = 0; row < rows; row++) {
+      const right = draw.rungs.some(([rr, cc]) => rr === row && cc === at);
+      const left  = draw.rungs.some(([rr, cc]) => rr === row && cc === at - 1);
+      if (!right && !left) continue;
+      const to = right ? at + 1 : at - 1;
+      pts.push([px(at), py(y(row))], [px(to), py(y(row))]);
+      at = to;
+    }
+    pts.push([px(at), H - PAD]);
+    const d = pts.map((p, j) => `${j ? 'L' : 'M'} ${p[0]} ${p[1]}`).join(' ');
+    parts.push(`<path class="ld-path ${String(r.team).toLowerCase()}" d="${d}"
+      data-handle="${esc(r.handle)}"><title>${esc(r.handle)} → ${esc(r.team)} Team</title></path>`);
+  });
+
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('width', String(W));
+  svg.setAttribute('height', String(H));
+  svg.innerHTML = parts.join('');
+
+  svg.querySelectorAll('.ld-path').forEach((el, k) => {
+    const len = el.getTotalLength();
+    el.style.strokeDasharray = String(len);
+    el.style.strokeDashoffset = String(animate ? len : 0);
+    if (animate) setTimeout(() => { el.style.strokeDashoffset = '0'; }, 120 + k * 240);
+  });
+}
+
+/**
+ * 길 하나만 밝게 본다.
+ *
+ * 여덟 명이면 길이 여덟 줄 겹쳐 지나가 누가 어디로 갔는지 눈으로 따라갈 수가
+ * 없다. 이름을 짚으면 그 사람 길만 남기고 나머지를 죽인다 — 그래야 '눈으로
+ * 따라가 확인할 수 있다'는 말이 빈말이 아니게 된다.
+ */
+let ldOnly = null;      // 눌러서 고정해 둔 사람 (없으면 null)
+
+function ldApplyOnly(handle) {
+  const svg = document.getElementById('ldSvg');
+  if (!svg) return;
+  svg.classList.toggle('only', !!handle);
+  const mark = (el) => el.classList.toggle('on', !!handle && el.dataset.handle === handle);
+  svg.querySelectorAll('.ld-path').forEach(mark);
+  svg.querySelectorAll('.ld-name').forEach(mark);
+  document.querySelectorAll('#ldTeams li[data-handle]').forEach(mark);
+}
+
+function ldRenderTeams(draw) {
+  const box = document.getElementById('ldTeams');
+  if (!box || !draw) return;
+  const side = (t) => draw.result.filter(r => r.team === t).map(r => r.handle);
+  const one = (t) => `<div class="ld-team ${t.toLowerCase()}">
+      <h4>${t} TEAM</h4>
+      <ul>${side(t).map(h => `<li data-handle="${esc(h)}">${esc(h)}</li>`).join('') || '<li>-</li>'}</ul>
+    </div>`;
+  box.innerHTML = one('A') + one('B');
+}
+
+async function ldGo() {
+  if (ldBusy) return;
+  const entries = ldEntries();
+  if (entries.length !== ldSize) return;
+  ldBusy = true;
+  renderLadder();
+  try {
+    const r = await apiPost('/api/match', { action: 'ladder', entries });
+    ldDraw = r.draw;
+    const stage = document.getElementById('ldStage');
+    if (stage) stage.hidden = false;
+    const when = document.getElementById('ldWhen');
+    if (when) when.textContent = `${formatDateTime(ldDraw.ts)} · ${ldDraw.by}`;
+
+    ldOnly = null;
+    const still = window.matchMedia
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    ldRenderSvg(ldDraw, !still);
+    ldRenderTeams(ldDraw);
+    if (stage) stage.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // 다음 사람들을 다시 고를 수 있게 체크를 비운다
+    ldPicked.clear();
+    ldSavePicked();
+    loadLdLog(1);
+  } catch (e) {
+    showToast(e.message);
+  } finally {
+    ldBusy = false;
+    renderLadder();
+  }
+}
+
+/* ---- 기록 ---- */
+
+async function loadLdLog(page) {
+  if (page) ldLogPage = page;
+  try {
+    ldLogData = await apiPost('/api/match', { action: 'ladderLog', page: ldLogPage });
+  } catch {
+    ldLogData = null;
+  }
+  renderLdLog();
+}
+
+function renderLdLog() {
+  const box = document.getElementById('ldLog');
+  const empty = document.getElementById('ldLogEmpty');
+  if (!box || !empty) return;
+  const d = ldLogData;
+  const rows = (d && d.draws) || [];
+  empty.hidden = rows.length > 0;
+
+  box.innerHTML = rows.map(r => {
+    const side = (t) => r.result.filter(x => x.team === t).map(x => esc(x.handle)).join(', ');
+    return `<div class="rl-log-row">
+      <div class="rl-log-top">
+        <span class="rl-log-size">${r.legs.length}명 · ${r.legs.length / 2}:${r.legs.length / 2}</span>
+        <span class="rl-log-when">${esc(formatDateTime(r.ts))} · ${esc(r.by)}</span>
+      </div>
+      <div class="ld-log-res${r.voidedAt ? ' ld-void' : ''}">
+        <b class="a">A</b> ${side('A') || '-'} &nbsp;·&nbsp; <b class="b">B</b> ${side('B') || '-'}
+      </div>
+      ${r.voidedAt
+        ? `<div class="foot-note" style="margin:var(--sp-2) 0 0;">무효로 함 · ${esc(r.voidedBy || '')}</div>`
+        : (isAdmin()
+            ? `<button type="button" class="rl-log-void" data-ldvoid="${r.id}">이 사다리 무효</button>`
+            : '')}
+    </div>`;
+  }).join('');
+
+  const pages = (d && d.pages) || 1;
+  const total = (d && d.total) || 0;
+  const per = (d && d.per) || 10;
+  renderPager('ldPager', 'ldpage', total, pages, ldLogPage, (ldLogPage - 1) * per, rows.length, '건');
+}
+
+/** 잘못 탄 사다리를 무효로 — 줄은 지우지 않고 표시만 남긴다. */
+async function ldVoid(btn) {
+  if (!confirm('이 사다리를 무효로 합니다.\n기록은 지워지지 않고 무효 표시만 남습니다.\n계속하시겠습니까?')) return;
+  btn.disabled = true;
+  try {
+    await apiPost('/api/match', { action: 'ladderVoid', id: Number(btn.dataset.ldvoid) });
+    await loadLdLog();
+    showToast('무효로 했습니다.');
+  } catch (e) {
+    btn.disabled = false;
+    showToast(e.message);
+  }
+}
+
+function initLadderEvents() {
+  ldPicked = new Set(rlReadJson(LD_PICK_KEY));
+  const saved = Number(readKey(LD_SIZE_KEY));
+  if (LD_SIZES.includes(saved)) ldSize = saved;
+
+  const sizes = document.getElementById('ldSizes');
+  if (sizes) sizes.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-ldsize]');
+    if (!btn || ldBusy) return;
+    ldSize = Number(btn.dataset.ldsize);
+    writeKey(LD_SIZE_KEY, String(ldSize), true);
+    // 인원을 줄였으면 넘치는 체크는 앞에서부터 남기고 떨어낸다
+    const keep = ldEntries().slice(0, ldSize);
+    ldPicked = new Set(keep);
+    ldSavePicked();
+    renderLadder();
+  });
+
+  const list = document.getElementById('ldList');
+  if (list) list.addEventListener('change', (e) => {
+    const el = e.target;
+    if (!el || el.type !== 'checkbox') return;
+    if (el.checked) ldPicked.add(el.value); else ldPicked.delete(el.value);
+    ldSavePicked();
+    // 정원이 찼는지에 따라 남은 칸이 잠기므로 명단도 다시 그린다
+    renderLadder();
+  });
+
+  const search = document.getElementById('ldSearch');
+  if (search) search.addEventListener('input', renderLdList);
+
+  const none = document.getElementById('ldNone');
+  if (none) none.addEventListener('click', () => {
+    ldPicked.clear();
+    ldSavePicked();
+    renderLadder();
+  });
+
+  const go = document.getElementById('ldGo');
+  if (go) go.addEventListener('click', ldGo);
+
+  // 이름을 짚으면 그 길만, 누르면 고정. 결과 칸은 탈 때마다 새로 지으므로
+  // 바깥 테두리에서 한 번만 받는다.
+  const stage = document.getElementById('ldStage');
+  if (stage) {
+    const who = (el) => (el && el.closest ? el.closest('[data-handle]') : null);
+    stage.addEventListener('click', (e) => {
+      const t = who(e.target);
+      if (!t) return;
+      ldOnly = ldOnly === t.dataset.handle ? null : t.dataset.handle;
+      ldApplyOnly(ldOnly);
+    });
+    stage.addEventListener('pointerover', (e) => {
+      if (ldOnly) return;
+      const t = who(e.target);
+      if (t) ldApplyOnly(t.dataset.handle);
+    });
+    // 자식 요소 사이를 지날 때도 pointerout 이 뜬다. 옮겨간 곳을 보고 정한다.
+    stage.addEventListener('pointerout', (e) => {
+      if (ldOnly) return;
+      const t = who(e.relatedTarget);
+      ldApplyOnly(t ? t.dataset.handle : null);
+    });
+  }
+
+  const refresh = document.getElementById('ldLogRefresh');
+  if (refresh) refresh.addEventListener('click', () => loadLdLog(1));
+
+  const log = document.getElementById('ldLog');
+  if (log) log.addEventListener('click', (e) => {
+    const vd = e.target.closest('[data-ldvoid]');
+    if (vd && !vd.disabled) ldVoid(vd);
+  });
+
+  bindPager('ldPager', 'ldpage', n => { ldLogPage = n; }, () => loadLdLog());
+}
+
 /* ---------- 초기화 ---------- */
 
 /** 탭만 켠다 — 받아오는 일 없이 화면만 바꾼다. */
@@ -7377,6 +7764,11 @@ function activateTab(name) {
   if (name === 'roulette') {
     (players.length ? Promise.resolve() : loadState()).then(renderRoulette);
     loadRlLog(1);
+  }
+  // 사다리도 같은 명단을 쓴다
+  if (name === 'ladder') {
+    (players.length ? Promise.resolve() : loadState()).then(renderLadder);
+    loadLdLog(1);
   }
 }
 
@@ -7593,6 +7985,7 @@ async function boot() {
   initVoteStats();
   initWhoCard();
   initRouletteEvents();
+  initLadderEvents();
   initAwakeEvents();
   renderAuthBar();
   try {

@@ -5,7 +5,7 @@ import {
   winGain, lossGain, cleanReason, ensureMatchVoid, noScoreFor,
   ensureHostDraws, rowToDraw, TEAM_NAMES, replay, nightStart,
 } from './_lib.js';
-import { ensureSeason, ensureRescore } from './_season.js';
+import { ensureSeason, ensureRescore, syncSeason } from './_season.js';
 
 /**
  * GET  /api/match?host=1&page=N        호스트 뽑기 기록 (누구나 볼 수 있다)
@@ -815,8 +815,21 @@ async function hostClear(req, res, b) {
 /** 한 번에 태울 수 있는 인원. 두 팀에 똑같이 나누므로 짝수만 받는다. */
 const LADDER_SIZES = [2, 4, 6, 8];
 
-/** 가로줄 수. 너무 적으면 안 섞이고, 너무 많으면 그림이 길어진다. */
-const LADDER_ROWS = (n) => Math.max(8, n * 2);
+/**
+ * 가로줄 수와 얼마나 촘촘히 놓을지.
+ *
+ * 처음에는 많이 섞일수록 공평하다고 여겨 줄 n*2 칸에 절반 확률로 놓았다.
+ * 8명이면 가로줄이 40개 가까이 생겨 그림이 알아볼 수 없는 그물이 됐다 —
+ * 눈으로 따라갈 수 없으면 사다리를 그려 보여주는 뜻이 없다.
+ *
+ * 그런데 **공평함은 가로줄 수와 아무 상관이 없다.** 서는 차례도 섞고 바닥의
+ * 팀표도 섞으므로, 가로줄이 하나도 없어도 각자 A 에 걸릴 확률은 정확히 절반이다.
+ * 가로줄이 하는 일은 그 뽑기를 눈으로 볼 수 있게 하는 것뿐이다.
+ * 4만 번씩 재어 보니 40개일 때나 13개일 때나 49.7~50.3% 로 같았다.
+ * 그래서 보기 좋은 쪽으로 줄였다.
+ */
+const LADDER_ROWS = (n) => Math.max(6, n);
+const LADDER_RUNG_PCT = 30;
 
 /**
  * 가로줄을 놓는다. 한 줄(row)에는 서로 닿지 않는 가로줄만 놓는다 —
@@ -827,8 +840,8 @@ function makeRungs(legs, rows) {
   for (let r = 0; r < rows; r++) {
     let c = 0;
     while (c < legs - 1) {
-      // 칸마다 절반쯤 확률로 놓되, 놓았으면 다음 칸은 건너뛴다
-      if (randomInt(2) === 0) { out.push([r, c]); c += 2; }
+      // 놓았으면 다음 칸은 건너뛴다 (가로줄이 이어지지 않게)
+      if (randomInt(100) < LADDER_RUNG_PCT) { out.push([r, c]); c += 2; }
       else c += 1;
     }
   }
@@ -857,6 +870,8 @@ async function ladderDraw(req, res, b) {
   if (!me) return;
   try {
     await ensureLadder();
+    // syncSeason() 은 지금 열려 있는 시즌 하나를 그대로 돌려준다
+    // (ensureSeason 처럼 {current} 로 싸서 주지 않는다). 첫 배포 직전이면 null.
     const season = await syncSeason();
     const entries = [...new Set((b.entries || []).map(h => String(h).trim()).filter(Boolean))];
     if (!LADDER_SIZES.includes(entries.length)) {
@@ -884,7 +899,8 @@ async function ladderDraw(req, res, b) {
     // 따라 내려가는 길은 한 칸씩만 옮겨 다니는 걸음이라 멀리 가기 어렵고,
     // 그래서 왼쪽에서 출발하면 왼쪽에 닿기 쉽다. 4만 번 돌려 보니 8명일 때
     // 맨 왼쪽 줄의 A 확률이 77.7%, 맨 오른쪽이 22.9% 였다.
-    // 팀표를 섞으면 줄 위치와 팀이 무관해진다 — 같은 조건에서 49.4~50.3%.
+    // 팀표를 섞으면 줄 위치와 팀이 무관해진다 — 같은 조건에서 49.7~50.3%.
+    // 이 섞기가 공평함을 혼자 떠받치고 있다. 가로줄은 그걸 눈에 보이게 할 뿐이다.
     const labels = shuffle([...Array(n / 2).fill('A'), ...Array(n / 2).fill('B')]);
     const result = legs.map((h, i) => {
       const slot = walk(i, n, rungs);
@@ -895,7 +911,7 @@ async function ladderDraw(req, res, b) {
     const ins = await q(
       `INSERT INTO ladder_draws (ts, drawn_by, season, legs, rungs, result, labels)
        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [ts, me, season.current ? season.current.id : null,
+      [ts, me, season ? season.id : null,
        JSON.stringify(legs), JSON.stringify(rungs), JSON.stringify(result),
        JSON.stringify(labels)]
     );

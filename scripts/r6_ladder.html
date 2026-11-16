@@ -1468,6 +1468,51 @@ body.rule-v2 #standingTable .streak-txt{ display:none; }
 .rl-spin{ transform-box:view-box; transform-origin:100px 100px; }
 /* 조각은 다 같은 색이다. 가는 선으로만 나눈다. */
 .rl-slice{ fill:var(--rl-slice); stroke:var(--rl-line); stroke-width:1; }
+/* ---------- 사다리 타기 ----------
+   사다리는 꾸밈이 아니라 뽑는 방법 그 자체다. 서버가 그어 보낸 가로줄을
+   그대로 그리고, 길을 따라 내려가는 선을 덧그려 결과를 보여준다. */
+.ld-wrap{ overflow-x:auto; padding:var(--sp-2) 0 var(--sp-4); }
+.ld-svg{ display:block; margin:0 auto; max-width:100%; height:auto; }
+/* 사다리 뼈대. 길에 덮여 사라지지 않도록 길보다 굵게 둔다 — 무엇을 따라
+   내려가는 중인지 보이지 않으면 사다리를 그린 뜻이 없다. */
+.ld-leg, .ld-rung{ stroke:var(--border-strong); stroke-width:4; stroke-linecap:round; }
+/* 따라 내려간 길. 그리기 전에는 숨어 있다가 선을 따라 차오른다.
+   사람마다 조금씩 어긋나게 그리므로(app.js) 겹치는 구간도 둘 다 보인다. */
+.ld-path{ fill:none; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
+.ld-path.a{ stroke:var(--rise); }
+.ld-path.b{ stroke:var(--success); }
+.ld-name{ font-family:var(--font-sans); font-weight:var(--fw-bold); font-size:11px;
+          fill:var(--text-primary); cursor:pointer; }
+/* 한 사람만 짚었을 때 — 나머지 길은 죽이고 짚은 길만 남긴다 */
+.ld-svg.only .ld-path{ opacity:.12; }
+.ld-svg.only .ld-path.on{ opacity:1; stroke-width:3.6; }
+.ld-svg.only .ld-name{ fill:var(--text-disabled); }
+.ld-svg.only .ld-name.on{ fill:var(--text-primary); }
+@media (prefers-reduced-motion:no-preference){
+  .ld-path{ transition:stroke-dashoffset 1.1s cubic-bezier(.4,0,.2,1),
+                       opacity var(--dur-fast) var(--ease-out),
+                       stroke-width var(--dur-fast) var(--ease-out); }
+}
+.ld-slot{ font-family:var(--font-sans); font-weight:var(--fw-bold); font-size:12px; }
+.ld-slot.a{ fill:var(--rise); } .ld-slot.b{ fill:var(--success); }
+/* 결과 두 칸 */
+.ld-teams{ display:grid; grid-template-columns:1fr 1fr; gap:var(--sp-3); }
+@media (max-width:620px){ .ld-teams{ grid-template-columns:1fr; } }
+.ld-team{ background:var(--surface-sunken); border:1px solid var(--border);
+          border-radius:var(--radius-sm); padding:var(--sp-3) var(--sp-4); }
+.ld-team h4{ font-size:var(--fs-caption); font-weight:var(--fw-bold); margin:0 0 var(--sp-2);
+             letter-spacing:.08em; }
+.ld-team.a h4{ color:var(--rise); } .ld-team.b h4{ color:var(--success); }
+.ld-team li{ list-style:none; font-size:var(--fs-caption); color:var(--text-primary);
+             line-height:1.8; cursor:pointer; border-radius:var(--radius-sm);
+             padding:0 var(--sp-2); margin:0 calc(var(--sp-2) * -1); }
+.ld-team li.on{ background:var(--accent-bg); }
+.ld-team ul{ margin:0; padding:0; }
+/* 기록 줄 */
+.ld-log-res{ display:inline-block; font-size:var(--fs-footnote); margin-top:var(--sp-2); }
+.ld-log-res b.a{ color:var(--rise); } .ld-log-res b.b{ color:var(--success); }
+.ld-void{ color:var(--text-tertiary); text-decoration:line-through; }
+
 /* 같은 팀으로 묶어둔 짝이 있었던 판. 조용히 넘어가지 않도록 한 줄을 준다.
    머리글 줄에 붙였더니 길어져 오른쪽이 잘렸다 — 제 줄로 뺀다.
    이름을 rl-pin 으로 두었더니 룰렛 바늘(.rl-pin)의 width:0 을 물려받아
@@ -3338,6 +3383,7 @@ if (/[?&]room=\d+/.test(location.search)) {
     <button class="tab-btn" data-tab="mostpoint">상세순위</button>
     <button class="tab-btn" data-tab="attendance">출석</button>
     <button class="tab-btn" data-tab="roulette">룰렛 &amp; 리폿</button>
+    <button class="tab-btn" data-tab="ladder">사다리 타기</button>
     <button class="tab-btn" data-tab="history">리폿(수기등록)</button>
     <button class="tab-btn" data-tab="tournament">대회<span class="tab-now" id="tourTabSub"></span></button>
     <button class="tab-btn" data-tab="rules">규정</button>
@@ -3780,6 +3826,65 @@ if (/[?&]room=\d+/.test(location.search)) {
       <div class="rl-log" id="rlLog"></div>
       <div id="rlLogEmpty" class="log-empty" hidden>아직 뽑은 기록이 없습니다.</div>
       <div class="pager" id="rlPager" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- LADDER — 경기 중에 뒤늦게 들어온 사람을 어느 팀에 넣을지 -->
+  <div class="tab-panel" id="tab-ladder">
+    <div class="panel hud-corner">
+      <div class="panel-head">
+        <h2>사다리 타기 · Ladder</h2>
+        <span class="pick-n" id="ldCount">0명</span>
+      </div>
+      <div class="foot-note" style="margin-top:0;margin-bottom:14px;">
+        경기 중에 뒤늦게 들어온 사람을 <b>A·B 팀에 반씩 나눠 넣습니다</b> ·
+        <b>사다리는 서버가 긋고 서버가 읽습니다</b> — 타는 사람이 짜 넣을 수 없습니다 ·
+        그려진 사다리를 눈으로 따라가면 결과가 맞는지 확인할 수 있습니다 ·
+        탄 것은 아래 기록에 남습니다.
+      </div>
+
+      <div class="side-label">인원 · Players</div>
+      <div class="rl-sizes" id="ldSizes"></div>
+
+      <div class="side-label" style="margin-top:var(--sp-5);">참가자 고르기</div>
+      <div class="rl-tools">
+        <button type="button" class="rl-clear" id="ldNone" hidden>✕ 전체 해제</button>
+        <input type="search" id="ldSearch" class="rl-search" placeholder="아이디 검색" aria-label="참가자 검색">
+      </div>
+      <div class="checklist rl-list" id="ldList"></div>
+
+      <div class="pick-note" id="ldNote" aria-live="polite"></div>
+      <div class="pick-actions">
+        <button class="btn" id="ldGo" disabled>사다리 타기</button>
+      </div>
+    </div>
+
+    <!-- 결과 — 타기 전에는 없는 칸이다 -->
+    <div class="panel hud-corner" id="ldStage" hidden>
+      <div class="panel-head">
+        <h2>이번 사다리 · This Ladder</h2>
+        <span class="rl-when" id="ldWhen"></span>
+      </div>
+      <div class="ld-wrap"><svg class="ld-svg" id="ldSvg" role="img" aria-label="사다리"></svg></div>
+      <div class="foot-note" style="margin:0 0 var(--sp-3);text-align:center;">
+        이름을 짚으면 그 사람의 길만 밝아집니다 · 누르면 그대로 고정됩니다.
+      </div>
+      <div class="ld-teams" id="ldTeams"></div>
+    </div>
+
+    <!-- 기록 -->
+    <div class="panel hud-corner">
+      <div class="panel-head">
+        <h2>사다리 기록 · Log</h2>
+        <button type="button" class="pick-clear" id="ldLogRefresh">↻ 새로고침</button>
+      </div>
+      <div class="foot-note" style="margin-top:0;margin-bottom:12px;">
+        누가 언제 누구를 어느 팀에 넣었는지 모두에게 남습니다 ·
+        <b>다시 타면 그것도 한 줄로 남습니다.</b>
+      </div>
+      <div class="rl-log" id="ldLog"></div>
+      <div id="ldLogEmpty" class="log-empty" hidden>아직 사다리를 탄 기록이 없습니다.</div>
+      <div class="pager" id="ldPager" style="display:none;"></div>
     </div>
   </div>
 
