@@ -3336,9 +3336,9 @@ if (/[?&]room=\d+/.test(location.search)) {
   <nav class="tabs"><div class="tabs-in">
     <button class="tab-btn active" data-tab="standing">순위</button>
     <button class="tab-btn" data-tab="mostpoint">상세순위</button>
-    <button class="tab-btn" data-tab="roulette">룰렛 &amp; 리폿</button>
     <button class="tab-btn" data-tab="attendance">출석</button>
-    <button class="tab-btn" data-tab="history">리폿(경기결과)</button>
+    <button class="tab-btn" data-tab="roulette">룰렛 &amp; 리폿</button>
+    <button class="tab-btn" data-tab="history">리폿(수기등록)</button>
     <button class="tab-btn" data-tab="tournament">대회<span class="tab-now" id="tourTabSub"></span></button>
     <button class="tab-btn" data-tab="rules">규정</button>
     <button class="tab-btn" data-tab="board">게시판</button>
@@ -5008,7 +5008,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 159;
+const APP_VERSION = 160;
 let toldToRefresh = false;
 
 /**
@@ -11801,7 +11801,7 @@ async function rlWipeLog() {
   if (done) {
     ask = `뽑기 기록 ${d.total}건을 모두 지웁니다. 되돌릴 수 없습니다.\n\n`
       + `※ 결과까지 올린 경기가 섞여 있습니다. 그 경기와 점수는 리폿에 그대로 남습니다 —\n`
-      + `   점수를 되돌리려면 리폿(경기결과)에서 해당 경기를 따로 취소해야 합니다.\n\n계속할까요?`;
+      + `   점수를 되돌리려면 리폿(수기등록)에서 해당 경기를 따로 취소해야 합니다.\n\n계속할까요?`;
   }
   if (!confirm(ask)) return;
 

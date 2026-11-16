@@ -431,7 +431,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 159;
+const APP_VERSION = 160;
 let toldToRefresh = false;
 
 /**
@@ -7224,7 +7224,7 @@ async function rlWipeLog() {
   if (done) {
     ask = `뽑기 기록 ${d.total}건을 모두 지웁니다. 되돌릴 수 없습니다.\n\n`
       + `※ 결과까지 올린 경기가 섞여 있습니다. 그 경기와 점수는 리폿에 그대로 남습니다 —\n`
-      + `   점수를 되돌리려면 리폿(경기결과)에서 해당 경기를 따로 취소해야 합니다.\n\n계속할까요?`;
+      + `   점수를 되돌리려면 리폿(수기등록)에서 해당 경기를 따로 취소해야 합니다.\n\n계속할까요?`;
   }
   if (!confirm(ask)) return;
 
