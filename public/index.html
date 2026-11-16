@@ -5151,7 +5151,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 162;
+const APP_VERSION = 163;
 let toldToRefresh = false;
 
 /**
@@ -12348,7 +12348,7 @@ function renderLdLog() {
       </div>
       ${r.voidedAt
         ? `<div class="foot-note" style="margin:var(--sp-2) 0 0;">무효로 함 · ${esc(r.voidedBy || '')}</div>`
-        : (isAdmin()
+        : (canStaff()
             ? `<button type="button" class="rl-log-void" data-ldvoid="${r.id}">이 사다리 무효</button>`
             : '')}
     </div>`;

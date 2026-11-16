@@ -944,9 +944,15 @@ async function ladderLog(req, res, b) {
   });
 }
 
-/** 잘못 돌린 사다리를 무효로 — 리더·웹마스터만. 줄은 지우지 않고 표시만 남긴다. */
+/**
+ * 잘못 탄 사다리를 무효로 — 관리자 이상. 줄은 지우지 않고 표시만 남긴다.
+ *
+ * 룰렛의 hostVoid 와 같은 문이다. 한때 웹마스터 이상으로 좁혀 두었는데,
+ * 사다리는 경기 중에 쓰는 것이라 잘못 탔으면 그 자리에서 물러야 한다 —
+ * 점수를 건드리는 일도 아니고 기록이 지워지지도 않으므로 좁혀둘 까닭이 없었다.
+ */
 async function ladderVoid(req, res, b) {
-  const me = await requireAdmin(req, res);
+  const me = await requireStaff(req, res);
   if (!me) return;
   await ensureLadder();
   const id = Number(b.id);
