@@ -1483,28 +1483,38 @@ body.rule-v2 #standingTable .streak-txt{ display:none; }
 .ld-leg, .ld-rung{ stroke:var(--rl-line); stroke-width:2.5; stroke-linecap:round; }
 /* 따라 내려간 길. 그리기 전에는 숨어 있다가 선을 따라 차오른다.
    룰렛 조각 위의 흰 글씨처럼, 어두운 판 위에 밝은 선으로 올라간다. */
+/* 길은 팀 색으로 가른다 — **그림에서만**.
+   아이디(위의 이름, 아래 명단)는 색 없이 둔다. 사람에게 색을 입히면 누가
+   어느 편인지가 아니라 '빨간 사람·금색 사람'처럼 읽힌다.
+   빨강과 금색을 고른 까닭: 이 화면에는 파랑이 한 점도 없어(팔레트 주석 참고)
+   색맹에 가장 안전한 빨강-파랑 짝을 쓸 수 없다. 그래서 색은 거들기만 하고,
+   어느 팀인지는 바닥의 A·B 글자와 아래 명단 두 칸이 글자로 말한다. */
 .ld-path{
   fill:none; stroke:var(--text-primary); stroke-width:3;
   stroke-linecap:round; stroke-linejoin:round;
 }
+.ld-path.a{ stroke:var(--rise); }
+.ld-path.b{ stroke:var(--top-rank); }
 .ld-name{
   font-family:var(--font-sans); font-weight:var(--fw-bold); font-size:12px;
   fill:var(--text-secondary); cursor:pointer;
 }
-/* 바닥 칸의 팀표. 글자로만 가른다 — 색으로 가르지 않는다.
-   'A TEAM' 을 여덟 번 적으니 바닥이 글자로 꽉 찼다. 한 글자면 족하다 —
-   어느 팀인지는 바로 아래 명단 두 칸이 말해준다. */
+/* 바닥 칸의 팀표. 길과 같은 색으로, 글자도 그대로 둔다 —
+   색을 못 가리는 사람에게는 글자가 답이 된다. */
 .ld-slot{
   font-family:var(--font-mono); font-weight:var(--fw-bold); font-size:14px;
   letter-spacing:.06em; fill:var(--text-tertiary);
 }
-/* 한 사람을 짚었을 때 — 그 길만 룰렛의 '걸린 조각' 색으로 켜고 나머지는 죽인다 */
-.ld-svg.only .ld-path{ opacity:.14; }
-.ld-svg.only .ld-path.on{ opacity:1; stroke:var(--rl-won); stroke-width:3.6; }
+.ld-slot.a{ fill:var(--rise); }
+.ld-slot.b{ fill:var(--top-rank); }
+/* 한 사람을 짚었을 때 — 나머지를 죽이고 그 길만 남긴다.
+   색은 팀 색 그대로 둔다. 짚었다고 빨갛게 바꾸면 A 팀 길과 구별이 없어진다. */
+.ld-svg.only .ld-path{ opacity:.12; }
+.ld-svg.only .ld-path.on{ opacity:1; stroke-width:4.2; }
 .ld-svg.only .ld-name{ fill:var(--text-disabled); }
-.ld-svg.only .ld-name.on{ fill:var(--rl-won); }
-.ld-svg.only .ld-slot{ opacity:.35; }
-.ld-svg.only .ld-slot.on{ opacity:1; fill:var(--rl-won); }
+.ld-svg.only .ld-name.on{ fill:var(--text-primary); }
+.ld-svg.only .ld-slot{ opacity:.3; }
+.ld-svg.only .ld-slot.on{ opacity:1; }
 @media (prefers-reduced-motion:no-preference){
   .ld-path{ transition:stroke-dashoffset 1.1s cubic-bezier(.4,0,.2,1),
                        opacity var(--dur-fast) var(--ease-out),

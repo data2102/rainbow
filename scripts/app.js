@@ -431,7 +431,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 163;
+const APP_VERSION = 164;
 let toldToRefresh = false;
 
 /**
@@ -7476,8 +7476,8 @@ function ldRenderSvg(draw, animate) {
       text-anchor="middle">${esc(nm)}<title>${esc(h)}</title></text>`);
   });
   (draw.labels || []).forEach((t, i) => {
-    parts.push(`<text class="ld-slot" data-slot="${i}" x="${x(i)}" y="${H - PAD + 26}"
-      text-anchor="middle">${esc(t)}</text>`);
+    parts.push(`<text class="ld-slot ${String(t).toLowerCase()}" data-slot="${i}"
+      x="${x(i)}" y="${H - PAD + 26}" text-anchor="middle">${esc(t)}</text>`);
   });
 
   // 따라 내려간 길 — 한 사람씩. 걷는 규칙은 서버의 walk() 와 같다.
@@ -7505,7 +7505,7 @@ function ldRenderSvg(draw, animate) {
     }
     pts.push([px(at), H - PAD]);
     const d = pts.map((p, j) => `${j ? 'L' : 'M'} ${p[0]} ${p[1]}`).join(' ');
-    parts.push(`<path class="ld-path" d="${d}"
+    parts.push(`<path class="ld-path ${String(r.team).toLowerCase()}" d="${d}"
       data-handle="${esc(r.handle)}"><title>${esc(r.handle)} → ${esc(r.team)} Team</title></path>`);
   });
 
