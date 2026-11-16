@@ -431,7 +431,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 161;
+const APP_VERSION = 162;
 let toldToRefresh = false;
 
 /**
@@ -7476,8 +7476,8 @@ function ldRenderSvg(draw, animate) {
       text-anchor="middle">${esc(nm)}<title>${esc(h)}</title></text>`);
   });
   (draw.labels || []).forEach((t, i) => {
-    parts.push(`<text class="ld-slot ${String(t).toLowerCase()}" x="${x(i)}" y="${H - PAD + 26}"
-      text-anchor="middle">${esc(t)} Team</text>`);
+    parts.push(`<text class="ld-slot" data-slot="${i}" x="${x(i)}" y="${H - PAD + 26}"
+      text-anchor="middle">${esc(t)}</text>`);
   });
 
   // 따라 내려간 길 — 한 사람씩. 걷는 규칙은 서버의 walk() 와 같다.
@@ -7505,7 +7505,7 @@ function ldRenderSvg(draw, animate) {
     }
     pts.push([px(at), H - PAD]);
     const d = pts.map((p, j) => `${j ? 'L' : 'M'} ${p[0]} ${p[1]}`).join(' ');
-    parts.push(`<path class="ld-path ${String(r.team).toLowerCase()}" d="${d}"
+    parts.push(`<path class="ld-path" d="${d}"
       data-handle="${esc(r.handle)}"><title>${esc(r.handle)} → ${esc(r.team)} Team</title></path>`);
   });
 
@@ -7538,16 +7538,27 @@ function ldApplyOnly(handle) {
   const mark = (el) => el.classList.toggle('on', !!handle && el.dataset.handle === handle);
   svg.querySelectorAll('.ld-path').forEach(mark);
   svg.querySelectorAll('.ld-name').forEach(mark);
-  document.querySelectorAll('#ldTeams li[data-handle]').forEach(mark);
+  document.querySelectorAll('#ldTeams .ld-mem').forEach(mark);
+
+  // 그 사람이 닿은 바닥 칸도 같이 켠다 — 길 끝이 어디인지가 곧 답이다
+  const hit = handle && ldDraw
+    ? (ldDraw.result.find(r => r.handle === handle) || {}).slot : null;
+  svg.querySelectorAll('.ld-slot').forEach(el =>
+    el.classList.toggle('on', hit != null && Number(el.dataset.slot) === hit));
 }
 
 function ldRenderTeams(draw) {
   const box = document.getElementById('ldTeams');
   if (!box || !draw) return;
-  const side = (t) => draw.result.filter(r => r.team === t).map(r => r.handle);
-  const one = (t) => `<div class="ld-team ${t.toLowerCase()}">
-      <h4>${t} TEAM</h4>
-      <ul>${side(t).map(h => `<li data-handle="${esc(h)}">${esc(h)}</li>`).join('') || '<li>-</li>'}</ul>
+  // 칸 번호 순으로 적는다. 그림에서 왼쪽부터 읽는 차례와 같아진다.
+  const side = (t) => draw.result.filter(r => r.team === t).sort((a, b) => a.slot - b.slot);
+  const one = (t) => `<div class="ld-team">
+      <span class="ld-team-n">${t} TEAM</span>
+      <div class="ld-roster">${side(t).map(r =>
+        `<div class="ld-mem" data-handle="${esc(r.handle)}">
+           <span class="ld-ord">${r.slot + 1}번 칸</span>
+           <span>${esc(r.handle)}</span>
+         </div>`).join('')}</div>
     </div>`;
   box.innerHTML = one('A') + one('B');
 }
@@ -7564,7 +7575,7 @@ async function ldGo() {
     const stage = document.getElementById('ldStage');
     if (stage) stage.hidden = false;
     const when = document.getElementById('ldWhen');
-    if (when) when.textContent = `${formatDateTime(ldDraw.ts)} · ${ldDraw.by}`;
+    if (when) when.textContent = `${formatDateTime(ldDraw.ts)} · ${ldDraw.by} 님이 탐`;
 
     ldOnly = null;
     const still = window.matchMedia
@@ -7613,7 +7624,7 @@ function renderLdLog() {
         <span class="rl-log-when">${esc(formatDateTime(r.ts))} · ${esc(r.by)}</span>
       </div>
       <div class="ld-log-res${r.voidedAt ? ' ld-void' : ''}">
-        <b class="a">A</b> ${side('A') || '-'} &nbsp;·&nbsp; <b class="b">B</b> ${side('B') || '-'}
+        <b>A</b> ${side('A') || '-'} &nbsp;·&nbsp; <b>B</b> ${side('B') || '-'}
       </div>
       ${r.voidedAt
         ? `<div class="foot-note" style="margin:var(--sp-2) 0 0;">무효로 함 · ${esc(r.voidedBy || '')}</div>`
