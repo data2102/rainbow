@@ -3175,17 +3175,19 @@ header .admin-btn.active{ background:var(--r6-red); border-color:var(--r6-red); 
   border-radius:var(--radius-lg); overflow:hidden;
   margin-bottom:var(--sp-4);
 }
-.sx{ background:var(--surface); padding:var(--sp-3) var(--sp-4); min-width:0; }
+/* 머리글 바로 아래 붙는 띠다. 읽을거리가 아니라 곁눈질로 보는 것이라
+   높이를 줄여 두었다 — 키우면 순위표가 그만큼 아래로 밀린다. */
+.sx{ background:var(--surface); padding:var(--sp-2) var(--sp-4); min-width:0; }
 .sk{
-  display:block; font-size:var(--fs-footnote); font-weight:var(--fw-bold);
-  letter-spacing:.06em; color:var(--text-tertiary); margin-bottom:2px;
+  display:block; font-size:11.5px; font-weight:var(--fw-bold);
+  letter-spacing:.06em; color:var(--text-tertiary); line-height:1.3;
 }
 .sv{
-  display:block; font-size:var(--fs-subhead); font-weight:var(--fw-bold);
+  display:block; font-size:15px; font-weight:var(--fw-bold); line-height:1.35;
   color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 .sv em{
-  font-style:normal; font-size:var(--fs-footnote);
+  font-style:normal; font-size:11.5px;
   font-weight:var(--fw-medium); color:var(--text-tertiary); margin-left:2px;
 }
 .sstrip.closed .sv{ color:var(--text-secondary); }
