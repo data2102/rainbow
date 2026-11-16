@@ -644,6 +644,52 @@ export async function noScoreFor(c, handles, ts) {
  * 옛 칸은 그대로 둔다 — 지난 기록을 읽어야 하고, 두 팀짜리는 거기에도 채운다.
  */
 let drawsReady = false;
+/**
+ * 사다리 타기.
+ *
+ * 경기가 돌아가는 중에 두 명, 네 명씩 뒤늦게 들어오는 일이 잦다. 그들을
+ * 어느 팀에 넣을지 정하는 자리다. 룰렛과 같은 원칙으로 **서버가 사다리를
+ * 긋고 서버가 결과를 읽는다** — 화면에서 그려 올리게 두면 돌리는 사람이
+ * 원하는 대로 만들 수 있다.
+ *
+ * 사다리는 꾸밈이 아니라 그 자체가 뽑는 방법이다. 가로줄(rungs)을 무작위로
+ * 놓고 위에서부터 따라 내려가 닿는 칸이 곧 팀이다. 그래서 화면에 그려 놓고
+ * 눈으로 따라가면 결과가 맞는지 누구나 확인할 수 있다.
+ */
+let ladderReady = false;
+export async function ensureLadder() {
+  if (ladderReady) return;
+  await q(`
+    CREATE TABLE IF NOT EXISTS ladder_draws (
+      id        BIGSERIAL PRIMARY KEY,
+      ts        BIGINT NOT NULL,
+      drawn_by  TEXT NOT NULL,
+      season    TEXT,
+      legs      JSONB NOT NULL,   -- 사다리에 선 차례 (아이디)
+      rungs     JSONB NOT NULL,   -- 가로줄 [[줄, 칸], ...]
+      result    JSONB NOT NULL,   -- [{handle, slot, team}]
+      labels    JSONB,            -- 바닥 칸의 팀표 ['A','B',...] — 이것도 섞는다
+      voided_at BIGINT,
+      voided_by TEXT
+    )`);
+  await q(`CREATE INDEX IF NOT EXISTS idx_ladder_ts ON ladder_draws (ts DESC)`);
+  ladderReady = true;
+}
+
+export function rowToLadder(r) {
+  return {
+    id: Number(r.id),
+    ts: Number(r.ts),
+    by: r.drawn_by,
+    legs: r.legs || [],
+    rungs: r.rungs || [],
+    labels: r.labels || [],
+    result: r.result || [],
+    voidedAt: r.voided_at == null ? null : Number(r.voided_at),
+    voidedBy: r.voided_by || null,
+  };
+}
+
 export async function ensureHostDraws() {
   if (drawsReady) return;
   await q(`

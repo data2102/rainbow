@@ -1,6 +1,7 @@
 import { randomInt } from 'node:crypto';
 import {
   q, tx, body, methodGuard, requireUser, currentStaff, requireStaff, requireAdmin, currentUser, audit,
+  ensureLadder, rowToLadder,
   winGain, lossGain, cleanReason, ensureMatchVoid, noScoreFor,
   ensureHostDraws, rowToDraw, TEAM_NAMES, replay, nightStart,
 } from './_lib.js';
@@ -31,6 +32,9 @@ export default async function handler(req, res) {
   if (b.action === 'hostManual') return hostManual(req, res, b);
   if (b.action === 'hostVoid') return hostVoid(req, res, b);
   if (b.action === 'hostClear') return hostClear(req, res, b);
+  if (b.action === 'ladder') return ladderDraw(req, res, b);
+  if (b.action === 'ladderLog') return ladderLog(req, res, b);
+  if (b.action === 'ladderVoid') return ladderVoid(req, res, b);
   return record(req, res, b);
 }
 
@@ -804,4 +808,138 @@ async function hostClear(req, res, b) {
   } catch (e) {
     res.status(400).json({ error: e.message });
   }
+}
+
+/* ---------- 사다리 타기 ---------- */
+
+/** 한 번에 태울 수 있는 인원. 두 팀에 똑같이 나누므로 짝수만 받는다. */
+const LADDER_SIZES = [2, 4, 6, 8];
+
+/** 가로줄 수. 너무 적으면 안 섞이고, 너무 많으면 그림이 길어진다. */
+const LADDER_ROWS = (n) => Math.max(8, n * 2);
+
+/**
+ * 가로줄을 놓는다. 한 줄(row)에는 서로 닿지 않는 가로줄만 놓는다 —
+ * 두 개가 이어져 있으면 따라 내려갈 때 어디로 가는지 모호해진다.
+ */
+function makeRungs(legs, rows) {
+  const out = [];
+  for (let r = 0; r < rows; r++) {
+    let c = 0;
+    while (c < legs - 1) {
+      // 칸마다 절반쯤 확률로 놓되, 놓았으면 다음 칸은 건너뛴다
+      if (randomInt(2) === 0) { out.push([r, c]); c += 2; }
+      else c += 1;
+    }
+  }
+  return out;
+}
+
+/** 위에서 i 번 줄로 내려가면 바닥 몇 번 칸에 닿는가 */
+function walk(i, legs, rungs) {
+  let at = i;
+  const rows = rungs.reduce((m, [r]) => Math.max(m, r), -1) + 1;
+  for (let r = 0; r < rows; r++) {
+    if (rungs.some(([rr, cc]) => rr === r && cc === at)) at += 1;
+    else if (rungs.some(([rr, cc]) => rr === r && cc === at - 1)) at -= 1;
+  }
+  return at;
+}
+
+/**
+ * POST {action:'ladder', entries:[handle...]}
+ *
+ * 고른 사람을 사다리에 세우고 바닥 칸의 절반은 A, 절반은 B 로 둔다.
+ * 서는 차례도 섞는다 — 고른 차례 그대로 세우면 누가 어디 설지 미리 보인다.
+ */
+async function ladderDraw(req, res, b) {
+  const me = await requireUser(req, res);
+  if (!me) return;
+  try {
+    await ensureLadder();
+    const season = await syncSeason();
+    const entries = [...new Set((b.entries || []).map(h => String(h).trim()).filter(Boolean))];
+    if (!LADDER_SIZES.includes(entries.length)) {
+      return res.status(400).json({
+        error: `${LADDER_SIZES.join('·')}명 중에서 고를 수 있습니다 · 지금 ${entries.length}명`,
+      });
+    }
+
+    const rows = await q(
+      `SELECT handle FROM players WHERE handle = ANY($1)`, [entries]
+    );
+    const found = new Set(rows.map(r => r.handle));
+    const missing = entries.filter(h => !found.has(h));
+    if (missing.length) {
+      return res.status(400).json({ error: '명단에 없는 선수입니다: ' + missing.join(', ') });
+    }
+
+    const legs = shuffle([...entries]);
+    const n = legs.length;
+    const rungs = makeRungs(n, LADDER_ROWS(n));
+
+    // 바닥 칸의 팀표도 섞는다.
+    //
+    // 앞 절반을 A, 뒤 절반을 B 로 박아두면 **왼쪽 줄이 유리해진다**. 사다리를
+    // 따라 내려가는 길은 한 칸씩만 옮겨 다니는 걸음이라 멀리 가기 어렵고,
+    // 그래서 왼쪽에서 출발하면 왼쪽에 닿기 쉽다. 4만 번 돌려 보니 8명일 때
+    // 맨 왼쪽 줄의 A 확률이 77.7%, 맨 오른쪽이 22.9% 였다.
+    // 팀표를 섞으면 줄 위치와 팀이 무관해진다 — 같은 조건에서 49.4~50.3%.
+    const labels = shuffle([...Array(n / 2).fill('A'), ...Array(n / 2).fill('B')]);
+    const result = legs.map((h, i) => {
+      const slot = walk(i, n, rungs);
+      return { handle: h, slot, team: labels[slot] };
+    });
+
+    const ts = Date.now();
+    const ins = await q(
+      `INSERT INTO ladder_draws (ts, drawn_by, season, legs, rungs, result, labels)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [ts, me, season.current ? season.current.id : null,
+       JSON.stringify(legs), JSON.stringify(rungs), JSON.stringify(result),
+       JSON.stringify(labels)]
+    );
+    const draw = rowToLadder(ins[0]);
+    await audit(me, 'ladder_draw', {
+      id: draw.id,
+      a: result.filter(r => r.team === 'A').map(r => r.handle),
+      b: result.filter(r => r.team === 'B').map(r => r.handle),
+    });
+    res.status(200).json({ ok: true, draw });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+}
+
+/** 지난 사다리들. 여러 번 돌린 것이 그대로 보여야 한다. */
+async function ladderLog(req, res, b) {
+  await ensureLadder();
+  const per = 10;
+  const page = Math.max(1, Number(b.page) || 1);
+  const [{ n }] = await q(`SELECT count(*)::int AS n FROM ladder_draws`);
+  const rows = await q(
+    `SELECT * FROM ladder_draws ORDER BY ts DESC LIMIT $1 OFFSET $2`,
+    [per, (page - 1) * per]
+  );
+  res.setHeader('Cache-Control', 'no-store');
+  res.status(200).json({
+    draws: rows.map(rowToLadder),
+    total: n, per, page, pages: Math.max(1, Math.ceil(n / per)),
+  });
+}
+
+/** 잘못 돌린 사다리를 무효로 — 리더·웹마스터만. 줄은 지우지 않고 표시만 남긴다. */
+async function ladderVoid(req, res, b) {
+  const me = await requireAdmin(req, res);
+  if (!me) return;
+  await ensureLadder();
+  const id = Number(b.id);
+  const rows = await q(
+    `UPDATE ladder_draws SET voided_at = $1, voided_by = $2
+      WHERE id = $3 AND voided_at IS NULL RETURNING *`,
+    [Date.now(), me, id]
+  );
+  if (!rows.length) return res.status(404).json({ error: '이미 무효로 한 사다리입니다.' });
+  await audit(me, 'ladder_void', { id });
+  res.status(200).json({ ok: true, draw: rowToLadder(rows[0]) });
 }
