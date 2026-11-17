@@ -718,6 +718,10 @@ export async function ensureEvent() {
   await q(`CREATE INDEX IF NOT EXISTS idx_event_ts ON event_brackets (ts DESC)`);
   // 조 나누기(v168). 조 크기도 조 개수도 2의 제곱이면 부전승이 없다.
   await q(`ALTER TABLE event_brackets ADD COLUMN IF NOT EXISTS groups JSONB`);
+  // 본선 방식(v170). 'tree' = 조별 1위끼리 외대진, 'asl' = 승자전·패자전·최종전·결승.
+  await q(`ALTER TABLE event_brackets ADD COLUMN IF NOT EXISTS format TEXT`);
+  // ASL 조추첨 결과 — 조 번호 네 개의 차례. 조별 1위가 다 나온 뒤에 뽑는다.
+  await q(`ALTER TABLE event_brackets ADD COLUMN IF NOT EXISTS draw JSONB`);
   // 조가 없던 때의 대진표는 그릴 수 없다(자리 채우는 방식이 달라졌다).
   // 지우지는 않고 닫아만 둔다 — 기록은 기록이다.
   await q(`UPDATE event_brackets SET closed_at = $1 WHERE groups IS NULL AND closed_at IS NULL`,
@@ -733,6 +737,8 @@ export function rowToEvent(r) {
     title: r.title || '',
     slots: r.slots || [],
     groups: r.groups || null,
+    format: r.format || 'tree',
+    draw: r.draw || null,
     picks: r.picks || {},
     log: r.log || [],
     closedAt: r.closed_at == null ? null : Number(r.closed_at),

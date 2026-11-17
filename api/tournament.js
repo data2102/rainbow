@@ -203,6 +203,7 @@ export default async function handler(req, res) {
     if (action === 'eventMake') return await eventMake(req, res, b);
     if (action === 'eventPick') return await eventPick(req, res, b, false);
     if (action === 'eventUndo') return await eventPick(req, res, b, true);
+    if (action === 'eventDraw') return await eventDraw(req, res, b);
     if (action === 'eventClose') return await eventDelete(req, res, b);
     return res.status(400).json({ error: '알 수 없는 요청입니다.' });
   } catch (e) {
@@ -427,10 +428,14 @@ function evGroupsOk(groups, n) {
  * 칸 이름은 그 칸이 덮는 잎 범위(`시작-끝`)다 — 사람 수와 조가 같으면 늘
  * 같은 이름이 나오므로, 적어둔 승자(picks)가 다시 셀 때마다 제자리를 찾는다.
  */
-function evTree(groups) {
-  const full = (from, to) => (to - from === 1)
+function evTreeOne(from, to) {
+  return (to - from === 1)
     ? { leaf: from, from, to }
-    : { from, to, a: full(from, (from + to) / 2), b: full((from + to) / 2, to) };
+    : { from, to, a: evTreeOne(from, (from + to) / 2), b: evTreeOne((from + to) / 2, to) };
+}
+
+function evTree(groups) {
+  const full = evTreeOne;
 
   let at = 0;
   let nodes = groups.map((sz) => { const nd = full(at, at + sz); at += sz; return nd; });
@@ -455,18 +460,18 @@ function evTree(groups) {
  * row 는 그 칸이 덮는 잎의 한가운데다. 화면은 이 값으로 세로 자리를 잡는다 —
  * 종이 대진표에서 두 선이 만나는 높이와 같은 뜻이다.
  */
-function evWalk(node, slots, picks, out, depth) {
+function evWalk(node, slots, picks, out, depth, group) {
   if (node.leaf !== undefined) {
     return { who: slots[node.leaf] || null, row: node.leaf, id: null };
   }
-  const a = evWalk(node.a, slots, picks, out, depth + 1);
-  const b = evWalk(node.b, slots, picks, out, depth + 1);
+  const a = evWalk(node.a, slots, picks, out, depth + 1, group);
+  const b = evWalk(node.b, slots, picks, out, depth + 1, group);
   const id = `${node.from}-${node.to}`;
   let win = picks[id] || null;
   if (!a.who || !b.who || (win !== a.who && win !== b.who)) win = null;
   const row = (a.row + b.row) / 2;
   out.push({
-    id, depth, row, win,
+    id, depth, row, win, group,
     a: a.who, b: b.who,
     aId: a.id, bId: b.id,
     aRow: a.row, bRow: b.row,
@@ -474,20 +479,121 @@ function evWalk(node, slots, picks, out, depth) {
   return { who: win, row, id };
 }
 
-function evBoard(slots, groups, picks) {
-  const root = evTree(groups);
+/* ---------- 본선: ASL 방식 ----------
+ *
+ * 조별 1위 넷을 다시 추첨해 둘씩 붙이고, 그 뒤로 승자전·패자전·최종전·결승을
+ * 치른다. 스타리그에서 쓰던 듀얼 토너먼트에 결승을 붙인 꼴이다.
+ *
+ *   1경기 ┐           ┌─ 승자전 ─ 이기면 결승 / 지면 최종전
+ *   2경기 ┘           └─ 패자전 ─ 이기면 최종전 / 지면 탈락
+ *                        최종전 ─ 이기면 결승
+ *                        결승 (3판 2선승)
+ *
+ * **두 사람이 다 정해진 칸만 결과를 가진다**는 규칙은 여기서도 같다.
+ * 1경기를 되돌리면 승자전·패자전의 한쪽이 비고, 그러면 그 뒤도 줄줄이 빈다.
+ */
+const ASL_IDS = ['asl:m1', 'asl:m2', 'asl:wf', 'asl:lf', 'asl:ff'];
+const ASL_GF = 'asl:gf';
+/** 결승은 3판 2선승. 두 판을 먼저 이기면 끝이라 많아야 세 판이다. */
+const ASL_GF_GAMES = 3;
+const ASL_GF_WIN = 2;
+
+/** 3판 2선승을 읽는다. 앞 판이 적혀 있어야 뒤 판이 센다. */
+function evSeries(picks, a, b) {
+  const games = [];
+  let wa = 0, wb = 0;
+  for (let g = 1; g <= ASL_GF_GAMES; g++) {
+    if (wa >= ASL_GF_WIN || wb >= ASL_GF_WIN) break;   // 이미 끝났다
+    const w = picks[`${ASL_GF}:${g}`] || null;
+    if (!a || !b || (w !== a && w !== b)) break;
+    games.push(w);
+    if (w === a) wa++; else wb++;
+  }
+  const winner = wa >= ASL_GF_WIN ? a : wb >= ASL_GF_WIN ? b : null;
+  // 다음에 둘 수 있는 판. 끝났으면 없다.
+  const open = (a && b && !winner && games.length < ASL_GF_GAMES) ? games.length + 1 : 0;
+  return { games, wa, wb, winner, open };
+}
+
+/** 조 이름 — A·B·C·D */
+const evGroupName = (i) => String.fromCharCode(65 + i);
+
+function evAsl(groupWins, picks, draw) {
+  const ord = Array.isArray(draw) && draw.length === 4 ? draw : null;
+  const who = (i) => (ord ? (groupWins[ord[i]] || null) : null);
+  const from = (i) => (ord ? `${evGroupName(ord[i])}조 1위` : '조 1위');
+
+  const one = (id, a, b) => {
+    let win = picks[id] || null;
+    if (!a || !b || (win !== a && win !== b)) win = null;
+    return { id, a: a || null, b: b || null, win };
+  };
+  const other = (m) => (m.win ? (m.win === m.a ? m.b : m.a) : null);
+
+  const m1 = one('asl:m1', who(0), who(1));
+  const m2 = one('asl:m2', who(2), who(3));
+  const wf = one('asl:wf', m1.win, m2.win);
+  const lf = one('asl:lf', other(m1), other(m2));
+  const ff = one('asl:ff', other(wf), lf.win);
+
+  const gfA = wf.win, gfB = ff.win;
+  const series = evSeries(picks, gfA, gfB);
+
+  const stages = [
+    { ...m1, name: '1경기', note: `${from(0)} vs ${from(1)} · 이기면 승자전, 지면 패자전` },
+    { ...m2, name: '2경기', note: `${from(2)} vs ${from(3)} · 이기면 승자전, 지면 패자전` },
+    { ...wf, name: '승자전', note: '이기면 결승 진출, 지면 최종전' },
+    { ...lf, name: '패자전', note: '이기면 최종전, 지면 탈락' },
+    { ...ff, name: '최종전', note: '이기면 결승 진출, 지면 탈락' },
+    {
+      id: ASL_GF, name: '결승', bo: ASL_GF_GAMES,
+      note: '승자전 승자 vs 최종전 승자 · 두 판을 먼저 이기면 우승',
+      a: gfA, b: gfB, win: series.winner,
+      games: series.games, wa: series.wa, wb: series.wb,
+      open: series.open,
+    },
+  ];
+  return { drawn: !!ord, order: ord, stages, champion: series.winner };
+}
+
+function evBoard(slots, groups, picks, format, draw) {
+  const asl = format === 'asl' && groups.length === 4;
+
+  // ASL 이면 조끼리 묶지 않는다. 조의 뿌리가 곧 그 조의 1위다.
   const out = [];
-  const top = evWalk(root, slots, picks, out, 0);
-  const maxDepth = out.reduce((m, x) => Math.max(m, x.depth), 0);
+  let maxDepth = 0;
+  let top = null;
+
+  if (asl) {
+    let at = 0;
+    const wins = [];
+    groups.forEach((sz, gi) => {
+      const node = evTreeOne(at, at + sz);
+      at += sz;
+      const r = evWalk(node, slots, picks, out, 0, gi);
+      wins.push(r.who || null);
+    });
+    maxDepth = out.reduce((m, x) => Math.max(m, x.depth), 0);
+    out.sort((x, y) => (y.depth - x.depth) || (x.row - y.row));
+    const a = evAsl(wins, picks, draw);
+    return {
+      matches: out, maxDepth, asl: a, groupWins: wins,
+      champion: a.champion, rootId: null,
+    };
+  }
+
+  const root = evTree(groups);
+  top = evWalk(root, slots, picks, out, 0, null);
+  maxDepth = out.reduce((m, x) => Math.max(m, x.depth), 0);
   out.sort((x, y) => (y.depth - x.depth) || (x.row - y.row));
-  return { matches: out, maxDepth, champion: top.who || null, rootId: top.id };
+  return { matches: out, maxDepth, asl: null, champion: top.who || null, rootId: top.id };
 }
 
 /** 화면이 바로 그릴 수 있게 대진표까지 붙여서 내보낸다 */
 function evView(row) {
   const ev = rowToEvent(row);
   const groups = ev.groups || [ev.slots.length];
-  const board = evBoard(ev.slots, groups, ev.picks);
+  const board = evBoard(ev.slots, groups, ev.picks, ev.format, ev.draw);
   return {
     ...ev,
     groups,
@@ -495,8 +601,33 @@ function evView(row) {
     n: ev.slots.length,
     matches: board.matches,
     maxDepth: board.maxDepth,
+    asl: board.asl,
+    groupWins: board.groupWins || null,
     champion: board.champion,
   };
+}
+
+/**
+ * 고를 수 있는 자리를 모두 모은다 — 조별 대진표 칸과 본선(ASL) 칸.
+ * 적힌 결과를 받아들일지 서버가 한 곳에서 판단하기 위해서다.
+ */
+function evSlot(board, id) {
+  const m = board.matches.find(x => x.id === id);
+  if (m) return { a: m.a, b: m.b, open: true };
+  const a = board.asl;
+  if (!a) return null;
+  if (id.startsWith(`${ASL_GF}:`)) {
+    const gf = a.stages[a.stages.length - 1];
+    const g = Number(id.slice(ASL_GF.length + 1));
+    if (!(g >= 1 && g <= ASL_GF_GAMES)) return null;
+    // 앞 판부터 차례로. 이미 끝난 판은 더 둘 수 없다.
+    return { a: gf.a, b: gf.b, open: g <= Math.max(gf.open, gf.games.length) };
+  }
+  // 결승은 판별로만 적는다. 'asl:gf' 를 통째로 적는 자리는 없다 —
+  // 3판 2선승의 승자는 세어서 나오는 것이지 골라서 정하는 것이 아니다.
+  if (id === ASL_GF) return null;
+  const st = a.stages.find(x => x.id === id);
+  return st ? { a: st.a, b: st.b, open: true } : null;
 }
 
 /** 지금 열려 있는 대회 하나. 없으면 null. */
@@ -547,6 +678,15 @@ async function eventMake(req, res, b) {
   const bad = evGroupsOk(groups, entries.length);
   if (bad) return res.status(400).json({ error: bad });
 
+  // 본선 방식. ASL(승자전·패자전·최종전·결승)은 조가 넷일 때만 돌아간다 —
+  // 1경기·2경기가 조별 1위 넷으로 짜이기 때문이다.
+  const format = b.format === 'asl' ? 'asl' : 'tree';
+  if (format === 'asl' && groups.length !== 4) {
+    return res.status(400).json({
+      error: `ASL 방식은 4조일 때만 됩니다 (지금 ${groups.length}조) — 조별 1위 넷이 붙는 방식입니다.`,
+    });
+  }
+
   const title = String(b.title || '').trim().slice(0, 40);
   const ts = Date.now();
   // 선 차례를 섞는다. 고른 차례 그대로 세우면 누가 어느 조에 설지 미리 보인다.
@@ -556,12 +696,12 @@ async function eventMake(req, res, b) {
   await q(`UPDATE event_brackets SET closed_at = $1 WHERE closed_at IS NULL`, [ts]);
 
   const ins = await q(
-    `INSERT INTO event_brackets (ts, made_by, title, slots, groups, picks, log)
-     VALUES ($1,$2,$3,$4,$5,'{}'::jsonb,$6) RETURNING *`,
-    [ts, me, title || null, JSON.stringify(slots), JSON.stringify(groups),
-     JSON.stringify([{ ts, by: me, what: 'make', n: entries.length, groups }])]
+    `INSERT INTO event_brackets (ts, made_by, title, slots, groups, format, picks, log)
+     VALUES ($1,$2,$3,$4,$5,$6,'{}'::jsonb,$7) RETURNING *`,
+    [ts, me, title || null, JSON.stringify(slots), JSON.stringify(groups), format,
+     JSON.stringify([{ ts, by: me, what: 'make', n: entries.length, groups, format }])]
   );
-  await audit(me, 'event_make', { id: Number(ins[0].id), n: entries.length, groups });
+  await audit(me, 'event_make', { id: Number(ins[0].id), n: entries.length, groups, format });
   res.status(200).json({ ok: true, event: evView(ins[0]) });
 }
 
@@ -577,18 +717,32 @@ async function eventPick(req, res, b, undo) {
   if (!rows.length) return res.status(404).json({ error: '지금 열려 있는 대회가 아닙니다.' });
 
   const ev = rowToEvent(rows[0]);
-  const board = evBoard(ev.slots, ev.groups || [ev.slots.length], ev.picks);
+  const board = evBoard(ev.slots, ev.groups || [ev.slots.length], ev.picks, ev.format, ev.draw);
   const key = String(b.match || '');
-  const m = board.matches.find(x => x.id === key);
+  const m = evSlot(board, key);
   if (!m) return res.status(400).json({ error: '없는 자리입니다.' });
+  if (!undo && !m.open) {
+    return res.status(400).json({ error: '아직 둘 차례가 아닌 판입니다.' });
+  }
 
   const picks = { ...ev.picks };
   let entry;
+
+  // 결승(3판 2선승)의 한 판을 건드리면 **그 뒤 판은 지운다.**
+  // 다른 칸은 다시 셀 때 앞뒤가 안 맞는 결과를 알아서 버리지만, 결승의 뒷 판은
+  // 선수 둘이 그대로라 '맞는 값'으로 남아 있다. 1차전을 되돌린 뒤 다시 적으면
+  // 2·3차전이 되살아나 그 자리에서 승부가 나 있었다.
+  const laterGames = (k) => {
+    if (!k.startsWith(`${ASL_GF}:`)) return;
+    const from = Number(k.slice(ASL_GF.length + 1));
+    for (let g = from + 1; g <= ASL_GF_GAMES; g++) delete picks[`${ASL_GF}:${g}`];
+  };
 
   if (undo) {
     if (!picks[key]) return res.status(400).json({ error: '아직 결과가 없는 자리입니다.' });
     entry = { ts: Date.now(), by: me, what: 'undo', match: key, was: picks[key] };
     delete picks[key];
+    laterGames(key);
   } else {
     if (!m.a || !m.b) return res.status(400).json({ error: '아직 두 사람이 다 정해지지 않았습니다.' });
     const win = String(b.winner || '').trim();
@@ -598,12 +752,66 @@ async function eventPick(req, res, b, undo) {
     if (picks[key] === win) return res.status(400).json({ error: '이미 그렇게 적혀 있습니다.' });
     entry = { ts: Date.now(), by: me, what: 'pick', match: key, win, was: picks[key] || null };
     picks[key] = win;
+    laterGames(key);
   }
 
   const out = await q(
     `UPDATE event_brackets SET picks = $1, log = $2 WHERE id = $3 RETURNING *`,
     [JSON.stringify(picks), JSON.stringify(evLogged(ev.log, entry)), ev.id]
   );
+  res.status(200).json({ ok: true, event: evView(out[0]) });
+}
+
+/**
+ * 본선 조추첨 — 리더·웹마스터만.
+ *
+ * 조별 1위가 **넷 다 나온 뒤에** 뽑는다. 미리 뽑아두면 조별 경기가 끝나기도
+ * 전에 누가 누구와 붙을지 정해져, 조별 경기를 일부러 지는 길이 생긴다.
+ * 다시 뽑는 것은 막지 않지만 기록에 남는다 — 룰렛·사다리와 같은 방식이다.
+ */
+async function eventDraw(req, res, b) {
+  const me = await requireAdmin(req, res);
+  if (!me) return;
+  await ensureEvent();
+
+  const rows = await q(
+    `SELECT * FROM event_brackets WHERE id = $1 AND closed_at IS NULL`, [Number(b.id)]
+  );
+  if (!rows.length) return res.status(404).json({ error: '지금 열려 있는 대회가 아닙니다.' });
+
+  const ev = rowToEvent(rows[0]);
+  if (ev.format !== 'asl') {
+    return res.status(400).json({ error: 'ASL 방식 대회가 아닙니다.' });
+  }
+  const board = evBoard(ev.slots, ev.groups, ev.picks, ev.format, ev.draw);
+  const wins = board.groupWins || [];
+  const left = wins.map((w, i) => (w ? null : evGroupName(i) + '조')).filter(Boolean);
+  if (left.length) {
+    return res.status(400).json({ error: `아직 1위가 안 나온 조가 있습니다: ${left.join(' · ')}` });
+  }
+
+  // 이미 본선을 치르던 중이면 그 결과는 지우고 새로 뽑는다 —
+  // 짝이 바뀌면 그 뒤 판은 뜻이 없어진다.
+  const picks = {};
+  for (const [k, v] of Object.entries(ev.picks)) {
+    if (!k.startsWith('asl:')) picks[k] = v;
+  }
+  const order = evShuffle([0, 1, 2, 3]);
+  const again = !!ev.draw;
+  const entry = {
+    ts: Date.now(), by: me, what: 'draw', again,
+    pairs: [
+      `${evGroupName(order[0])}-${evGroupName(order[1])}`,
+      `${evGroupName(order[2])}-${evGroupName(order[3])}`,
+    ],
+  };
+
+  const out = await q(
+    `UPDATE event_brackets SET draw = $1, picks = $2, log = $3 WHERE id = $4 RETURNING *`,
+    [JSON.stringify(order), JSON.stringify(picks),
+     JSON.stringify(evLogged(ev.log, entry)), ev.id]
+  );
+  await audit(me, 'event_draw', { id: ev.id, order });
   res.status(200).json({ ok: true, event: evView(out[0]) });
 }
 
