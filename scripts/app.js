@@ -431,7 +431,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 166;
+const APP_VERSION = 167;
 let toldToRefresh = false;
 
 /**
@@ -7877,9 +7877,18 @@ function renderEvBoard() {
   const d = evData;
   board.hidden = !d;
   if (logPanel) logPanel.hidden = !d;
-  // 대회가 서 있으면 고르는 칸은 접는다. 다시 고르려면 단추를 누른다 —
-  // 그래야 대진표가 있는데 모르고 새로 짜는 일이 없다.
-  pick.hidden = !!d && !evForcePick;
+
+  // 고르는 칸을 보여줄 때는 두 가지다 — 짤 수 있는 사람이고, 아직 대회가
+  // 없거나(또는 '다시 고르기'를 연 상태) 일 때.
+  //   · 대회가 서 있으면 접는다. 그래야 대진표가 있는데 모르고 새로 짜지 않는다.
+  //   · 짤 수 없는 사람에게는 아예 안 보여준다. 누르지도 못하는 명단을
+  //     마흔 줄 펼쳐두면 '내가 뭔가 해야 하나' 싶게 만든다.
+  const canMake = evCanMake();
+  pick.hidden = !canMake || (!!d && !evForcePick);
+
+  const empty = document.getElementById('evEmpty');
+  if (empty) empty.hidden = !!d || canMake;
+
   if (!d) { renderEvPick(); return; }
 
   const name = document.getElementById('evBoardName');

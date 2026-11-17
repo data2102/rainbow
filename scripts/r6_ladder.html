@@ -4364,6 +4364,16 @@ if (/[?&]room=\d+/.test(location.search)) {
   <!-- EVENT — 1:1 단판 토너먼트 -->
   <div class="tab-panel" id="tab-event">
 
+    <!-- 대회가 아직 없고, 짤 수도 없는 사람에게 보이는 칸.
+         쓸 수 없는 참가자 명단을 마흔 줄 펼쳐 보여줄 까닭이 없다. -->
+    <div class="panel hud-corner" id="evEmpty" hidden>
+      <div class="panel-head"><h2>이벤트 · 1:1 대회</h2></div>
+      <div class="log-empty" style="margin:0;">
+        아직 열린 대회가 없습니다.<br>
+        <span class="foot-note">대진표는 리더·웹마스터가 짭니다 · 짜면 여기에 바로 보입니다.</span>
+      </div>
+    </div>
+
     <!-- 참가자 고르기. 대진표가 서 있는 동안에는 접어둔다. -->
     <div class="panel hud-corner" id="evPickPanel">
       <div class="panel-head">
