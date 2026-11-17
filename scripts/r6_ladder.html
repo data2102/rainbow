@@ -1290,6 +1290,11 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .evt-h, .evt-v{ position:absolute; display:block; background:var(--text-tertiary); }
 .evt-h{ height:2px; margin-top:-1px; }
 .evt-v{ width:2px; margin-left:-1px; }
+/* 이기고 올라간 길. 이름만 칠하면 '누가 이겼나'는 알아도 '어디로 갔나'는
+   눈으로 못 따라간다 — 타고 올라간 선까지 같이 칠한다. */
+.evt-h.on, .evt-v.on{ background:var(--accent); }
+.evt-h.on{ height:3px; margin-top:-1.5px; }
+.evt-v.on{ width:3px; margin-left:-1.5px; }
 .evt-m{
   position:absolute; width:154px; box-sizing:border-box;
   display:flex; flex-direction:column; gap:2px;
@@ -1297,10 +1302,15 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   border-radius:var(--radius-md); background:var(--surface);
   padding:var(--sp-2); z-index:1;
 }
-.evt-m.ready{ border-left-color:var(--accent); }
-.evt-m.done{ border-left-color:var(--success-strong); }
+/* 왼쪽 띠로 그 칸의 형편을 말한다.
+   빨강은 **이겼다**는 뜻 하나로만 쓴다 — 이름도 선도 띠도 같은 빨강이라야
+   한눈에 이어진다. 그래서 '할 차례'는 주황으로 비켰다. 둘 다 빨강이면
+   아직 안 한 경기와 끝난 경기가 같은 색이 된다. */
+.evt-m.ready{ border-left-color:var(--warning); }
+.evt-m.done{ border-left-color:var(--accent); }
 .evt-m.wait{ border-color:var(--border); border-left-color:var(--border); opacity:.75; }
-.evt-champ-box{ background:var(--top-rank-bg); border-color:var(--top-rank); }
+.evt-champ-box.done{ background:var(--accent-bg); border-color:var(--accent); }
+.evt-champ-box.wait{ background:var(--surface-sunken); }
 /* 이름 칸이 곧 단추다. 이긴 사람을 '고르는' 일이라 이름을 누르는 것이 가장 곧다. */
 .evt-s{
   display:flex; align-items:center; gap:var(--sp-2); width:100%;
@@ -1314,7 +1324,7 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .evt-s:hover:not(:disabled){ border-color:var(--accent); background:var(--accent-bg); }
 .evt-s:disabled{ cursor:default; }
 .evt-s:focus-visible{ outline:none; box-shadow:var(--shadow-focus); }
-.evt-s.won{ border-color:var(--success-strong); background:var(--success-bg); color:var(--success-strong); }
+.evt-s.won{ border-color:var(--accent); background:var(--accent-bg); color:var(--accent-strong); }
 .evt-s.won::after{ content:'승'; margin-left:auto; flex:none; }
 .evt-s.lost{ color:var(--text-tertiary); }
 .evt-s.wait{

@@ -431,7 +431,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 168;
+const APP_VERSION = 169;
 let toldToRefresh = false;
 
 /**
@@ -7939,12 +7939,16 @@ function evMatchHtml(m, label) {
     title="${esc(label)}">${undo}${side(m.a)}${side(m.b)}</div>`;
 }
 
-/** 두 칸을 잇는 꺾은선. 가로 → 세로 → 가로. */
-function evLink(x1, y1, x2, y2, midX) {
+/**
+ * 두 칸을 잇는 꺾은선. 가로 → 세로 → 가로.
+ * `on` 이면 이기고 올라간 길이라 빨갛게 긋는다.
+ */
+function evLink(x1, y1, x2, y2, midX, on) {
+  const c = on ? ' on' : '';
   const h = (left, top, w) =>
-    `<i class="evt-h" style="left:${left}px;top:${top}px;width:${Math.max(1, w)}px"></i>`;
+    `<i class="evt-h${c}" style="left:${left}px;top:${top}px;width:${Math.max(1, w)}px"></i>`;
   const v = (left, top, hh) =>
-    `<i class="evt-v" style="left:${left}px;top:${top}px;height:${Math.max(2, hh)}px"></i>`;
+    `<i class="evt-v${c}" style="left:${left}px;top:${top}px;height:${Math.max(2, hh)}px"></i>`;
   return h(x1, y1, midX - x1)
     + v(midX, Math.min(y1, y2), Math.abs(y2 - y1))
     + h(midX, y2, x2 - midX);
@@ -7962,7 +7966,10 @@ function evTreeHtml(d) {
   const H = d.n * EV_LEAF + EV_PAD * 2;
   const label = evLabels(d);
 
+  // 이긴 길은 나중에 그린다. 겹치는 자리에서 회색 선 밑에 깔리지 않도록.
   const lines = [];
+  const won = [];
+  const byId = new Map(d.matches.map(m => [m.id, m]));
   const boxes = [];
   for (const m of d.matches) {
     m.x = x(m.depth);
@@ -7974,7 +7981,11 @@ function evTreeHtml(d) {
       if (!childId) continue;
       const cx = x(m.depth + 1) + EV_BOX;
       const cy = Math.round(y(childRow));
-      lines.push(evLink(cx, cy, thisX, thisY, cx + Math.round((thisX - cx) / 2)));
+      // 그 아이 칸에 승자가 적혔으면 이 선을 타고 올라온 것이다
+      const child = byId.get(childId);
+      const hot = !!(child && child.win);
+      (hot ? won : lines).push(
+        evLink(cx, cy, thisX, thisY, cx + Math.round((thisX - cx) / 2), hot));
     }
     boxes.push(evMatchHtml(m, label[m.id] || ''));
   }
@@ -7990,7 +8001,8 @@ function evTreeHtml(d) {
   const root = d.matches.find(m => m.depth === 0);
   if (root) {
     const ry = Math.round(y(root.row));
-    lines.push(evLink(x(0) + EV_BOX, ry, champX, ry, x(0) + EV_BOX + 20));
+    (d.champion ? won : lines).push(
+      evLink(x(0) + EV_BOX, ry, champX, ry, x(0) + EV_BOX + 20, !!d.champion));
     boxes.push(`<div class="evt-m evt-champ-box ${d.champion ? 'done' : 'wait'}"
       style="left:${champX}px;top:${Math.round(ry - 26)}px">
       <span class="evt-s ${d.champion ? 'won' : 'wait'}">
@@ -8002,7 +8014,7 @@ function evTreeHtml(d) {
     <div class="evt-hint">← 옆으로 밀어서 뒤 회전을 봅니다 →</div>
     <div class="evt-tree" style="width:${W}px;height:${H + 26}px">
       ${heads.join('')}
-      <div class="evt-body" style="height:${H}px">${lines.join('')}${boxes.join('')}</div>
+      <div class="evt-body" style="height:${H}px">${lines.join('')}${won.join('')}${boxes.join('')}</div>
     </div>
   </div>`;
 }
