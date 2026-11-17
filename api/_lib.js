@@ -690,6 +690,48 @@ export function rowToLadder(r) {
   };
 }
 
+/* ---------- 이벤트 (1:1 대회) ----------
+ *
+ * 체크한 사람들로 외대진(단판 토너먼트)을 짠다. 래더 경기가 아니므로
+ * **점수는 건드리지 않는다** (1:1 은 래더로 치지 않는다 — MIN_SIDE=2).
+ *
+ * 대진표를 통째로 저장하지 않고 **첫 줄 자리(slots)와 고른 승자(picks)만**
+ * 남긴다. 나머지 줄은 그 둘로 그때그때 다시 센다. 되돌리기를 위해서다 —
+ * 2회전 결과를 지우면 3·4회전은 '누가 올라왔는지 모르는 자리'가 되어야 하는데,
+ * 대진표를 통째로 들고 있으면 그 뒷정리를 손으로 해야 하고 한 군데라도
+ * 빠뜨리면 있지도 않은 사람이 결승에 남는다. 다시 세면 그런 일이 없다.
+ */
+let eventReady = false;
+export async function ensureEvent() {
+  if (eventReady) return;
+  await q(`
+    CREATE TABLE IF NOT EXISTS event_brackets (
+      id        BIGSERIAL PRIMARY KEY,
+      ts        BIGINT NOT NULL,
+      made_by   TEXT NOT NULL,
+      title     TEXT,
+      slots     JSONB NOT NULL,   -- 1회전 자리. 아이디 또는 null(부전승 상대)
+      picks     JSONB NOT NULL,   -- {"회전,칸": 이긴 사람}
+      log       JSONB NOT NULL,   -- [{ts, by, what, ...}] 누가 무엇을 눌렀나
+      closed_at BIGINT            -- 새 대진표가 생기면 닫힌다
+    )`);
+  await q(`CREATE INDEX IF NOT EXISTS idx_event_ts ON event_brackets (ts DESC)`);
+  eventReady = true;
+}
+
+export function rowToEvent(r) {
+  return {
+    id: Number(r.id),
+    ts: Number(r.ts),
+    by: r.made_by,
+    title: r.title || '',
+    slots: r.slots || [],
+    picks: r.picks || {},
+    log: r.log || [],
+    closedAt: r.closed_at == null ? null : Number(r.closed_at),
+  };
+}
+
 export async function ensureHostDraws() {
   if (drawsReady) return;
   await q(`

@@ -1,4 +1,8 @@
-import { q, body, methodGuard, requireUser, requireStaff, requireAdmin, audit } from './_lib.js';
+import { randomInt } from 'node:crypto';
+import {
+  q, body, methodGuard, requireUser, requireStaff, requireAdmin, audit,
+  ensureEvent, rowToEvent,
+} from './_lib.js';
 
 /**
  * 회차마다 참가 팀도 경기 방식도 다르다. 화면(app.js)의 TOURNAMENT_EDITIONS 와
@@ -185,12 +189,21 @@ function rowToMatch(r) {
 export default async function handler(req, res) {
   if (!methodGuard(req, res, ['GET', 'POST'])) return;
   try {
+    // 이벤트(1:1 대회)는 tournament_matches 를 쓰지 않는다. 회차 대회 표를
+    // 만드느라 기다릴 까닭이 없어 먼저 가른다.
+    if (req.method === 'GET' && req.query && req.query.event) return await eventCurrent(res);
+
     await ensureTable();
     if (req.method === 'GET') return await listMatches(res);
 
-    const { action } = body(req);
+    const b = body(req);
+    const { action } = b;
     if (action === 'record') return await record(req, res);
     if (action === 'delete') return await remove(req, res);
+    if (action === 'eventMake') return await eventMake(req, res, b);
+    if (action === 'eventPick') return await eventPick(req, res, b, false);
+    if (action === 'eventUndo') return await eventPick(req, res, b, true);
+    if (action === 'eventClose') return await eventDelete(req, res, b);
     return res.status(400).json({ error: '알 수 없는 요청입니다.' });
   } catch (e) {
     res.status(500).json({ error: '처리 실패: ' + e.message });
@@ -331,4 +344,221 @@ async function remove(req, res) {
 
   await audit(me, 'delete_tournament_match', rowToMatch(rows[0]));
   res.status(200).json({ ok: true });
+}
+
+/* ===================================================================
+ * 이벤트 (1:1 대회)
+ *
+ * 여기 얹혀 있는 까닭: Vercel Hobby 는 서버리스 함수가 12개까지인데 지금
+ * 11개라 새 파일을 만들 수 없다. 같은 '대회' 갈래라 여기에 둔다.
+ *
+ * 대진표는 **첫 줄 자리(slots)와 고른 승자(picks)만** 저장하고 나머지 줄은
+ * 그때그때 다시 센다(_lib.js 의 ensureEvent 주석 참고). 되돌리기가 뒷정리를
+ * 따로 하지 않아도 되는 것은 그래서다.
+ * =================================================================== */
+
+/** 한 대회에 설 수 있는 사람 수. 2명 미만은 대회가 아니고, 64명이면 6회전이다. */
+const EVENT_MIN = 2;
+const EVENT_MAX = 64;
+/** 기록 줄은 이만큼만 남긴다. 한 대회에서 이보다 더 누를 일은 없다. */
+const EVENT_LOG_MAX = 300;
+
+/** 자리를 섞는다. api/match.js 의 shuffle 과 같은 방식(크립토 난수). */
+function evShuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1);
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/**
+ * 첫 줄 자리를 짠다.
+ *
+ * 사람 수가 2의 제곱이 아니면 빈자리가 생기고, 그 빈자리와 짝지어진 사람은
+ * 싸우지 않고 올라간다(부전승). 빈자리가 한 짝에 둘 들어가면 아무도 없는
+ * 경기가 생기므로, **짝마다 한 자리는 반드시 사람으로 채운다.**
+ * 어느 짝이 부전승을 받을지는 제비로 고른다 — 부전승은 이득이라 손으로
+ * 정하게 두면 그 자체가 특혜가 된다.
+ */
+function evSeed(entries) {
+  const mix = evShuffle(entries);
+  const n = mix.length;
+  let size = 1;
+  while (size < n) size *= 2;
+  const half = size / 2;
+
+  const byes = size - n;
+  const byePairs = new Set(evShuffle([...Array(half).keys()]).slice(0, byes));
+
+  const slots = new Array(size).fill(null);
+  let at = 0;
+  for (let p = 0; p < half; p++) {
+    slots[p * 2] = mix[at++];
+    if (!byePairs.has(p)) slots[p * 2 + 1] = mix[at++];
+  }
+  return slots;
+}
+
+/**
+ * 자리와 고른 승자로 대진표 전체를 센다.
+ *
+ * 고른 승자가 그 칸의 두 사람 중 하나가 아니면 **버린다.** 앞 회전을
+ * 되돌리면 뒷 회전의 자리가 비는데, 그때 남아 있던 옛 승자를 그대로 두면
+ * 올라오지도 않은 사람이 다음 회전에 서 있게 된다.
+ *
+ * **부전승은 1회전에만 있다.** 처음에는 '옆자리가 비면 부전승'으로 두었는데,
+ * 2회전부터는 옆자리가 빈 것이 "아직 안 올라왔다"는 뜻이라 — 6명으로 짜 보니
+ * 1회전 네 번째 경기가 끝나지도 않았는데 그 상대가 결승에 올라가 있었다.
+ * 빈자리의 뜻이 회전마다 다르므로 회전을 보고 가른다.
+ */
+function evRounds(slots, picks) {
+  const rounds = [];
+  let cur = slots;
+  for (let r = 0; cur.length > 1; r++) {
+    const ms = [];
+    for (let i = 0; i < cur.length; i += 2) {
+      const a = cur[i] || null;
+      const b = cur[i + 1] || null;
+      const bye = r === 0 && !!a && !b;
+      let win = picks[`${r},${i / 2}`] || null;
+      // **두 사람이 다 정해진 칸만 결과를 가진다.**
+      // 처음에는 '고른 사람이 둘 중 하나면 된다'로 두었는데, 앞 회전을
+      // 되돌려 상대 자리가 비어도 이긴 쪽 이름은 그대로라 결과가 살아남았다 —
+      // 8강 한 칸을 지웠는데 준결승·결승은 물론 우승자까지 그대로 서 있었다.
+      if (!a || !b || (win !== a && win !== b)) win = null;
+      if (bye) win = a;                    // 고를 것이 없다
+      ms.push({ a, b, win, bye });
+    }
+    rounds.push(ms);
+    cur = ms.map(m => m.win);
+  }
+  return rounds;
+}
+
+/** 화면이 바로 그릴 수 있게 대진표까지 붙여서 내보낸다 */
+function evView(row) {
+  const ev = rowToEvent(row);
+  const rounds = evRounds(ev.slots, ev.picks);
+  const last = rounds[rounds.length - 1];
+  return {
+    ...ev,
+    entrants: ev.slots.filter(Boolean),
+    rounds,
+    champion: last && last.length === 1 ? last[0].win : null,
+  };
+}
+
+/** 지금 열려 있는 대회 하나. 없으면 null. */
+async function eventCurrent(res) {
+  await ensureEvent();
+  const rows = await q(
+    `SELECT * FROM event_brackets WHERE closed_at IS NULL ORDER BY ts DESC LIMIT 1`
+  );
+  res.setHeader('Cache-Control', 'no-store');
+  res.status(200).json({ event: rows.length ? evView(rows[0]) : null });
+}
+
+/** 기록 한 줄 붙이기 — 누가 무엇을 눌렀는지가 남아야 되돌린 것도 보인다 */
+function evLogged(log, entry) {
+  const next = [entry, ...(log || [])];
+  return next.slice(0, EVENT_LOG_MAX);
+}
+
+/** 대진표 만들기 — 리더·웹마스터만 */
+async function eventMake(req, res, b) {
+  const me = await requireAdmin(req, res);
+  if (!me) return;
+  await ensureEvent();
+
+  const entries = [...new Set((b.entries || []).map(h => String(h).trim()).filter(Boolean))];
+  if (entries.length < EVENT_MIN) {
+    return res.status(400).json({ error: `${EVENT_MIN}명 이상 골라주세요 · 지금 ${entries.length}명` });
+  }
+  if (entries.length > EVENT_MAX) {
+    return res.status(400).json({ error: `${EVENT_MAX}명까지 넣을 수 있습니다 · 지금 ${entries.length}명` });
+  }
+
+  const found = new Set(
+    (await q(`SELECT handle FROM players WHERE handle = ANY($1)`, [entries])).map(r => r.handle)
+  );
+  const missing = entries.filter(h => !found.has(h));
+  if (missing.length) {
+    return res.status(400).json({ error: '명단에 없는 선수입니다: ' + missing.join(', ') });
+  }
+
+  const title = String(b.title || '').trim().slice(0, 40);
+  const ts = Date.now();
+  const slots = evSeed(entries);
+
+  // 열려 있던 대회는 닫는다. 지우지는 않는다 — 지난 대진표도 기록이다.
+  await q(`UPDATE event_brackets SET closed_at = $1 WHERE closed_at IS NULL`, [ts]);
+
+  const ins = await q(
+    `INSERT INTO event_brackets (ts, made_by, title, slots, picks, log)
+     VALUES ($1,$2,$3,$4,'{}'::jsonb,$5) RETURNING *`,
+    [ts, me, title || null, JSON.stringify(slots),
+     JSON.stringify([{ ts, by: me, what: 'make', n: entries.length }])]
+  );
+  await audit(me, 'event_make', { id: Number(ins[0].id), n: entries.length });
+  res.status(200).json({ ok: true, event: evView(ins[0]) });
+}
+
+/** 그 칸에서 이긴 사람을 고른다 / 되돌린다 — 관리자 이상 */
+async function eventPick(req, res, b, undo) {
+  const me = await requireStaff(req, res);
+  if (!me) return;
+  await ensureEvent();
+
+  const rows = await q(
+    `SELECT * FROM event_brackets WHERE id = $1 AND closed_at IS NULL`, [Number(b.id)]
+  );
+  if (!rows.length) return res.status(404).json({ error: '지금 열려 있는 대회가 아닙니다.' });
+
+  const ev = rowToEvent(rows[0]);
+  const rounds = evRounds(ev.slots, ev.picks);
+  const r = Number(b.round), i = Number(b.idx);
+  const m = rounds[r] && rounds[r][i];
+  if (!m) return res.status(400).json({ error: '없는 자리입니다.' });
+  if (m.bye) return res.status(400).json({ error: '부전승 자리는 고르고 말고 할 것이 없습니다.' });
+
+  const key = `${r},${i}`;
+  const picks = { ...ev.picks };
+  let entry;
+
+  if (undo) {
+    if (!picks[key]) return res.status(400).json({ error: '아직 결과가 없는 자리입니다.' });
+    entry = { ts: Date.now(), by: me, what: 'undo', round: r, idx: i, was: picks[key] };
+    delete picks[key];
+  } else {
+    if (!m.a || !m.b) return res.status(400).json({ error: '아직 두 사람이 다 정해지지 않았습니다.' });
+    const win = String(b.winner || '').trim();
+    if (win !== m.a && win !== m.b) {
+      return res.status(400).json({ error: '그 자리에 있는 두 사람 중에서 고를 수 있습니다.' });
+    }
+    if (picks[key] === win) return res.status(400).json({ error: '이미 그렇게 적혀 있습니다.' });
+    entry = { ts: Date.now(), by: me, what: 'pick', round: r, idx: i, win, was: picks[key] || null };
+    picks[key] = win;
+  }
+
+  const out = await q(
+    `UPDATE event_brackets SET picks = $1, log = $2 WHERE id = $3 RETURNING *`,
+    [JSON.stringify(picks), JSON.stringify(evLogged(ev.log, entry)), ev.id]
+  );
+  res.status(200).json({ ok: true, event: evView(out[0]) });
+}
+
+/** 대회 자체를 치운다 — 리더·웹마스터만 */
+async function eventDelete(req, res, b) {
+  const me = await requireAdmin(req, res);
+  if (!me) return;
+  await ensureEvent();
+  const rows = await q(
+    `UPDATE event_brackets SET closed_at = $1 WHERE id = $2 AND closed_at IS NULL RETURNING id`,
+    [Date.now(), Number(b.id)]
+  );
+  if (!rows.length) return res.status(404).json({ error: '이미 닫힌 대회입니다.' });
+  await audit(me, 'event_close', { id: Number(rows[0].id) });
+  res.status(200).json({ ok: true, event: null });
 }
