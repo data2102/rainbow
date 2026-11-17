@@ -14,6 +14,14 @@
 #  listens every few seconds and points the forward there - so a new
 #  home address or Radmin being on does not matter.
 #
+#  Better than a forward: the game seems to take the address of the
+#  network adapter Windows ranks first. So we rank the tunnel first
+#  (interface metric 1). Then the game listens on the tunnel address
+#  itself, players reach it with no forward in between (the forward
+#  re-sends every packet and can make players lag), and -Watch
+#  removes the forward. If the game ignores the rank, the forward
+#  stays as before - nothing is lost.
+#
 #  The private key is made here and never leaves this PC. Only the
 #  public half goes to the site.
 #
@@ -43,6 +51,17 @@ function Log([string]$m) {
 function Say([string]$m) { Write-Host "  $m"; Log $m }
 
 # ---------------------------------------------------------------- watch
+# Rank the tunnel adapter first so the game listens on the tunnel address.
+# Only the 10.66.0.0/24 route goes through the tunnel, so nothing else changes.
+function Set-TunnelFirst {
+  $i = Get-NetIPInterface -InterfaceAlias $Tunnel -AddressFamily IPv4 -ErrorAction SilentlyContinue
+  if ($i -and $i.InterfaceMetric -ne 1) {
+    Set-NetIPInterface -InterfaceAlias $Tunnel -AddressFamily IPv4 -InterfaceMetric 1 -ErrorAction SilentlyContinue
+    Log 'tunnel adapter ranked first (metric 1)'
+  }
+  return [bool]$i
+}
+
 function Get-TunnelIp {
   if (-not (Test-Path $Conf)) { return $null }
   $line = Get-Content $Conf | Where-Object { $_ -match '^\s*Address\s*=\s*([0-9.]+)' } | Select-Object -First 1
@@ -69,12 +88,25 @@ function Set-Proxy([string]$listenIp, [string]$target) {
 
 function Watch-Loop {
   Log 'watch: start'
+  $direct = $false
   while ($true) {
     try {
       $tip = Get-TunnelIp
       if ($tip) {
         $svc = Get-Service -Name "WireGuardTunnel`$$Tunnel" -ErrorAction SilentlyContinue
         if ($svc -and $svc.Status -ne 'Running') { Start-Service $svc; Log 'watch: tunnel restarted' }
+        Set-TunnelFirst | Out-Null
+
+        # the game on the tunnel address itself = no forward needed (best case)
+        $onTunnel = Get-NetTCPConnection -State Listen -LocalAddress $tip -LocalPort $Port -ErrorAction SilentlyContinue |
+          Where-Object {
+            $p = Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue
+            $p -and $p.ProcessName -like 'RainbowSix*'
+          } | Select-Object -First 1
+        if ([bool]$onTunnel -ne $direct) {
+          $direct = [bool]$onTunnel
+          if ($direct) { Log ("watch: game listens on {0}:{1} directly - no forward" -f $tip, $Port) }
+        }
 
         # where is the GAME listening? (not our own forward on the tunnel address)
         $game = Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue |
@@ -196,6 +228,8 @@ function Do-Register([string]$token) {
   & $wgui /installtunnelservice $Conf | Out-Null
   Start-Sleep -Seconds 3
   Say 'Tunnel: installed - it starts with Windows from now on'
+  for ($i = 0; $i -lt 10; $i++) { if (Set-TunnelFirst) { break }; Start-Sleep -Seconds 1 }
+  Say 'Tunnel: ranked first - the game will listen on the tunnel address'
 
   Open-Firewall
 
