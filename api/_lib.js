@@ -710,12 +710,18 @@ export async function ensureEvent() {
       ts        BIGINT NOT NULL,
       made_by   TEXT NOT NULL,
       title     TEXT,
-      slots     JSONB NOT NULL,   -- 1회전 자리. 아이디 또는 null(부전승 상대)
+      slots     JSONB NOT NULL,   -- 선수가 선 차례 (섞은 뒤)
       picks     JSONB NOT NULL,   -- {"회전,칸": 이긴 사람}
       log       JSONB NOT NULL,   -- [{ts, by, what, ...}] 누가 무엇을 눌렀나
       closed_at BIGINT            -- 새 대진표가 생기면 닫힌다
     )`);
   await q(`CREATE INDEX IF NOT EXISTS idx_event_ts ON event_brackets (ts DESC)`);
+  // 조 나누기(v168). 조 크기도 조 개수도 2의 제곱이면 부전승이 없다.
+  await q(`ALTER TABLE event_brackets ADD COLUMN IF NOT EXISTS groups JSONB`);
+  // 조가 없던 때의 대진표는 그릴 수 없다(자리 채우는 방식이 달라졌다).
+  // 지우지는 않고 닫아만 둔다 — 기록은 기록이다.
+  await q(`UPDATE event_brackets SET closed_at = $1 WHERE groups IS NULL AND closed_at IS NULL`,
+          [Date.now()]);
   eventReady = true;
 }
 
@@ -726,6 +732,7 @@ export function rowToEvent(r) {
     by: r.made_by,
     title: r.title || '',
     slots: r.slots || [],
+    groups: r.groups || null,
     picks: r.picks || {},
     log: r.log || [],
     closedAt: r.closed_at == null ? null : Number(r.closed_at),

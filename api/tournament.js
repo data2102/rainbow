@@ -374,79 +374,128 @@ function evShuffle(arr) {
 }
 
 /**
- * 첫 줄 자리를 짠다.
+ * 인원을 '조'로 나눈다 — 부전승이 생기지 않도록.
  *
- * 사람 수가 2의 제곱이 아니면 빈자리가 생기고, 그 빈자리와 짝지어진 사람은
- * 싸우지 않고 올라간다(부전승). 빈자리가 한 짝에 둘 들어가면 아무도 없는
- * 경기가 생기므로, **짝마다 한 자리는 반드시 사람으로 채운다.**
- * 어느 짝이 부전승을 받을지는 제비로 고른다 — 부전승은 이득이라 손으로
- * 정하게 두면 그 자체가 특혜가 된다.
+ * 2의 제곱이 아닌 인원을 한 덩어리로 짜면 빈자리가 생기고, 그 옆에 선 사람은
+ * 싸우지 않고 올라간다. 26명이면 32자리에 빈자리 6개다.
+ *
+ * 대신 **조로 쪼갠다.** 조 크기가 2의 제곱이면 조 안에 빈자리가 없고,
+ * 조 개수도 2의 제곱이면 조별 승자끼리 붙는 뒷 단계에도 빈자리가 없다.
+ *   26 = 8+8+8+2 → 조마다 한 명이 남아 넷, 그 넷이 준결승·결승. 부전승 0.
+ *
+ * 나누는 법은 인원의 2진수 그대로다(26 = 16+8+2). 그 자리 수가 조 개수가
+ * 되는데 2의 제곱이 아니면, 가장 큰 조를 반으로 쪼개 개수를 맞춘다
+ * (16+8+2 → 8+8+8+2). 홀수 인원만은 1인 조가 하나 남아 — 그 한 명은
+ * 부전승이 된다. 홀수는 어떻게 짜도 한 명이 남는다.
  */
-function evSeed(entries) {
-  const mix = evShuffle(entries);
-  const n = mix.length;
-  let size = 1;
-  while (size < n) size *= 2;
-  const half = size / 2;
-
-  const byes = size - n;
-  const byePairs = new Set(evShuffle([...Array(half).keys()]).slice(0, byes));
-
-  const slots = new Array(size).fill(null);
-  let at = 0;
-  for (let p = 0; p < half; p++) {
-    slots[p * 2] = mix[at++];
-    if (!byePairs.has(p)) slots[p * 2 + 1] = mix[at++];
+function evSplit(n) {
+  if (n < 2) return null;
+  const parts = [];
+  for (let b = 1; b <= n; b <<= 1) if (n & b) parts.push(b);
+  let k = 1;
+  while (k < parts.length) k *= 2;
+  while (parts.length < k) {
+    parts.sort((a, b) => b - a);
+    const big = parts.shift();
+    if (big < 2) return null;
+    parts.push(big / 2, big / 2);
   }
-  return slots;
+  return parts.sort((a, b) => b - a);
+}
+
+const isPow2 = (v) => Number.isInteger(v) && v >= 1 && (v & (v - 1)) === 0;
+
+/** 조 나누기가 쓸 수 있는 값인지 */
+function evGroupsOk(groups, n) {
+  if (!Array.isArray(groups) || !groups.length) return '조를 나눠주세요.';
+  if (!isPow2(groups.length)) {
+    return `조 개수는 1·2·4·8… 이어야 합니다 (지금 ${groups.length}조) — 그래야 조별 승자끼리 빈자리 없이 붙습니다.`;
+  }
+  for (const g of groups) {
+    if (!isPow2(g)) return `조 인원은 1·2·4·8·16… 이어야 합니다 (${g}명짜리 조가 있습니다).`;
+  }
+  const sum = groups.reduce((a, b) => a + b, 0);
+  if (sum !== n) return `조 인원을 더하면 ${sum}명인데 고른 사람은 ${n}명입니다.`;
+  return null;
 }
 
 /**
- * 자리와 고른 승자로 대진표 전체를 센다.
+ * 조 나누기로 대진 나무를 세운다.
  *
- * 고른 승자가 그 칸의 두 사람 중 하나가 아니면 **버린다.** 앞 회전을
- * 되돌리면 뒷 회전의 자리가 비는데, 그때 남아 있던 옛 승자를 그대로 두면
- * 올라오지도 않은 사람이 다음 회전에 서 있게 된다.
- *
- * **부전승은 1회전에만 있다.** 처음에는 '옆자리가 비면 부전승'으로 두었는데,
- * 2회전부터는 옆자리가 빈 것이 "아직 안 올라왔다"는 뜻이라 — 6명으로 짜 보니
- * 1회전 네 번째 경기가 끝나지도 않았는데 그 상대가 결승에 올라가 있었다.
- * 빈자리의 뜻이 회전마다 다르므로 회전을 보고 가른다.
+ * 잎(선수가 설 자리)에 0..n-1 번을 매기고, 조마다 그 범위를 반씩 갈라 내려가
+ * 꽉 찬 나무를 만든다. 그 다음 조의 뿌리들을 둘씩 묶어 결승까지 올린다.
+ * 칸 이름은 그 칸이 덮는 잎 범위(`시작-끝`)다 — 사람 수와 조가 같으면 늘
+ * 같은 이름이 나오므로, 적어둔 승자(picks)가 다시 셀 때마다 제자리를 찾는다.
  */
-function evRounds(slots, picks) {
-  const rounds = [];
-  let cur = slots;
-  for (let r = 0; cur.length > 1; r++) {
-    const ms = [];
-    for (let i = 0; i < cur.length; i += 2) {
-      const a = cur[i] || null;
-      const b = cur[i + 1] || null;
-      const bye = r === 0 && !!a && !b;
-      let win = picks[`${r},${i / 2}`] || null;
-      // **두 사람이 다 정해진 칸만 결과를 가진다.**
-      // 처음에는 '고른 사람이 둘 중 하나면 된다'로 두었는데, 앞 회전을
-      // 되돌려 상대 자리가 비어도 이긴 쪽 이름은 그대로라 결과가 살아남았다 —
-      // 8강 한 칸을 지웠는데 준결승·결승은 물론 우승자까지 그대로 서 있었다.
-      if (!a || !b || (win !== a && win !== b)) win = null;
-      if (bye) win = a;                    // 고를 것이 없다
-      ms.push({ a, b, win, bye });
+function evTree(groups) {
+  const full = (from, to) => (to - from === 1)
+    ? { leaf: from, from, to }
+    : { from, to, a: full(from, (from + to) / 2), b: full((from + to) / 2, to) };
+
+  let at = 0;
+  let nodes = groups.map((sz) => { const nd = full(at, at + sz); at += sz; return nd; });
+  while (nodes.length > 1) {
+    const next = [];
+    for (let i = 0; i < nodes.length; i += 2) {
+      const a = nodes[i], b = nodes[i + 1];
+      next.push({ from: a.from, to: b.to, a, b });
     }
-    rounds.push(ms);
-    cur = ms.map(m => m.win);
+    nodes = next;
   }
-  return rounds;
+  return nodes[0];
+}
+
+/**
+ * 나무를 훑어 칸 목록을 만든다. 화면은 이 목록만 보고 그린다.
+ *
+ * **두 사람이 다 정해진 칸만 결과를 가진다.** 앞 칸을 되돌리면 뒷 칸의 한쪽이
+ * 비는데, 그때 남아 있던 옛 승자를 그대로 두면 올라오지도 않은 사람이 다음
+ * 칸에 서 있게 된다. 다시 셀 때마다 버리므로 되돌리기가 뒷정리를 하지 않아도 된다.
+ *
+ * row 는 그 칸이 덮는 잎의 한가운데다. 화면은 이 값으로 세로 자리를 잡는다 —
+ * 종이 대진표에서 두 선이 만나는 높이와 같은 뜻이다.
+ */
+function evWalk(node, slots, picks, out, depth) {
+  if (node.leaf !== undefined) {
+    return { who: slots[node.leaf] || null, row: node.leaf, id: null };
+  }
+  const a = evWalk(node.a, slots, picks, out, depth + 1);
+  const b = evWalk(node.b, slots, picks, out, depth + 1);
+  const id = `${node.from}-${node.to}`;
+  let win = picks[id] || null;
+  if (!a.who || !b.who || (win !== a.who && win !== b.who)) win = null;
+  const row = (a.row + b.row) / 2;
+  out.push({
+    id, depth, row, win,
+    a: a.who, b: b.who,
+    aId: a.id, bId: b.id,
+    aRow: a.row, bRow: b.row,
+  });
+  return { who: win, row, id };
+}
+
+function evBoard(slots, groups, picks) {
+  const root = evTree(groups);
+  const out = [];
+  const top = evWalk(root, slots, picks, out, 0);
+  const maxDepth = out.reduce((m, x) => Math.max(m, x.depth), 0);
+  out.sort((x, y) => (y.depth - x.depth) || (x.row - y.row));
+  return { matches: out, maxDepth, champion: top.who || null, rootId: top.id };
 }
 
 /** 화면이 바로 그릴 수 있게 대진표까지 붙여서 내보낸다 */
 function evView(row) {
   const ev = rowToEvent(row);
-  const rounds = evRounds(ev.slots, ev.picks);
-  const last = rounds[rounds.length - 1];
+  const groups = ev.groups || [ev.slots.length];
+  const board = evBoard(ev.slots, groups, ev.picks);
   return {
     ...ev,
+    groups,
     entrants: ev.slots.filter(Boolean),
-    rounds,
-    champion: last && last.length === 1 ? last[0].win : null,
+    n: ev.slots.length,
+    matches: board.matches,
+    maxDepth: board.maxDepth,
+    champion: board.champion,
   };
 }
 
@@ -488,20 +537,31 @@ async function eventMake(req, res, b) {
     return res.status(400).json({ error: '명단에 없는 선수입니다: ' + missing.join(', ') });
   }
 
+  // 조 나누기. 적어 보내지 않으면 부전승이 가장 적게 나오는 쪽으로 서버가 고른다.
+  const groups = Array.isArray(b.groups) && b.groups.length
+    ? b.groups.map(v => Number(v))
+    : evSplit(entries.length);
+  if (!groups) {
+    return res.status(400).json({ error: '이 인원은 조를 나눌 수 없습니다.' });
+  }
+  const bad = evGroupsOk(groups, entries.length);
+  if (bad) return res.status(400).json({ error: bad });
+
   const title = String(b.title || '').trim().slice(0, 40);
   const ts = Date.now();
-  const slots = evSeed(entries);
+  // 선 차례를 섞는다. 고른 차례 그대로 세우면 누가 어느 조에 설지 미리 보인다.
+  const slots = evShuffle(entries);
 
   // 열려 있던 대회는 닫는다. 지우지는 않는다 — 지난 대진표도 기록이다.
   await q(`UPDATE event_brackets SET closed_at = $1 WHERE closed_at IS NULL`, [ts]);
 
   const ins = await q(
-    `INSERT INTO event_brackets (ts, made_by, title, slots, picks, log)
-     VALUES ($1,$2,$3,$4,'{}'::jsonb,$5) RETURNING *`,
-    [ts, me, title || null, JSON.stringify(slots),
-     JSON.stringify([{ ts, by: me, what: 'make', n: entries.length }])]
+    `INSERT INTO event_brackets (ts, made_by, title, slots, groups, picks, log)
+     VALUES ($1,$2,$3,$4,$5,'{}'::jsonb,$6) RETURNING *`,
+    [ts, me, title || null, JSON.stringify(slots), JSON.stringify(groups),
+     JSON.stringify([{ ts, by: me, what: 'make', n: entries.length, groups }])]
   );
-  await audit(me, 'event_make', { id: Number(ins[0].id), n: entries.length });
+  await audit(me, 'event_make', { id: Number(ins[0].id), n: entries.length, groups });
   res.status(200).json({ ok: true, event: evView(ins[0]) });
 }
 
@@ -517,19 +577,17 @@ async function eventPick(req, res, b, undo) {
   if (!rows.length) return res.status(404).json({ error: '지금 열려 있는 대회가 아닙니다.' });
 
   const ev = rowToEvent(rows[0]);
-  const rounds = evRounds(ev.slots, ev.picks);
-  const r = Number(b.round), i = Number(b.idx);
-  const m = rounds[r] && rounds[r][i];
+  const board = evBoard(ev.slots, ev.groups || [ev.slots.length], ev.picks);
+  const key = String(b.match || '');
+  const m = board.matches.find(x => x.id === key);
   if (!m) return res.status(400).json({ error: '없는 자리입니다.' });
-  if (m.bye) return res.status(400).json({ error: '부전승 자리는 고르고 말고 할 것이 없습니다.' });
 
-  const key = `${r},${i}`;
   const picks = { ...ev.picks };
   let entry;
 
   if (undo) {
     if (!picks[key]) return res.status(400).json({ error: '아직 결과가 없는 자리입니다.' });
-    entry = { ts: Date.now(), by: me, what: 'undo', round: r, idx: i, was: picks[key] };
+    entry = { ts: Date.now(), by: me, what: 'undo', match: key, was: picks[key] };
     delete picks[key];
   } else {
     if (!m.a || !m.b) return res.status(400).json({ error: '아직 두 사람이 다 정해지지 않았습니다.' });
@@ -538,7 +596,7 @@ async function eventPick(req, res, b, undo) {
       return res.status(400).json({ error: '그 자리에 있는 두 사람 중에서 고를 수 있습니다.' });
     }
     if (picks[key] === win) return res.status(400).json({ error: '이미 그렇게 적혀 있습니다.' });
-    entry = { ts: Date.now(), by: me, what: 'pick', round: r, idx: i, win, was: picks[key] || null };
+    entry = { ts: Date.now(), by: me, what: 'pick', match: key, win, was: picks[key] || null };
     picks[key] = win;
   }
 

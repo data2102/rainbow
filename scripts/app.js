@@ -431,7 +431,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 167;
+const APP_VERSION = 168;
 let toldToRefresh = false;
 
 /**
@@ -7748,6 +7748,7 @@ let evPicked = new Set();
 let evData = null;        // 서버가 보낸 지금 대회 (없으면 null)
 let evBusy = false;
 let evForcePick = false;  // 대진표가 있어도 '참가자 다시 고르기'를 연 상태
+let evGroupsTouched = false;  // 조 나누기를 손으로 고쳤는가
 
 function evSavePicked() { writeKey(EV_PICK_KEY, JSON.stringify([...evPicked]), true); }
 
@@ -7785,18 +7786,60 @@ function renderEvList() {
 }
 
 /**
- * 고를 때 쓰는 안내. 사람 수가 2의 제곱이 아니면 부전승이 몇 자리 생기는지
- * 미리 알려준다 — 대진표가 나온 뒤에 "얘는 왜 안 싸우고 올라가?" 를 듣는 것보다 낫다.
+ * 인원을 조로 나눈다. api/tournament.js 의 evSplit 과 같아야 한다.
+ *
+ * 조 크기도 조 개수도 2의 제곱이면 부전승이 생기지 않는다 —
+ * 26 = 8+8+8+2 이면 조마다 한 명씩 넷이 남고, 그 넷이 준결승·결승을 한다.
  */
-function evSeedNote(n) {
+function evSplit(n) {
   if (n < 2) return null;
-  let size = 1;
-  while (size < n) size *= 2;
-  const byes = size - n;
-  const rounds = Math.log2(size);
-  return byes
-    ? `${n}명 · ${rounds}회전 · 첫 회전에 부전승 ${byes}자리 (제비로 정합니다)`
-    : `${n}명 · ${rounds}회전 · 부전승 없이 딱 떨어집니다`;
+  const parts = [];
+  for (let b = 1; b <= n; b <<= 1) if (n & b) parts.push(b);
+  let k = 1;
+  while (k < parts.length) k *= 2;
+  while (parts.length < k) {
+    parts.sort((a, b) => b - a);
+    const big = parts.shift();
+    if (big < 2) return null;
+    parts.push(big / 2, big / 2);
+  }
+  return parts.sort((a, b) => b - a);
+}
+
+/** 적어 넣은 조 나누기를 읽는다. '8/8/8/2' · '8 8 8 2' 둘 다 받는다. */
+function evReadGroups() {
+  const el = document.getElementById('evGroups');
+  const raw = (el ? el.value : '').trim();
+  if (!raw) return null;
+  const parts = raw.split(/[^0-9]+/).filter(Boolean).map(Number);
+  return parts.length ? parts : null;
+}
+
+const evPow2 = (v) => Number.isInteger(v) && v >= 1 && (v & (v - 1)) === 0;
+
+/**
+ * 지금 적힌 조 나누기가 쓸 수 있는 값인지. api/tournament.js 의 evGroupsOk 와 같다.
+ * 되돌려주는 것은 [문제, 안내] — 문제가 null 이면 만들 수 있다.
+ */
+function evGroupCheck(groups, n) {
+  if (!groups) return ['조를 나눠주세요.', ''];
+  if (!evPow2(groups.length)) {
+    return [`조 개수는 1·2·4·8… 이어야 합니다 (지금 ${groups.length}조).`, ''];
+  }
+  for (const g of groups) {
+    if (!evPow2(g)) return [`조 인원은 1·2·4·8·16… 이어야 합니다 (${g}명짜리 조).`, ''];
+  }
+  const sum = groups.reduce((a, b) => a + b, 0);
+  if (sum !== n) return [`조를 더하면 ${sum}명인데 고른 사람은 ${n}명입니다.`, ''];
+
+  const byes = groups.filter(g => g === 1).length;
+  const deep = groups.map(g => Math.log2(g) + Math.log2(groups.length));
+  const lo = Math.min(...deep), hi = Math.max(...deep);
+  const games = n - 1 - byes;
+  return [null,
+    `${groups.join(' + ')} = ${n}명 · ${games}경기 · 우승까지 `
+    + (lo === hi ? `${lo}판` : `${lo}~${hi}판`)
+    + (byes ? ` · <b>부전승 ${byes}명</b> (홀수라 한 명은 남습니다)` : ' · <b>부전승 없음</b>')];
 }
 
 function renderEvPick() {
@@ -7808,64 +7851,160 @@ function renderEvPick() {
   const none = document.getElementById('evNone');
   if (none) { none.hidden = !n; none.textContent = `✕ 전체 해제 ${n}명`; }
 
+  // 고른 사람 수가 바뀌면 조 나누기를 자동으로 다시 적는다 — 손으로 고쳐둔
+  // 값이 있으면 건드리지 않는다(evGroupsTouched).
+  const box = document.getElementById('evGroups');
+  if (box && !evGroupsTouched) {
+    const auto = evSplit(n);
+    box.value = auto ? auto.join(' / ') : '';
+  }
+  const groups = evReadGroups();
+  const [bad, info] = n >= 2 ? evGroupCheck(groups, n) : ['2명 이상 골라주세요.', ''];
+
+  const gNote = document.getElementById('evGroupNote');
+  if (gNote) gNote.innerHTML = n >= 2 ? (bad ? esc(bad) : info) : '';
+
   const note = document.getElementById('evNote');
   if (note) {
-    note.textContent = !evCanMake()
-      ? '대진표는 리더·웹마스터가 짭니다.'
-      : (evSeedNote(n) || '2명 이상 골라주세요.');
+    note.textContent = !evCanMake() ? '대진표는 리더·웹마스터가 짭니다.'
+      : n < 2 ? '2명 이상 골라주세요.'
+      : bad ? bad
+      : `${n}명으로 짭니다.`;
   }
 
   const make = document.getElementById('evMake');
   if (make) {
-    make.disabled = evBusy || !evCanMake() || n < 2;
+    make.disabled = evBusy || !evCanMake() || n < 2 || !!bad;
     make.textContent = evBusy ? '짜는 중…' : '토너먼트 대진표 만들기';
   }
   renderEvList();
 }
 
-/** 회전 이름. 끝에서부터 세는 쪽이 사람 말에 가깝다 — 결승·준결승·8강… */
-function evRoundName(r, total) {
-  const left = total - r;
-  if (left === 1) return '결승';
-  if (left === 2) return '준결승';
-  return `${Math.pow(2, left)}강`;
+/* ---- 대진 나무 그리기 ----
+ *
+ * 종이 대진표처럼 **자리를 직접 찍는다.** 처음에는 회전마다 칸을 세로로
+ * 늘어놓고 CSS 로 가운데를 맞췄는데, 조 나누기가 들어오면서 회전마다 칸
+ * 수가 2:1 로 떨어지지 않게 되어(26명이면 12 → 6 → 4) 줄이 어긋났다.
+ * 서버가 칸마다 'row'(그 칸이 덮는 잎의 한가운데)를 보내주므로 그 값으로
+ * 세로 자리를 잡고, 잇는 선은 직접 그린다 — 경계가 또렷해야 헷갈리지 않는다.
+ */
+const EV_LEAF = 42;    // 선수 한 자리의 높이
+const EV_COL  = 190;   // 회전 한 칸의 폭
+const EV_BOX  = 154;   // 경기 상자의 폭
+const EV_BOXH = 58;    // 경기 상자의 높이
+const EV_PAD  = 16;
+
+/** 회전 이름. 왼쪽부터 1회전, 끝에서 둘은 준결승·결승. */
+function evRoundName(depth, maxDepth) {
+  if (depth === 0) return '결승';
+  if (depth === 1) return '준결승';
+  return `${maxDepth - depth + 1}회전`;
 }
 
-/**
- * 대진 나무의 칸 하나.
- *
- * 이름 칸이 곧 단추다 — 이긴 사람을 고르는 일이라 이름을 누르는 것이 가장
- * 곧고, 칸마다 '승리' 단추를 따로 달면 좁은 칸에 단추가 둘씩 늘어난다.
- */
-function evMatchHtml(m, r, i) {
-  const can = evCanPick() && !!m.a && !!m.b && !m.bye;
+/** 칸 이름표(기록에 적을 것). '3회전 2경기' 처럼. */
+function evLabels(d) {
+  const by = new Map();
+  for (const m of d.matches) {
+    if (!by.has(m.depth)) by.set(m.depth, []);
+    by.get(m.depth).push(m);
+  }
+  const out = {};
+  for (const [depth, list] of by) {
+    list.sort((x, y) => x.row - y.row);
+    list.forEach((m, i) => {
+      out[m.id] = `${evRoundName(depth, d.maxDepth)} ${i + 1}경기`;
+    });
+  }
+  return out;
+}
 
+/** 경기 상자 하나 */
+function evMatchHtml(m, label) {
+  const can = evCanPick() && !!m.a && !!m.b;
   const side = (who) => {
     if (!who) return `<span class="evt-s wait"><span class="evt-nm">올라올 자리</span></span>`;
     const won = m.win === who;
     const lost = !!m.win && !won;
     return `<button type="button" class="evt-s${won ? ' won' : ''}${lost ? ' lost' : ''}"
       ${can ? '' : 'disabled'} title="${esc(who)}"
-      data-evwin="${esc(who)}" data-evr="${r}" data-evi="${i}"
+      data-evwin="${esc(who)}" data-evm="${esc(m.id)}"
       ><span class="evt-nm">${esc(who)}</span></button>`;
   };
-
-  if (m.bye) {
-    return `<div class="evt-m done">
-      <span class="evt-s won"><span class="evt-nm">${esc(m.a)}</span></span>
-      <span class="evt-s evt-bye"><span class="evt-nm">부전승</span>
-        <span class="evt-bye-k">상대 없음</span></span>
-    </div>`;
-  }
-
   const state = m.win ? 'done' : (m.a && m.b ? 'ready' : 'wait');
-  // 되돌리기는 결과가 적힌 칸에만
   const undo = (m.win && evCanPick())
     ? `<button type="button" class="evt-undo" title="되돌리기"
-        data-evundo="1" data-evr="${r}" data-evi="${i}">↺</button>`
+        data-evundo="1" data-evm="${esc(m.id)}">↺</button>`
     : '';
+  return `<div class="evt-m ${state}" style="left:${m.x}px;top:${m.top}px"
+    title="${esc(label)}">${undo}${side(m.a)}${side(m.b)}</div>`;
+}
 
-  return `<div class="evt-m ${state}">${undo}${side(m.a)}${side(m.b)}</div>`;
+/** 두 칸을 잇는 꺾은선. 가로 → 세로 → 가로. */
+function evLink(x1, y1, x2, y2, midX) {
+  const h = (left, top, w) =>
+    `<i class="evt-h" style="left:${left}px;top:${top}px;width:${Math.max(1, w)}px"></i>`;
+  const v = (left, top, hh) =>
+    `<i class="evt-v" style="left:${left}px;top:${top}px;height:${Math.max(2, hh)}px"></i>`;
+  return h(x1, y1, midX - x1)
+    + v(midX, Math.min(y1, y2), Math.abs(y2 - y1))
+    + h(midX, y2, x2 - midX);
+}
+
+/** 대진 나무 전체 */
+function evTreeHtml(d) {
+  // 왼쪽 끝 상자가 칸 모서리에 붙지 않도록 조금 띄운다
+  const EV_X0 = 6;
+  const x = (depth) => EV_X0 + (d.maxDepth - depth) * EV_COL;
+  const y = (row) => EV_PAD + row * EV_LEAF + EV_LEAF / 2;
+  // 우승 칸은 결승에서 한 칸 더 오른쪽이다. 그 상자까지 들어갈 만큼만 넓힌다 —
+  // 어림잡아 잡았더니 우승 상자가 4px 잘려 나갔다.
+  const W = EV_X0 + (d.maxDepth + 1) * EV_COL + EV_BOX + 8;
+  const H = d.n * EV_LEAF + EV_PAD * 2;
+  const label = evLabels(d);
+
+  const lines = [];
+  const boxes = [];
+  for (const m of d.matches) {
+    m.x = x(m.depth);
+    m.top = Math.round(y(m.row) - EV_BOXH / 2);
+    const thisX = m.x;
+    const thisY = Math.round(y(m.row));
+    // 아이가 '경기'인 쪽만 선을 긋는다. 선수(잎)는 상자 안에 이름으로 들어 있다.
+    for (const [childId, childRow] of [[m.aId, m.aRow], [m.bId, m.bRow]]) {
+      if (!childId) continue;
+      const cx = x(m.depth + 1) + EV_BOX;
+      const cy = Math.round(y(childRow));
+      lines.push(evLink(cx, cy, thisX, thisY, cx + Math.round((thisX - cx) / 2)));
+    }
+    boxes.push(evMatchHtml(m, label[m.id] || ''));
+  }
+
+  // 회전 머리글
+  const heads = [];
+  for (let depth = d.maxDepth; depth >= 0; depth--) {
+    if (!d.matches.some(m => m.depth === depth)) continue;
+    heads.push(`<div class="evt-head" style="left:${x(depth)}px">${esc(evRoundName(depth, d.maxDepth))}</div>`);
+  }
+  // 우승 칸
+  const champX = x(0) + EV_COL;
+  const root = d.matches.find(m => m.depth === 0);
+  if (root) {
+    const ry = Math.round(y(root.row));
+    lines.push(evLink(x(0) + EV_BOX, ry, champX, ry, x(0) + EV_BOX + 20));
+    boxes.push(`<div class="evt-m evt-champ-box ${d.champion ? 'done' : 'wait'}"
+      style="left:${champX}px;top:${Math.round(ry - 26)}px">
+      <span class="evt-s ${d.champion ? 'won' : 'wait'}">
+        <span class="evt-nm">${esc(d.champion || '아직')}</span></span></div>`);
+    heads.push(`<div class="evt-head" style="left:${champX}px">우승</div>`);
+  }
+
+  return `<div class="evt-wrap">
+    <div class="evt-hint">← 옆으로 밀어서 뒤 회전을 봅니다 →</div>
+    <div class="evt-tree" style="width:${W}px;height:${H + 26}px">
+      ${heads.join('')}
+      <div class="evt-body" style="height:${H}px">${lines.join('')}${boxes.join('')}</div>
+    </div>
+  </div>`;
 }
 
 function renderEvBoard() {
@@ -7917,27 +8056,7 @@ function renderEvBoard() {
 
   const box = document.getElementById('evRounds');
   if (box) {
-    const cols = d.rounds.map((ms, r) => `<div class="evt-col">
-      <div class="evt-col-h">${esc(evRoundName(r, d.rounds.length))}</div>
-      <div class="evt-cells">${ms.map((m, i) =>
-        `<div class="evt-cell">${evMatchHtml(m, r, i)}</div>`).join('')}</div>
-    </div>`);
-
-    // 마지막 칸 — 우승자 자리. 결승 오른쪽에 한 칸 더 두어야 나무가 끝난다.
-    cols.push(`<div class="evt-col evt-champ-col">
-      <div class="evt-col-h">우승</div>
-      <div class="evt-cells"><div class="evt-cell">
-        <div class="evt-m ${d.champion ? 'done' : 'wait'}">
-          <span class="evt-s ${d.champion ? 'won' : 'wait'}">
-            <span class="evt-nm">${esc(d.champion || '아직')}</span></span>
-        </div>
-      </div></div>
-    </div>`);
-
-    box.innerHTML = `<div class="evt-wrap">
-      <div class="evt-hint">← 옆으로 밀어서 뒤 회전을 봅니다 →</div>
-      <div class="evt-tree">${cols.join('')}</div></div>`;
-
+    box.innerHTML = evTreeHtml(d);
     // 나무가 화면보다 넓을 때만 '밀어서 보라'고 적는다. 늘 적어두면
     // 밀 것이 없는 화면에서도 밀어야 하는 줄 안다.
     const wrap = box.querySelector('.evt-wrap');
@@ -7959,11 +8078,12 @@ function renderEvLog() {
   const box = document.getElementById('evLog');
   if (!box) return;
   const rows = (evData && evData.log) || [];
-  const total = evData ? evData.rounds.length : 0;
-  const where = (e) => `${evRoundName(e.round, total)} ${e.idx + 1}경기`;
+  const label = evData ? evLabels(evData) : {};
+  const where = (e) => label[e.match] || e.match || '';
   box.innerHTML = rows.map(e => {
     if (e.what === 'make') {
       return `<div class="ev-log-row"><b>대진표를 짰습니다</b> · ${e.n}명
+        ${e.groups ? `· ${esc(e.groups.join('/'))} 조` : ''}
         <span class="ev-log-w">${esc(formatDateTime(e.ts))} · ${esc(e.by)}</span></div>`;
     }
     if (e.what === 'undo') {
@@ -8001,7 +8121,9 @@ async function evMake() {
   evBusy = true; renderEvPick();
   try {
     const title = (document.getElementById('evTitle') || {}).value || '';
-    evApply(await apiPost('/api/tournament', { action: 'eventMake', entries, title }));
+    const groups = evReadGroups();
+    evApply(await apiPost('/api/tournament', { action: 'eventMake', entries, title, groups }));
+    evGroupsTouched = false;
     const board = document.getElementById('evBoard');
     if (board) board.scrollIntoView({ behavior: 'smooth', block: 'start' });
     showToast(`${entries.length}명으로 대진표를 짰습니다.`);
@@ -8012,23 +8134,23 @@ async function evMake() {
   }
 }
 
-async function evPick(round, idx, winner) {
+async function evPick(match, winner) {
   if (evBusy || !evData) return;
   evBusy = true;
   try {
     evApply(await apiPost('/api/tournament',
-      { action: 'eventPick', id: evData.id, round, idx, winner }));
+      { action: 'eventPick', id: evData.id, match, winner }));
   } catch (e) { showToast(e.message); }
   evBusy = false;
 }
 
-async function evUndo(round, idx) {
+async function evUndo(match) {
   if (evBusy || !evData) return;
   if (!confirm('이 경기 결과를 지웁니다.\n뒤 회전에 올라가 있던 자리도 같이 비워집니다.\n계속할까요?')) return;
   evBusy = true;
   try {
     evApply(await apiPost('/api/tournament',
-      { action: 'eventUndo', id: evData.id, round, idx }));
+      { action: 'eventUndo', id: evData.id, match }));
     showToast('되돌렸습니다.');
   } catch (e) { showToast(e.message); }
   evBusy = false;
@@ -8072,15 +8194,21 @@ function initEventEvents() {
     evPicked.clear(); evSavePicked(); renderEvPick();
   });
 
+  const groups = document.getElementById('evGroups');
+  if (groups) groups.addEventListener('input', () => { evGroupsTouched = true; renderEvPick(); });
+
+  const auto = document.getElementById('evAuto');
+  if (auto) auto.addEventListener('click', () => { evGroupsTouched = false; renderEvPick(); });
+
   const make = document.getElementById('evMake');
   if (make) make.addEventListener('click', evMake);
 
   const rounds = document.getElementById('evRounds');
   if (rounds) rounds.addEventListener('click', (e) => {
     const un = e.target.closest('[data-evundo]');
-    if (un) return evUndo(Number(un.dataset.evr), Number(un.dataset.evi));
+    if (un) return evUndo(un.dataset.evm);
     const win = e.target.closest('[data-evwin]');
-    if (win && !win.disabled) evPick(Number(win.dataset.evr), Number(win.dataset.evi), win.dataset.evwin);
+    if (win && !win.disabled) evPick(win.dataset.evm, win.dataset.evwin);
   });
 
   const close = document.getElementById('evClose');
