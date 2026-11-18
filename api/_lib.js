@@ -726,6 +726,38 @@ export async function ensureEvent() {
   // 지우지는 않고 닫아만 둔다 — 기록은 기록이다.
   await q(`UPDATE event_brackets SET closed_at = $1 WHERE groups IS NULL AND closed_at IS NULL`,
           [Date.now()]);
+
+  /* **마지막 조만 작은** 4조짜리는 패자부활전으로 올린다 (v178).
+   * 8/8/8/2 는 올리고 8/8/8/8 · 8/8/4/4 는 그대로 둔다 — 패자부활전은
+   * '작은 조 하나' 를 메우는 방식이라 그 모양일 때만 뜻이 있다.
+   *
+   * 8/8/8/2 를 외대진으로 치르면 2명짜리 조는 한 판만 이기고 준결승에 선다 —
+   * 1·2회전을 건너뛰니 사실상 부전승 두 번이다. 그러라고 조를 나눈 것이 아니다.
+   * 패자부활전이 생기기 전(v174)에 짠 대진표는 `format='tree'` 로 남아 있어,
+   * 리더가 화면에서 [패자부활전으로 바꾸기] 를 눌러야만 올라갔다.
+   *
+   * 조별 칸 이름은 그 칸이 덮는 잎 범위(`시작-끝`)라 방식이 달라도 같다.
+   * 그래서 **이미 적어둔 조별 결과는 그대로 남는다.**
+   *
+   * 한 번만 올린다 — 손으로 방식을 바꾼 적이 있는 대진표(`what:'format'` 기록이
+   * 있는 것)는 건드리지 않는다. 안 그러면 리더가 외대진으로 되돌려 놓아도
+   * 다음 요청에서 또 패자부활전으로 뒤집혀 싸우게 된다.
+   */
+  await q(
+    `UPDATE event_brackets
+        SET format = 'rep',
+            log = $1::jsonb || log
+      WHERE closed_at IS NULL
+        AND COALESCE(format, 'tree') = 'tree'
+        AND groups IS NOT NULL
+        AND jsonb_array_length(groups) = 4
+        AND (groups->>3)::int < (groups->>2)::int
+        AND NOT (log @> '[{"what":"format"}]'::jsonb)`,
+    [JSON.stringify([{
+      ts: Date.now(), by: '(자동)', what: 'format',
+      from: 'tree', to: 'rep', auto: true,
+    }])]
+  );
   eventReady = true;
 }
 

@@ -5581,7 +5581,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 177;
+const APP_VERSION = 178;
 let toldToRefresh = false;
 
 /**
@@ -12917,6 +12917,9 @@ function evShown() {
 }
 
 /** 대진표를 짜고 지우는 일은 리더·웹마스터만 */
+/** 본선 방식을 손으로 골랐나 — 골랐으면 조 나누기가 바뀌어도 안 건드린다 */
+let evFormatTouched = false;
+
 function evCanMake() { return isAdmin(); }
 /** 결과를 적고 되돌리는 일은 관리자 이상 */
 function evCanPick() { return canStaff(); }
@@ -13017,7 +13020,16 @@ function renderEvPick() {
   // 외대진이 아닌 방식은 조가 넷일 때만 — ASL 은 1경기·2경기가 조별 1위 넷으로
   // 짜이고, 패자부활전은 A-C · B-D 로 짝을 못박아 두었다.
   const fBox = document.getElementById('evFormatBox');
-  if (fBox) fBox.hidden = !(groups && groups.length === 4 && !bad);
+  const four = !!(groups && groups.length === 4 && !bad);
+  if (fBox) fBox.hidden = !four;
+  // 조 크기가 다르면(8/8/8/2) 외대진은 작은 조가 부전승 두 번을 얻는다.
+  // 그래서 패자부활전을 미리 골라둔다 — 손으로 바꾼 뒤에는 건드리지 않는다.
+  if (four && !evFormatTouched) {
+    const uneven = groups[0] !== groups[groups.length - 1];
+    const want = uneven ? 'rep' : 'tree';
+    const el = document.querySelector(`input[name="evFormat"][value="${want}"]`);
+    if (el) el.checked = true;
+  }
 
   const note = document.getElementById('evNote');
   if (note) {
@@ -13555,6 +13567,12 @@ function renderEvLog() {
         · 1경기 ${esc((e.pairs || [])[0] || '')} · 2경기 ${esc((e.pairs || [])[1] || '')}
         <span class="ev-log-w">${esc(formatDateTime(e.ts))} · ${esc(e.by)}</span></div>`;
     }
+    if (e.what === 'format' && e.auto) {
+      return `<div class="ev-log-row"><b>패자부활전으로 올렸습니다</b>
+        · 조 크기가 달라(8/8/8/2) 외대진은 작은 조가 부전승 두 번을 얻습니다
+        <span>(조별 경기 결과는 그대로)</span>
+        <span class="ev-log-w">${esc(formatDateTime(e.ts))} · 자동</span></div>`;
+    }
     if (e.what === 'format') {
       return `<div class="ev-log-row"><b>본선 방식을 바꿨습니다</b>
         · ${esc(EV_FORMAT_NAME[e.from] || e.from || '')} → ${esc(EV_FORMAT_NAME[e.to] || e.to || '')}
@@ -13754,7 +13772,7 @@ function initEventEvents() {
   });
 
   const fbox = document.getElementById('evFormatBox');
-  if (fbox) fbox.addEventListener('change', renderEvPick);
+  if (fbox) fbox.addEventListener('change', () => { evFormatTouched = true; renderEvPick(); });
 
   for (const id of ['evDraw', 'evDrawAgain']) {
     const el = document.getElementById(id);
