@@ -431,7 +431,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 172;
+const APP_VERSION = 173;
 let toldToRefresh = false;
 
 /**
@@ -7977,11 +7977,13 @@ function evLink(x1, y1, x2, y2, midX, on) {
 function evTreeHtml(d) {
   // 왼쪽 끝 상자가 칸 모서리에 붙지 않도록 조금 띄운다
   const EV_X0 = 6;
-  const x = (depth) => EV_X0 + (d.maxDepth - depth) * EV_COL;
+  // 조 이름을 적을 왼쪽 띠. 조가 하나뿐이면 띠도 필요 없다.
+  const GUT = (d.groups || []).length > 1 ? 48 : 0;
+  const x = (depth) => EV_X0 + GUT + (d.maxDepth - depth) * EV_COL;
   const y = (row) => EV_PAD + row * EV_LEAF + EV_LEAF / 2;
   // 우승 칸은 결승에서 한 칸 더 오른쪽이다. 그 상자까지 들어갈 만큼만 넓힌다 —
   // 어림잡아 잡았더니 우승 상자가 4px 잘려 나갔다.
-  const W = EV_X0 + (d.maxDepth + (d.asl ? 0 : 1)) * EV_COL + EV_BOX + 8;
+  const W = EV_X0 + GUT + (d.maxDepth + (d.asl ? 0 : 1)) * EV_COL + EV_BOX + 8;
   const H = d.n * EV_LEAF + EV_PAD * 2;
   const label = evLabels(d);
 
@@ -8017,27 +8019,26 @@ function evTreeHtml(d) {
     boxes.push(evMatchHtml(m, label[m.id] || ''));
   }
 
-  // 조 이름표 — A·B·C·D.
+  // 조 이름 — 왼쪽에 **띠로 묶어** 적는다.
   //
-  // 조는 ASL 이 아니어도 있다(8/8/8/2 로 나누면 네 덩어리다). 한때 ASL 일 때만
-  // 적었더니, 일반 토너먼트에서는 여덟 명씩 묶인 것이 보이지 않아 어디까지가
-  // 한 조인지 알 수 없었다.
-  //
-  // 자리는 **그 조의 가장 왼쪽 칸 위**다. 왼쪽 끝에 못 박아두면 2명짜리 조처럼
-  // 3회전에서 시작하는 조의 이름표가 엉뚱한 자리에 선다.
-  const heads = [];
-  if ((d.groups || []).length > 1) {
-    const seen = new Set();
-    for (const m of d.matches) {
-      if (m.group == null || seen.has(m.group)) continue;
-      seen.add(m.group);
-      const mine = d.matches.filter(x => x.group === m.group);
-      const deep = mine.reduce((a, x) => (x.depth > a.depth ? x : a));
-      const top = mine.reduce((a, x) => (x.row < a.row ? x : a));
-      heads.push(`<div class="evt-gtag" style="left:${x(deep.depth)}px;top:${
-        Math.round(y(top.row) - EV_BOXH / 2 - 19)}px">${esc(evGroupName(m.group))}조</div>`);
-    }
+  // 처음에는 그 조의 첫 칸 위에 한 줄로 적었는데 두 가지가 어긋났다.
+  //   · 이름표를 회전 머리글과 같은 칸에 넣는 바람에 좌표가 26px 밀렸고,
+  //     상자(z-index:1)가 이름표를 덮어 **B·C조가 아예 안 보였다**(A조만 보였다).
+  //   · 사람 이름 바로 위에 붙어 있어 '이 사람의 조' 처럼 읽혔다.
+  // 띠로 두면 어디부터 어디까지가 한 조인지가 길이로 보인다. 자리도 상자와
+  // 같은 칸(.evt-body) 안이라 어긋날 일이 없다.
+  const bands = [];
+  if (GUT) {
+    let at = 0;
+    (d.groups || []).forEach((sz, i) => {
+      const top = Math.round(EV_PAD + at * EV_LEAF);
+      const h = Math.round(sz * EV_LEAF);
+      at += sz;
+      bands.push(`<div class="evt-gband" style="top:${top}px;height:${h}px"
+        ><span>${esc(evGroupName(i))}조</span></div>`);
+    });
   }
+  const heads = [];
 
   // 회전 머리글
   for (let depth = d.maxDepth; depth >= 0; depth--) {
@@ -8063,7 +8064,7 @@ function evTreeHtml(d) {
     <div class="evt-hint">← 옆으로 밀어서 뒤 회전을 봅니다 →</div>
     <div class="evt-tree" style="width:${W}px;height:${H + 26}px">
       ${heads.join('')}
-      <div class="evt-body" style="height:${H}px">${lines.join('')}${won.join('')}${boxes.join('')}</div>
+      <div class="evt-body" style="height:${H}px">${bands.join('')}${lines.join('')}${won.join('')}${boxes.join('')}</div>
     </div>
   </div>`;
 }

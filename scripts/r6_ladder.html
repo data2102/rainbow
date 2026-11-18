@@ -1420,10 +1420,18 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 }
 .ev-bo-next{ display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-top:var(--sp-3); }
 /* 조 이름표 — 대진 나무 왼쪽 */
-.evt-gtag{
-  position:absolute; width:154px; text-align:center;
+/* 조 묶음 띠 — 왼쪽에서 '여기부터 여기까지가 한 조' 를 길이로 보여준다. */
+.evt-gband{
+  position:absolute; left:0; width:40px;
+  display:flex; align-items:center; justify-content:center;
+  border-left:2px solid var(--border-strong);
+  border-top:2px solid var(--border-strong);
+  border-bottom:2px solid var(--border-strong);
+  border-radius:var(--radius-sm) 0 0 var(--radius-sm);
+}
+.evt-gband span{
   font-size:var(--fs-footnote); font-weight:var(--fw-bold);
-  letter-spacing:.08em; color:var(--accent);
+  letter-spacing:.06em; color:var(--accent); white-space:nowrap;
 }
 
 /* 조 나누기 칸 */
