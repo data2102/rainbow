@@ -565,6 +565,25 @@ function evAsl(groupWins, picks, draw) {
   return { drawn: !!ord, order: ord, stages, champion: series.winner };
 }
 
+/**
+ * 칸마다 '몇 조인지' 를 달아준다.
+ *
+ * 칸 이름이 그 칸이 덮는 잎 범위(`시작-끝`)이므로, 그 범위가 어느 조 안에
+ * 들어가는지만 보면 된다. 조를 넘어 묶이는 칸(준결승·결승)은 조가 없다.
+ * 본선 방식과 상관없이 붙인다 — 화면에 A·B·C·D 를 적어주려면 필요하다.
+ */
+function evTagGroups(matches, groups) {
+  const range = [];
+  let at = 0;
+  for (const sz of groups) { range.push([at, at + sz]); at += sz; }
+  for (const m of matches) {
+    const [f, t] = m.id.split('-').map(Number);
+    const i = range.findIndex(([a, b]) => a <= f && t <= b);
+    m.group = i < 0 ? null : i;
+  }
+  return matches;
+}
+
 function evBoard(slots, groups, picks, format, draw) {
   const asl = format === 'asl' && groups.length === 4;
 
@@ -586,7 +605,7 @@ function evBoard(slots, groups, picks, format, draw) {
     out.sort((x, y) => (y.depth - x.depth) || (x.row - y.row));
     const a = evAsl(wins, picks, draw);
     return {
-      matches: out, maxDepth, asl: a, groupWins: wins,
+      matches: evTagGroups(out, groups), maxDepth, asl: a, groupWins: wins,
       champion: a.champion, rootId: null,
     };
   }
@@ -595,7 +614,10 @@ function evBoard(slots, groups, picks, format, draw) {
   top = evWalk(root, slots, picks, out, 0, null);
   maxDepth = out.reduce((m, x) => Math.max(m, x.depth), 0);
   out.sort((x, y) => (y.depth - x.depth) || (x.row - y.row));
-  return { matches: out, maxDepth, asl: null, champion: top.who || null, rootId: top.id };
+  return {
+    matches: evTagGroups(out, groups), maxDepth, asl: null,
+    champion: top.who || null, rootId: top.id,
+  };
 }
 
 /** 화면이 바로 그릴 수 있게 대진표까지 붙여서 내보낸다 */
