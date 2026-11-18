@@ -431,7 +431,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 175;
+const APP_VERSION = 176;
 let toldToRefresh = false;
 
 /**
@@ -7983,8 +7983,8 @@ function evMatchHtml(m, label) {
   };
   const state = m.win ? 'done' : (m.a && m.b ? 'ready' : 'wait');
   const undo = (m.win && evCanPick())
-    ? `<button type="button" class="evt-undo" title="되돌리기"
-        data-evundo="1" data-evm="${esc(m.id)}">↺</button>`
+    ? `<button type="button" class="evt-undo" title="되돌리기 — ${esc(label)}"
+        aria-label="되돌리기" data-evundo="1" data-evm="${esc(m.id)}">↺</button>`
     : '';
   return `<div class="evt-m ${state}" style="left:${m.x}px;top:${m.top}px"
     title="${esc(label)}">${undo}${side(m.a, m.aSeat)}${side(m.b, m.bSeat)}</div>`;
@@ -8349,18 +8349,21 @@ function renderEvBoard() {
 
   const how = document.getElementById('evHow');
   if (how) {
-    how.innerHTML = (d.finals && d.finals.canDraw)
+    // 되돌리는 법은 **화면에 있는 그대로** 적는다. '되돌리기' 라고만 적어두면
+    // 그 글자가 적힌 단추를 찾게 되는데, 화면에 있는 것은 ↺ 하나뿐이다.
+    const UNDO = '잘못 눌렀으면 상자 <b>오른쪽 위 <span class="evt-undo-k">↺</span></b> 를 '
+      + '누릅니다 — 그 뒤 회전은 저절로 비워집니다.';
+    how.innerHTML = !evCanPick()
+      ? '결과를 적는 것은 관리자 이상입니다 · 대진표는 누구나 볼 수 있습니다.'
+      : (d.finals && d.finals.canDraw)
       ? '조별 경기입니다 · <b>이긴 사람의 이름을 누르면</b> 올라갑니다 · '
-        + '조별 1위가 넷 다 나오면 <b>아래 본선</b>에서 조추첨을 합니다.'
+        + '조별 1위가 넷 다 나오면 <b>아래 본선</b>에서 조추첨을 합니다.<br>' + UNDO
       : d.finals
-      ? '조별 경기입니다 · <b>이긴 사람의 이름을 누르면</b> 올라갑니다 · '
-        + '조 결승까지 끝나면 <b>아래 본선</b>에서 패자부활전·준결승·결승으로 이어집니다.'
+      ? '<b>이긴 사람의 이름을 누르면</b> 올라갑니다 · 조 결승이 끝나면 진 사람은 '
+        + '<b>패자부활전</b>(맨 아래 칸)으로 내려갑니다.<br>' + UNDO
       : d.champion
-      ? '끝났습니다 · 잘못 적은 칸은 <b>되돌리기</b>로 고칠 수 있습니다 — 그 뒤 회전은 저절로 비워집니다.'
-      : (evCanPick()
-          ? '<b>이긴 사람의 이름을 누르면</b> 다음 회전으로 올라갑니다 · 잘못 눌렀으면 <b>되돌리기</b> · '
-            + '되돌리면 그 뒤 회전은 저절로 비워집니다.'
-          : '결과를 적는 것은 관리자 이상입니다 · 대진표는 누구나 볼 수 있습니다.');
+      ? '끝났습니다 · ' + UNDO
+      : '<b>이긴 사람의 이름을 누르면</b> 다음 회전으로 올라갑니다 · ' + UNDO;
   }
 
   const box = document.getElementById('evRounds');
