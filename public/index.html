@@ -5499,7 +5499,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 170;
+const APP_VERSION = 171;
 let toldToRefresh = false;
 
 /**
@@ -12992,7 +12992,7 @@ function evLabels(d) {
     list.sort((x, y) => x.row - y.row);
     list.forEach((m, i) => {
       const g = (d.asl && m.group != null) ? `${evGroupName(m.group)}조 ` : '';
-      const nm = (d.asl && depth === 0) ? '조 결승' : evRoundName(depth, d.maxDepth);
+      const nm = (d.asl && depth === 0) ? '결승' : evRoundName(depth, d.maxDepth);
       out[m.id] = `${g}${nm}${depth === 0 && d.asl ? '' : ` ${i + 1}경기`}`;
     });
   }
@@ -13002,8 +13002,11 @@ function evLabels(d) {
 /** 경기 상자 하나 */
 function evMatchHtml(m, label) {
   const can = evCanPick() && !!m.a && !!m.b;
-  const side = (who) => {
-    if (!who) return `<span class="evt-s wait"><span class="evt-nm">올라올 자리</span></span>`;
+  const side = (who, from) => {
+    if (!who) {
+      return `<span class="evt-s wait"><span class="evt-nm">${
+        from ? esc(from + ' 승자') : '미정'}</span></span>`;
+    }
     const won = m.win === who;
     const lost = !!m.win && !won;
     return `<button type="button" class="evt-s${won ? ' won' : ''}${lost ? ' lost' : ''}"
@@ -13017,7 +13020,7 @@ function evMatchHtml(m, label) {
         data-evundo="1" data-evm="${esc(m.id)}">↺</button>`
     : '';
   return `<div class="evt-m ${state}" style="left:${m.x}px;top:${m.top}px"
-    title="${esc(label)}">${undo}${side(m.a)}${side(m.b)}</div>`;
+    title="${esc(label)}">${undo}${side(m.a, m.aSeat)}${side(m.b, m.bSeat)}</div>`;
 }
 
 /**
@@ -13055,6 +13058,14 @@ function evTreeHtml(d) {
   for (const m of d.matches) {
     m.x = x(m.depth);
     m.top = Math.round(y(m.row) - EV_BOXH / 2);
+    // 아직 안 정해진 쪽은 **어느 경기에서 올라오는지** 적는다.
+    // '올라올 자리' 를 스물다섯 번 똑같이 적어두면 어느 칸이 어느 경기와
+    // 이어지는지 선을 따라가야만 알 수 있다. 회전까지 적는 것은 경기 번호가
+    // 회전마다 1부터 다시 매겨지기 때문이다 — '3경기 승자' 만으로는
+    // 1회전 3경기인지 2회전 3경기인지 알 수 없다. 재어 보니 가장 긴
+    // '1회전 12경기 승자'(101px)도 칸(132px)에 들어간다.
+    m.aSeat = m.aId ? label[m.aId] : null;
+    m.bSeat = m.bId ? label[m.bId] : null;
     const thisX = m.x;
     const thisY = Math.round(y(m.row));
     // 아이가 '경기'인 쪽만 선을 긋는다. 선수(잎)는 상자 안에 이름으로 들어 있다.
@@ -13102,7 +13113,7 @@ function evTreeHtml(d) {
     boxes.push(`<div class="evt-m evt-champ-box ${d.champion ? 'done' : 'wait'}"
       style="left:${champX}px;top:${Math.round(ry - 26)}px">
       <span class="evt-s ${d.champion ? 'won' : 'wait'}">
-        <span class="evt-nm">${esc(d.champion || '아직')}</span></span></div>`);
+        <span class="evt-nm">${esc(d.champion || '미정')}</span></span></div>`);
     heads.push(`<div class="evt-head" style="left:${champX}px">우승</div>`);
   }
 
@@ -13131,8 +13142,10 @@ function evAslRow(st, d) {
   // 한때 결승에도 이름 단추를 달았더니, 눌러도 아무 일이 없거나 서버가 되돌려
   // 보냈다(3판 2선승의 승자는 세어서 나오는 것이지 골라서 정하는 것이 아니다).
   const can = evCanPick() && !!st.a && !!st.b && !st.bo;
-  const side = (who) => {
-    if (!who) return `<span class="ev-s2 wait"><span>올라올 자리</span></span>`;
+  const side = (who, from) => {
+    if (!who) {
+      return `<span class="ev-s2 wait"><span>${esc(from || '미정')}</span></span>`;
+    }
     const won = st.win === who;
     const lost = !!st.win && !won;
     const cls = `ev-s2${won ? ' won' : ''}${lost ? ' lost' : ''}`;
@@ -13156,7 +13169,7 @@ function evAslRow(st, d) {
       ${tag}
       ${undo}
     </div>
-    <div class="ko-pair">${side(st.a)}<div class="ko-vs">vs</div>${side(st.b)}</div>
+    <div class="ko-pair">${side(st.a, st.aFrom)}<div class="ko-vs">vs</div>${side(st.b, st.bFrom)}</div>
     ${st.bo ? evAslBo(st) : ''}
     <div class="ko-note">${esc(st.note || '')}</div>
   </div>`;

@@ -539,14 +539,23 @@ function evAsl(groupWins, picks, draw) {
   const gfA = wf.win, gfB = ff.win;
   const series = evSeries(picks, gfA, gfB);
 
+  // aFrom·bFrom — 아직 안 정해진 자리에 **누가 올라올 자리인지** 적는다.
+  // 'olla올 자리' 를 열두 번 똑같이 적어두면 어느 칸이 어느 경기와 이어지는지
+  // 선을 따라가야만 알 수 있다. 자리 이름을 그 자리에 적으면 바로 읽힌다.
   const stages = [
-    { ...m1, name: '1경기', note: `${from(0)} vs ${from(1)} · 이기면 승자전, 지면 패자전` },
-    { ...m2, name: '2경기', note: `${from(2)} vs ${from(3)} · 이기면 승자전, 지면 패자전` },
-    { ...wf, name: '승자전', note: '이기면 결승 진출, 지면 최종전' },
-    { ...lf, name: '패자전', note: '이기면 최종전, 지면 탈락' },
-    { ...ff, name: '최종전', note: '이기면 결승 진출, 지면 탈락' },
+    { ...m1, name: '1경기', aFrom: from(0), bFrom: from(1),
+      note: `${from(0)} vs ${from(1)} · 이기면 승자전, 지면 패자전` },
+    { ...m2, name: '2경기', aFrom: from(2), bFrom: from(3),
+      note: `${from(2)} vs ${from(3)} · 이기면 승자전, 지면 패자전` },
+    { ...wf, name: '승자전', aFrom: '1경기 승자', bFrom: '2경기 승자',
+      note: '이기면 결승 진출, 지면 최종전' },
+    { ...lf, name: '패자전', aFrom: '1경기 패자', bFrom: '2경기 패자',
+      note: '이기면 최종전, 지면 탈락' },
+    { ...ff, name: '최종전', aFrom: '승자전 패자', bFrom: '패자전 승자',
+      note: '이기면 결승 진출, 지면 탈락' },
     {
       id: ASL_GF, name: '결승', bo: ASL_GF_GAMES,
+      aFrom: '승자전 승자', bFrom: '최종전 승자',
       note: '승자전 승자 vs 최종전 승자 · 두 판을 먼저 이기면 우승',
       a: gfA, b: gfB, win: series.winner,
       games: series.games, wa: series.wa, wb: series.wb,
