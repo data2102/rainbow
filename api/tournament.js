@@ -707,11 +707,27 @@ function evBoard(slots, groups, picks, format, draw) {
     let at = 0;
     const wins = [];
     const gfin = [];   // 조 결승 칸. 패자부활전은 여기서 '진 사람'을 꺼낸다.
+
+    /* **조마다 1회전을 같은 칸에서 시작한다.**
+     *
+     * 조 크기가 다르면 회전 수도 다르다(8명은 3회전, 2명은 1회전). 모든 조의
+     * 뿌리를 depth 0 에 두면 2명짜리 D조의 단 한 판이 8명 조의 '조 결승' 과
+     * 같은 칸에 서서, 세 판을 이겨 올라온 자리처럼 보인다 — 사용자가
+     * 'D조를 1회전 레벨로 내려 달라' 고 한 까닭이다.
+     *
+     * 그래서 작은 조는 그만큼 **오른쪽이 아니라 왼쪽에서** 끝낸다. 회전 수가
+     * 모자란 만큼 뿌리의 depth 를 올려주면(=왼쪽 칸), 1회전이 한 줄로 맞는다.
+     *   8명 조: 1회전(depth 2) → 2회전(1) → 조 결승(0)
+     *   2명 조: 1회전(depth 2) 하나로 끝
+     */
+    const lvlOf = (sz) => Math.max(0, Math.round(Math.log2(sz)) - 1);
+    const topLvl = Math.max(...groups.map(lvlOf));
+
     groups.forEach((sz, gi) => {
       const node = evTreeOne(at, at + sz);
       at += sz;
       const before = out.length;
-      const r = evWalk(node, slots, picks, out, 0, gi);
+      const r = evWalk(node, slots, picks, out, topLvl - lvlOf(sz), gi);
       wins.push(r.who || null);
       // evWalk 은 뿌리를 맨 뒤에 넣는다. 한 명짜리 조는 칸이 없다.
       gfin.push(out.length > before ? out[out.length - 1] : null);
