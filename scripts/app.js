@@ -431,7 +431,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 173;
+const APP_VERSION = 174;
 let toldToRefresh = false;
 
 /**
@@ -7864,7 +7864,8 @@ function renderEvPick() {
   const gNote = document.getElementById('evGroupNote');
   if (gNote) gNote.innerHTML = n >= 2 ? (bad ? esc(bad) : info) : '';
 
-  // ASL 은 조가 넷일 때만 — 1경기·2경기가 조별 1위 넷으로 짜이기 때문이다
+  // 외대진이 아닌 방식은 조가 넷일 때만 — ASL 은 1경기·2경기가 조별 1위 넷으로
+  // 짜이고, 패자부활전은 A-C · B-D 로 짝을 못박아 두었다.
   const fBox = document.getElementById('evFormatBox');
   if (fBox) fBox.hidden = !(groups && groups.length === 4 && !bad);
 
@@ -7894,6 +7895,12 @@ function renderEvPick() {
  */
 const ASL_GF = 'asl:gf';   // api/tournament.js 와 같아야 한다
 
+/** 본선 방식 이름. api/tournament.js 의 EV_FORMAT_NAME 과 같다. */
+const EV_FORMAT_NAME = { tree: '외대진', asl: 'ASL', rep: '패자부활전' };
+// '…으로' 와 '…로' 는 받침에 따라 갈린다. 'ASL' 은 글자만 보면 받침이 없지만
+// 읽으면 '에스엘' 이라 'ASL로' 가 맞다 — 세어서 고를 수 없으니 적어둔다.
+const EV_FORMAT_TO = { tree: '외대진으로', asl: 'ASL로', rep: '패자부활전으로' };
+
 const EV_LEAF = 42;    // 선수 한 자리의 높이
 const EV_COL  = 190;   // 회전 한 칸의 폭
 const EV_BOX  = 154;   // 경기 상자의 폭
@@ -7910,11 +7917,28 @@ function evRoundName(depth, maxDepth) {
   return `${maxDepth - depth + 1}회전`;
 }
 
+/**
+ * 조 안의 회전 이름. 본선이 따로 있는 방식(ASL·패자부활)에서 쓴다.
+ *
+ * 조로 나누면 맨 오른쪽 칸은 **그 조의 결승**이지 대회의 결승이 아니다.
+ * 그래서 '준결승·결승' 을 쓰면 안 된다 — D조는 칸이 하나뿐인데 그 하나가
+ * 맨 오른쪽에 서니, 머리글이 '조 1위' 이던 동안 D조가 '3회전에 있다'고
+ * 읽혔다. 자리는 맞았고 이름이 틀렸던 것이다.
+ */
+function evGroupRound(depth, maxDepth, head) {
+  if (depth === 0) return head ? '조 결승' : '결승';
+  return `${maxDepth - depth + 1}회전`;
+}
+
 /** 칸 이름표(기록에 적을 것). '3회전 2경기' 처럼. */
 function evLabels(d) {
   const out0 = {};
-  if (d.asl) {
-    for (const st of d.asl.stages) out0[st.id] = `본선 ${st.name}`;
+  if (d.finals) {
+    // 패자부활전은 칸 이름에 이미 '패자부활·준결승·결승' 이 들어 있어 '본선'을
+    // 덧붙이면 '본선 준결승 1경기' 가 된다. ASL 은 '1경기·승자전' 처럼 짧아서
+    // 무엇의 1경기인지 적어줘야 한다.
+    const pre = d.finals.kind === 'asl' ? '본선 ' : '';
+    for (const st of d.finals.stages) out0[st.id] = `${pre}${st.name}`;
     for (let g = 1; g <= 3; g++) out0[`${ASL_GF}:${g}`] = `본선 결승 ${g}차전`;
   }
   const by = new Map();
@@ -7926,9 +7950,10 @@ function evLabels(d) {
   for (const [depth, list] of by) {
     list.sort((x, y) => x.row - y.row);
     list.forEach((m, i) => {
-      const g = (d.asl && m.group != null) ? `${evGroupName(m.group)}조 ` : '';
-      const nm = (d.asl && depth === 0) ? '결승' : evRoundName(depth, d.maxDepth);
-      out[m.id] = `${g}${nm}${depth === 0 && d.asl ? '' : ` ${i + 1}경기`}`;
+      const g = (d.finals && m.group != null) ? `${evGroupName(m.group)}조 ` : '';
+      const nm = d.finals ? evGroupRound(depth, d.maxDepth, false)
+                          : evRoundName(depth, d.maxDepth);
+      out[m.id] = `${g}${nm}${depth === 0 && d.finals ? '' : ` ${i + 1}경기`}`;
     });
   }
   return out;
@@ -7983,7 +8008,7 @@ function evTreeHtml(d) {
   const y = (row) => EV_PAD + row * EV_LEAF + EV_LEAF / 2;
   // 우승 칸은 결승에서 한 칸 더 오른쪽이다. 그 상자까지 들어갈 만큼만 넓힌다 —
   // 어림잡아 잡았더니 우승 상자가 4px 잘려 나갔다.
-  const W = EV_X0 + GUT + (d.maxDepth + (d.asl ? 0 : 1)) * EV_COL + EV_BOX + 8;
+  const W = EV_X0 + GUT + (d.maxDepth + (d.finals ? 0 : 1)) * EV_COL + EV_BOX + 8;
   const H = d.n * EV_LEAF + EV_PAD * 2;
   const label = evLabels(d);
 
@@ -8043,12 +8068,13 @@ function evTreeHtml(d) {
   // 회전 머리글
   for (let depth = d.maxDepth; depth >= 0; depth--) {
     if (!d.matches.some(m => m.depth === depth)) continue;
-    const nm = (d.asl && depth === 0) ? '조 1위' : evRoundName(depth, d.maxDepth);
+    const nm = d.finals ? evGroupRound(depth, d.maxDepth, true)
+                        : evRoundName(depth, d.maxDepth);
     heads.push(`<div class="evt-head" style="left:${x(depth)}px">${esc(nm)}</div>`);
   }
-  // 우승 칸. ASL 이면 조별 대진표는 조 1위에서 끝나고 본선은 아래 칸에서 이어진다.
+  // 우승 칸. 본선이 따로 있으면 조별 대진표는 조 결승에서 끝난다.
   const champX = x(0) + EV_COL;
-  const root = d.asl ? null : d.matches.find(m => m.depth === 0);
+  const root = d.finals ? null : d.matches.find(m => m.depth === 0);
   if (root) {
     const ry = Math.round(y(root.row));
     (d.champion ? won : lines).push(
@@ -8070,10 +8096,14 @@ function evTreeHtml(d) {
 }
 
 
-/* ---- 본선 (ASL) ----
+/* ---- 본선 ----
  *
- * 조별 1위 넷을 다시 추첨해 둘씩 붙이고, 승자전·패자전·최종전을 거쳐
- * 결승(3판 2선승)까지 간다. 칸 모양은 회차 대회의 .ko-row 를 그대로 쓴다.
+ * 두 방식이 같은 칸 모양(.ko-row)을 쓴다. 서버가 'finals' 로 칸 목록을 보내고
+ * 화면은 그대로 줄로 늘어놓는다 — 어느 방식이든 '이름을 누르면 올라간다' 는
+ * 같으므로, 방식마다 그리는 코드를 따로 두지 않는다.
+ *
+ *   asl — 조별 1위 넷을 다시 추첨해 승자전·패자전·최종전·결승(3판 2선승)
+ *   rep — A·B·C조 결승 패자 셋 + D조 1위가 패자부활전 → 준결승 → 결승
  */
 
 /** 조 이름 — A·B·C·D. api/tournament.js 의 evGroupName 과 같다. */
@@ -8145,14 +8175,20 @@ function evAslBo(st) {
   return `<div class="ev-bo">${score}${games}</div>${next}`;
 }
 
+/** 조별 1위가 본선에서 설 자리. 패자부활전은 추첨이 없어 처음부터 정해져 있다. */
+const REP_SEAT = ['준결승 1경기', '준결승 1경기', '준결승 2경기', '패자부활 2경기'];
+
 /** 조별 1위 넉 줄 */
 function evAslWins(d) {
   const wins = d.groupWins || [];
-  const ord = (d.asl && d.asl.order) || null;
+  const f = d.finals || null;
+  const ord = (f && f.order) || null;
+  const rep = f && f.kind === 'rep';
   return `<div class="ev-wins">${wins.map((w, i) => {
-    // 추첨에서 어느 자리로 갔는지 — 1·2경기 어느 쪽인지 알 수 있다
+    // 본선에서 어느 자리로 가는지 — ASL 은 추첨 결과, 패자부활전은 못박혀 있다
     const at = ord ? ord.indexOf(i) : -1;
-    const seat = at < 0 ? '' : `<i class="ev-win-s">${at < 2 ? '1경기' : '2경기'}</i>`;
+    const seat = rep ? `<i class="ev-win-s">${REP_SEAT[i] || ''}</i>`
+      : at < 0 ? '' : `<i class="ev-win-s">${at < 2 ? '1경기' : '2경기'}</i>`;
     return `<span class="ev-win${w ? ' on' : ''}">
       <span class="ev-win-g">${evGroupName(i)}</span>
       ${w ? `<b>${esc(w)}</b>` : '<span class="wait">아직</span>'}
@@ -8161,31 +8197,57 @@ function evAslWins(d) {
   }).join('')}</div>`;
 }
 
+/** 방식마다 다른 머리글·설명 */
+const EV_FINALS_TEXT = {
+  asl: {
+    head: '본선 · ASL',
+    how: '조별 1위 넷이 둘씩 붙어 <b>승자전 · 패자전 · 최종전</b>을 치르고, '
+       + '승자전 승자와 최종전 승자가 <b>결승 3판 2선승</b>으로 맞붙습니다.',
+  },
+  rep: {
+    head: '본선 · 패자부활전',
+    how: '<b>A조 · C조 결승 패자</b>가 붙고 <b>B조 결승 패자 · D조 1위</b>가 붙어, '
+       + '이긴 둘이 다시 붙습니다. 그 승자는 준결승 2경기에서 <b>C조 1위</b>와, '
+       + 'A조 1위와 B조 1위는 준결승 1경기에서 맞붙습니다.<br>'
+       + 'D조는 1 · 2회전을 건너뛰는 대신 부활전 두 판을 더 이겨야 합니다 — '
+       + '그래서 우승까지 이겨야 하는 판이 네 조 모두 다섯 판으로 같습니다.',
+  },
+};
+
 function renderEvAsl(d) {
   const panel = document.getElementById('evAslPanel');
   if (!panel) return;
-  const a = d && d.asl;
+  const a = d && d.finals;
   panel.hidden = !a;
   if (!a) return;
 
   const wins = d.groupWins || [];
   const ready = wins.every(Boolean);
+  const txt = EV_FINALS_TEXT[a.kind] || EV_FINALS_TEXT.asl;
+
+  const head = document.getElementById('evAslHead');
+  if (head) head.textContent = txt.head;
+  const how = document.getElementById('evAslHow');
+  if (how) how.innerHTML = txt.how;
 
   const when = document.getElementById('evAslWhen');
   if (when) {
-    when.textContent = !ready ? '조별 경기가 끝나면 추첨합니다'
+    when.textContent = d.champion ? `우승 · ${d.champion}`
+      : !a.canDraw ? (ready ? '진행 중' : '조별 경기가 끝나면 이어집니다')
+      : !ready ? '조별 경기가 끝나면 추첨합니다'
       : !a.drawn ? '조별 1위가 다 나왔습니다 — 추첨할 차례'
-      : (d.champion ? `우승 · ${d.champion}` : '진행 중');
+      : '진행 중';
   }
 
   const box = document.getElementById('evAslWins');
   if (box) box.innerHTML = evAslWins(d);
 
-  // 추첨 단추는 넷이 다 나왔을 때만. 다시 뽑는 것도 막지 않는다 — 기록에 남는다.
+  // 추첨 단추는 ASL 에서, 넷이 다 나왔을 때만. 패자부활전은 짝이 못박혀 있어
+  // 뽑을 것이 없다(canDraw=false) — 단추를 아예 두지 않는다.
   // 아직 안 뽑았으면 그게 할 일이라 큰 단추로, 다시 뽑는 것은 드물고 되돌릴 수
   // 없는 일이라 작은 단추로 둔다. 둘 다 크게 두었더니 다시 뽑기가 화면에서
   // 가장 큰 빨간 띠가 되어 그것부터 누르게 생겼다.
-  const can = ready && evCanMake();
+  const can = a.canDraw && ready && evCanMake();
   const drawBox = document.getElementById('evDrawBox');
   if (drawBox) drawBox.hidden = !(can && !a.drawn);
   const againBox = document.getElementById('evDrawAgainBox');
@@ -8203,7 +8265,7 @@ function renderEvAsl(d) {
 
 async function evDraw() {
   if (evBusy || !evData) return;
-  const again = evData.asl && evData.asl.drawn;
+  const again = evData.finals && evData.finals.drawn;
   if (again && !confirm('조추첨을 다시 합니다.\n지금까지 치른 본선 결과는 모두 지워집니다.\n계속할까요?')) return;
   evBusy = true;
   try {
@@ -8254,9 +8316,12 @@ function renderEvBoard() {
 
   const how = document.getElementById('evHow');
   if (how) {
-    how.innerHTML = d.asl
+    how.innerHTML = (d.finals && d.finals.canDraw)
       ? '조별 경기입니다 · <b>이긴 사람의 이름을 누르면</b> 올라갑니다 · '
         + '조별 1위가 넷 다 나오면 <b>아래 본선</b>에서 조추첨을 합니다.'
+      : d.finals
+      ? '조별 경기입니다 · <b>이긴 사람의 이름을 누르면</b> 올라갑니다 · '
+        + '조 결승까지 끝나면 <b>아래 본선</b>에서 패자부활전·준결승·결승으로 이어집니다.'
       : d.champion
       ? '끝났습니다 · 잘못 적은 칸은 <b>되돌리기</b>로 고칠 수 있습니다 — 그 뒤 회전은 저절로 비워집니다.'
       : (evCanPick()
@@ -8280,6 +8345,7 @@ function renderEvBoard() {
 
   const btns = document.getElementById('evAdminBtns');
   if (btns) btns.hidden = !evCanMake();
+  renderEvFormatSwitch(d);
 
   renderEvAsl(d);
   renderEvLog();
@@ -8301,6 +8367,12 @@ function renderEvLog() {
     if (e.what === 'draw') {
       return `<div class="ev-log-row"><b>조추첨${e.again ? ' (다시)' : ''}</b>
         · 1경기 ${esc((e.pairs || [])[0] || '')} · 2경기 ${esc((e.pairs || [])[1] || '')}
+        <span class="ev-log-w">${esc(formatDateTime(e.ts))} · ${esc(e.by)}</span></div>`;
+    }
+    if (e.what === 'format') {
+      return `<div class="ev-log-row"><b>본선 방식을 바꿨습니다</b>
+        · ${esc(EV_FORMAT_NAME[e.from] || e.from || '')} → ${esc(EV_FORMAT_NAME[e.to] || e.to || '')}
+        <span>(조별 경기 결과는 그대로)</span>
         <span class="ev-log-w">${esc(formatDateTime(e.ts))} · ${esc(e.by)}</span></div>`;
     }
     if (e.what === 'undo') {
@@ -8339,8 +8411,7 @@ async function evMake() {
   try {
     const title = (document.getElementById('evTitle') || {}).value || '';
     const groups = evReadGroups();
-    const asl = document.getElementById('evAsl');
-    const format = (asl && asl.checked && groups && groups.length === 4) ? 'asl' : 'tree';
+    const format = (groups && groups.length === 4) ? evReadFormat() : 'tree';
     evApply(await apiPost('/api/tournament',
       { action: 'eventMake', entries, title, groups, format }));
     evGroupsTouched = false;
@@ -8372,6 +8443,54 @@ async function evUndo(match) {
     evApply(await apiPost('/api/tournament',
       { action: 'eventUndo', id: evData.id, match }));
     showToast('되돌렸습니다.');
+  } catch (e) { showToast(e.message); }
+  evBusy = false;
+}
+
+/** 고른 본선 방식 */
+function evReadFormat() {
+  const el = document.querySelector('input[name="evFormat"]:checked');
+  const v = el ? el.value : 'tree';
+  return EV_FORMAT_NAME[v] ? v : 'tree';
+}
+
+/**
+ * 서 있는 대진표의 본선 방식 바꾸기 — 리더·웹마스터만.
+ *
+ * 조별 칸 이름은 세 방식에서 같으므로 **조별 경기 결과를 잃지 않는다.**
+ * 대진표를 다시 짜면 선 차례를 새로 섞으니 이미 치른 경기가 날아가는데,
+ * 방식만 바꾸는 길이 있으면 대회 중에도 갈아탈 수 있다.
+ */
+function renderEvFormatSwitch(d) {
+  const wrap = document.getElementById('evFormatSwitch');
+  if (!wrap) return;
+  const four = d && (d.groups || []).length === 4;
+  wrap.hidden = !(d && evCanMake());
+  if (wrap.hidden) return;
+
+  const now = document.getElementById('evFormatNow');
+  if (now) now.textContent = EV_FORMAT_NAME[d.format] || d.format || '';
+
+  const btns = document.getElementById('evFormatBtns');
+  if (!btns) return;
+  // 외대진으로는 늘 갈 수 있다. 나머지는 4조일 때만.
+  const can = ['tree', 'rep', 'asl'].filter(f => f !== d.format && (f === 'tree' || four));
+  btns.innerHTML = can.length
+    ? can.map(f => `<button type="button" class="btn-mini" data-evfmt="${f}"
+        >${esc(EV_FORMAT_TO[f])} 바꾸기</button>`).join('')
+    : '<span class="foot-note" style="margin:0;">4조가 아니라 외대진만 됩니다.</span>';
+}
+
+async function evSetFormat(format) {
+  if (evBusy || !evData) return;
+  const name = EV_FORMAT_NAME[format] || format;
+  if (!confirm(`본선 방식을 ${EV_FORMAT_TO[format] || name} 바꿉니다.\n`
+    + '조별 경기 결과는 그대로 남습니다.\n이미 치른 본선 결과만 지워집니다.\n\n계속할까요?')) return;
+  evBusy = true;
+  try {
+    evApply(await apiPost('/api/tournament',
+      { action: 'eventFormat', id: evData.id, format }));
+    showToast(`${name} 방식으로 바꿨습니다.`);
   } catch (e) { showToast(e.message); }
   evBusy = false;
 }
@@ -8441,6 +8560,15 @@ function initEventEvents() {
     const p = document.getElementById('evPickPanel');
     if (p) p.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
+
+  const fsw = document.getElementById('evFormatBtns');
+  if (fsw) fsw.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-evfmt]');
+    if (b) evSetFormat(b.dataset.evfmt);
+  });
+
+  const fbox = document.getElementById('evFormatBox');
+  if (fbox) fbox.addEventListener('change', renderEvPick);
 
   for (const id of ['evDraw', 'evDrawAgain']) {
     const el = document.getElementById(id);

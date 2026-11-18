@@ -1382,6 +1382,36 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 }
 /* 조추첨 — 아직 안 뽑았으면 할 일이라 크게, 다시 뽑는 것은 드문 일이라 작게. */
 .ev-draw-again{ display:flex; justify-content:flex-end; }
+
+/* 본선 방식 고르기. 셋 중 하나이므로 라디오 — 체크 하나로 두었을 때는
+   '끄면 외대진' 이라고 적어야 했는데, 방식이 셋이 되면 그렇게 못 적는다. */
+.ev-fmt{ display:flex; flex-direction:column; gap:var(--sp-2); }
+.ev-fmt .check-item{
+  align-items:flex-start; line-height:1.5;
+  border:1px solid var(--border); border-radius:var(--radius-md);
+}
+.ev-fmt .check-item input{ margin-top:2px; }
+.ev-fmt .check-item i{
+  display:block; margin-top:2px; font-style:normal;
+  color:var(--text-tertiary); font-size:var(--fs-footnote);
+}
+.ev-fmt .check-item:has(input:checked){
+  border-color:var(--accent); background:var(--accent-bg);
+}
+
+/* 서 있는 대진표의 방식 바꾸기 */
+.ev-fmt-switch{
+  display:flex; align-items:center; flex-wrap:wrap; gap:var(--sp-2);
+  margin-top:var(--sp-4); padding-top:var(--sp-3);
+  border-top:1px solid var(--border);
+  font-size:var(--fs-caption);
+}
+.ev-fmt-now{
+  padding:2px var(--sp-2); border-radius:var(--radius-sm);
+  border:1px solid var(--accent); background:var(--accent-bg);
+  color:var(--accent-strong); font-weight:var(--fw-bold);
+}
+.ev-fmt-btns{ display:flex; gap:var(--sp-2); flex-wrap:wrap; }
 /* 조별 1위 넉 줄 */
 .ev-wins{ display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-bottom:var(--sp-4); }
 .ev-win{
@@ -4482,13 +4512,28 @@ if (/[?&]room=\d+/.test(location.search)) {
 
       <div id="evFormatBox" hidden>
         <div class="side-label" style="margin-top:var(--sp-5);">본선 방식</div>
-        <label class="check-item" style="border:1px solid var(--border);border-radius:var(--radius-md);">
-          <input type="checkbox" id="evAsl">
-          <span><b>ASL 방식</b> — 조별 1위 넷을 다시 추첨해
-            승자전 · 패자전 · 최종전 · 결승(3판 2선승)</span>
-        </label>
+        <div class="ev-fmt">
+          <label class="check-item">
+            <input type="radio" name="evFormat" value="tree" checked>
+            <span><b>외대진</b> — 조별 1위 넷이 준결승 · 결승으로 바로 붙습니다.
+              <i>조 인원이 다르면 작은 조가 유리합니다.</i></span>
+          </label>
+          <label class="check-item">
+            <input type="radio" name="evFormat" value="rep">
+            <span><b>패자부활전</b> — A · C조 결승 패자가 붙고, B조 결승 패자와
+              D조 1위가 붙습니다. 이긴 둘이 다시 붙어 준결승에 올라갑니다.
+              <i>네 조 모두 우승까지 다섯 판 — 8/8/8/2 에 맞춘 방식입니다.</i></span>
+          </label>
+          <label class="check-item">
+            <input type="radio" name="evFormat" value="asl">
+            <span><b>ASL</b> — 조별 1위 넷을 다시 추첨해 승자전 · 패자전 ·
+              최종전 · 결승(3판 2선승).
+              <i>조 인원이 같을 때 쓰는 방식입니다.</i></span>
+          </label>
+        </div>
         <div class="foot-note" style="margin-top:var(--sp-2);">
-          끄면 조별 1위 넷이 준결승 · 결승으로 바로 붙습니다(외대진).
+          외대진이 아닌 방식은 <b>4조</b>일 때만 됩니다. 짠 뒤에도 바꿀 수 있고,
+          그때 <b>조별 경기 결과는 그대로 남습니다.</b>
         </div>
       </div>
 
@@ -4507,6 +4552,13 @@ if (/[?&]room=\d+/.test(location.search)) {
       <div class="ev-champ" id="evChamp" hidden></div>
       <div class="foot-note" id="evHow" style="margin-top:0;margin-bottom:var(--sp-4);"></div>
       <div id="evRounds"></div>
+      <!-- 방식 바꾸기. 조별 칸 이름은 세 방식에서 같으므로 다시 짜지 않아도 된다 —
+           이미 적어둔 조별 결과를 잃지 않고 갈아탈 수 있다. -->
+      <div class="ev-fmt-switch" id="evFormatSwitch" hidden>
+        <span class="side-label" style="margin:0;">본선 방식</span>
+        <span class="ev-fmt-now" id="evFormatNow"></span>
+        <span class="ev-fmt-btns" id="evFormatBtns"></span>
+      </div>
       <div class="pick-actions" id="evAdminBtns" hidden>
         <button type="button" class="btn-mini btn-reject" id="evClose">이 대회 치우기</button>
         <button type="button" class="btn-mini" id="evRemake">참가자 다시 고르기</button>
@@ -4516,13 +4568,10 @@ if (/[?&]room=\d+/.test(location.search)) {
     <!-- 본선 (ASL) -->
     <div class="panel hud-corner" id="evAslPanel" hidden>
       <div class="panel-head">
-        <h2>본선 · ASL</h2>
+        <h2 id="evAslHead">본선</h2>
         <span class="rl-when" id="evAslWhen"></span>
       </div>
-      <div class="foot-note" style="margin-top:0;margin-bottom:var(--sp-4);">
-        조별 1위 넷이 둘씩 붙어 <b>승자전 · 패자전 · 최종전</b>을 치르고,
-        승자전 승자와 최종전 승자가 <b>결승 3판 2선승</b>으로 맞붙습니다.
-      </div>
+      <div class="foot-note" id="evAslHow" style="margin-top:0;margin-bottom:var(--sp-4);"></div>
       <div id="evAslWins"></div>
       <div class="pick-actions" id="evDrawBox" hidden>
         <button class="btn" id="evDraw">조추첨 하기</button>

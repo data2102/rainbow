@@ -204,6 +204,7 @@ export default async function handler(req, res) {
     if (action === 'eventPick') return await eventPick(req, res, b, false);
     if (action === 'eventUndo') return await eventPick(req, res, b, true);
     if (action === 'eventDraw') return await eventDraw(req, res, b);
+    if (action === 'eventFormat') return await eventFormat(req, res, b);
     if (action === 'eventClose') return await eventDelete(req, res, b);
     return res.status(400).json({ error: '알 수 없는 요청입니다.' });
   } catch (e) {
@@ -406,6 +407,10 @@ function evSplit(n) {
 
 const isPow2 = (v) => Number.isInteger(v) && v >= 1 && (v & (v - 1)) === 0;
 
+/** 본선 방식 — tree(외대진) · asl · rep(패자부활전) */
+const EV_FORMATS = ['tree', 'asl', 'rep'];
+const EV_FORMAT_NAME = { tree: '외대진', asl: 'ASL', rep: '패자부활전' };
+
 /** 조 나누기가 쓸 수 있는 값인지 */
 function evGroupsOk(groups, n) {
   if (!Array.isArray(groups) || !groups.length) return '조를 나눠주세요.';
@@ -562,7 +567,77 @@ function evAsl(groupWins, picks, draw) {
       open: series.open,
     },
   ];
-  return { drawn: !!ord, order: ord, stages, champion: series.winner };
+  return { kind: 'asl', drawn: !!ord, canDraw: true, order: ord, stages, champion: series.winner };
+}
+
+/* ---------- 본선: 패자부활전 방식 ----------
+ *
+ * 조가 8/8/8/2 처럼 기울어 있으면 작은 조는 한 판만 이기고 준결승에 선다 —
+ * 1·2회전을 건너뛰니 사실상 부전승 두 번이다. 그래서 D조 1위를 바로 올리지
+ * 않고, A·B·C조 결승에서 진 셋과 함께 부활전을 치르게 한다.
+ *
+ *   A조 결승 패자 ┐
+ *                 ├ 부활 1경기 ┐
+ *   C조 결승 패자 ┘            │
+ *                              ├ 부활 결승 ─ 이기면 준결승
+ *   B조 결승 패자 ┐            │
+ *                 ├ 부활 2경기 ┘
+ *   D조 1위       ┘
+ *
+ *   준결승 1경기 = A조 1위 vs B조 1위
+ *   준결승 2경기 = C조 1위 vs 부활 결승 승자
+ *   결승
+ *
+ * 이러면 우승까지 이겨야 하는 판이 A·B·C조 1위 다섯 판, D조 1위도 다섯 판으로
+ * 같아진다(8/8/8/2 기준). 조별 22경기 + 부활 3 + 준결승 2 + 결승 1 = 28경기.
+ *
+ * **조추첨이 없다.** 어느 조 패자가 어느 조 패자와 붙는지(A-C, B-D)를 못박았기
+ * 때문이다 — 사용자가 그렇게 정했고, 뽑을 것이 없으면 뽑는 단추도 두지 않는다.
+ */
+function evRep(wins, finals, picks) {
+  const one = (id, a, b) => {
+    let win = picks[id] || null;
+    if (!a || !b || (win !== a && win !== b)) win = null;
+    return { id, a: a || null, b: b || null, win };
+  };
+  // 조 결승에서 진 사람. 그 칸의 승자가 적혀야 패자도 정해진다 —
+  // 여기서도 **두 사람이 다 정해진 칸만 결과를 가진다**는 규칙이 이어진다.
+  const lost = (i) => {
+    const m = finals[i];
+    if (!m || !m.win) return null;
+    return m.win === m.a ? m.b : m.a;
+  };
+  const g = (i) => evGroupName(i);
+
+  const r1 = one('rep:1', lost(0), lost(2));
+  const r2 = one('rep:2', lost(1), wins[3] || null);
+  const r3 = one('rep:3', r1.win, r2.win);
+  const s1 = one('rep:sf1', wins[0] || null, wins[1] || null);
+  const s2 = one('rep:sf2', wins[2] || null, r3.win);
+  const gf = one('rep:gf', s1.win, s2.win);
+
+  const stages = [
+    { ...r1, name: '패자부활 1경기',
+      aFrom: `${g(0)}조 결승 패자`, bFrom: `${g(2)}조 결승 패자`,
+      note: `${g(0)}조 결승 패자 vs ${g(2)}조 결승 패자 · 지면 탈락` },
+    { ...r2, name: '패자부활 2경기',
+      aFrom: `${g(1)}조 결승 패자`, bFrom: `${g(3)}조 1위`,
+      note: `${g(1)}조 결승 패자 vs ${g(3)}조 1위 · 지면 탈락` },
+    { ...r3, name: '패자부활 결승',
+      aFrom: '패자부활 1경기 승자', bFrom: '패자부활 2경기 승자',
+      note: '이기면 준결승 2경기 진출, 지면 탈락' },
+    { ...s1, name: '준결승 1경기',
+      aFrom: `${g(0)}조 1위`, bFrom: `${g(1)}조 1위`,
+      note: `${g(0)}조 1위 vs ${g(1)}조 1위 · 이기면 결승 진출` },
+    { ...s2, name: '준결승 2경기',
+      aFrom: `${g(2)}조 1위`, bFrom: '패자부활 결승 승자',
+      note: `${g(2)}조 1위 vs 패자부활 승자 · 이기면 결승 진출` },
+    { ...gf, name: '결승',
+      aFrom: '준결승 1경기 승자', bFrom: '준결승 2경기 승자',
+      note: '이기는 사람이 우승' },
+  ];
+  // canDraw·drawn — 화면이 조추첨 단추를 둘지 판단하는 값. 부활전은 뽑을 것이 없다.
+  return { kind: 'rep', drawn: true, canDraw: false, order: null, stages, champion: gf.win };
 }
 
 /**
@@ -585,27 +660,33 @@ function evTagGroups(matches, groups) {
 }
 
 function evBoard(slots, groups, picks, format, draw) {
-  const asl = format === 'asl' && groups.length === 4;
+  const four = groups.length === 4;
+  const asl = format === 'asl' && four;
+  const rep = format === 'rep' && four;
 
-  // ASL 이면 조끼리 묶지 않는다. 조의 뿌리가 곧 그 조의 1위다.
+  // 본선이 따로 있으면 조끼리 묶지 않는다. 조의 뿌리가 곧 그 조의 결승이다.
   const out = [];
   let maxDepth = 0;
   let top = null;
 
-  if (asl) {
+  if (asl || rep) {
     let at = 0;
     const wins = [];
+    const gfin = [];   // 조 결승 칸. 패자부활전은 여기서 '진 사람'을 꺼낸다.
     groups.forEach((sz, gi) => {
       const node = evTreeOne(at, at + sz);
       at += sz;
+      const before = out.length;
       const r = evWalk(node, slots, picks, out, 0, gi);
       wins.push(r.who || null);
+      // evWalk 은 뿌리를 맨 뒤에 넣는다. 한 명짜리 조는 칸이 없다.
+      gfin.push(out.length > before ? out[out.length - 1] : null);
     });
     maxDepth = out.reduce((m, x) => Math.max(m, x.depth), 0);
     out.sort((x, y) => (y.depth - x.depth) || (x.row - y.row));
-    const a = evAsl(wins, picks, draw);
+    const a = asl ? evAsl(wins, picks, draw) : evRep(wins, gfin, picks);
     return {
-      matches: evTagGroups(out, groups), maxDepth, asl: a, groupWins: wins,
+      matches: evTagGroups(out, groups), maxDepth, finals: a, groupWins: wins,
       champion: a.champion, rootId: null,
     };
   }
@@ -615,7 +696,7 @@ function evBoard(slots, groups, picks, format, draw) {
   maxDepth = out.reduce((m, x) => Math.max(m, x.depth), 0);
   out.sort((x, y) => (y.depth - x.depth) || (x.row - y.row));
   return {
-    matches: evTagGroups(out, groups), maxDepth, asl: null,
+    matches: evTagGroups(out, groups), maxDepth, finals: null,
     champion: top.who || null, rootId: top.id,
   };
 }
@@ -632,7 +713,7 @@ function evView(row) {
     n: ev.slots.length,
     matches: board.matches,
     maxDepth: board.maxDepth,
-    asl: board.asl,
+    finals: board.finals,
     groupWins: board.groupWins || null,
     champion: board.champion,
   };
@@ -645,7 +726,7 @@ function evView(row) {
 function evSlot(board, id) {
   const m = board.matches.find(x => x.id === id);
   if (m) return { a: m.a, b: m.b, open: true };
-  const a = board.asl;
+  const a = board.finals;
   if (!a) return null;
   if (id.startsWith(`${ASL_GF}:`)) {
     const gf = a.stages[a.stages.length - 1];
@@ -709,12 +790,12 @@ async function eventMake(req, res, b) {
   const bad = evGroupsOk(groups, entries.length);
   if (bad) return res.status(400).json({ error: bad });
 
-  // 본선 방식. ASL(승자전·패자전·최종전·결승)은 조가 넷일 때만 돌아간다 —
-  // 1경기·2경기가 조별 1위 넷으로 짜이기 때문이다.
-  const format = b.format === 'asl' ? 'asl' : 'tree';
-  if (format === 'asl' && groups.length !== 4) {
+  // 본선 방식. ASL·패자부활전은 조가 넷일 때만 돌아간다 — ASL 은 1경기·2경기가
+  // 조별 1위 넷으로 짜이고, 패자부활전은 A-C · B-D 로 짝을 못박아 두었다.
+  const format = EV_FORMATS.includes(b.format) ? b.format : 'tree';
+  if (format !== 'tree' && groups.length !== 4) {
     return res.status(400).json({
-      error: `ASL 방식은 4조일 때만 됩니다 (지금 ${groups.length}조) — 조별 1위 넷이 붙는 방식입니다.`,
+      error: `${EV_FORMAT_NAME[format]} 방식은 4조일 때만 됩니다 (지금 ${groups.length}조).`,
     });
   }
 
@@ -843,6 +924,52 @@ async function eventDraw(req, res, b) {
      JSON.stringify(evLogged(ev.log, entry)), ev.id]
   );
   await audit(me, 'event_draw', { id: ev.id, order });
+  res.status(200).json({ ok: true, event: evView(out[0]) });
+}
+
+/**
+ * 본선 방식만 바꾼다 — 리더·웹마스터만. **조별 경기 결과는 그대로 둔다.**
+ *
+ * 조별 칸의 이름은 그 칸이 덮는 잎 범위(`시작-끝`)이고, 이 범위는 세 방식에서
+ * 모두 같다(조를 나누는 법이 같으니 잎 번호도 같다). 그래서 방식을 갈아도
+ * 이미 적어둔 조별 결과가 제자리를 찾는다 — 대진표를 다시 짤 필요가 없다.
+ * 본선 결과(`asl:*` · `rep:*`)만 지운다. 짝이 달라지면 뜻이 없어지기 때문이다.
+ */
+async function eventFormat(req, res, b) {
+  const me = await requireAdmin(req, res);
+  if (!me) return;
+  await ensureEvent();
+
+  const rows = await q(
+    `SELECT * FROM event_brackets WHERE id = $1 AND closed_at IS NULL`, [Number(b.id)]
+  );
+  if (!rows.length) return res.status(404).json({ error: '지금 열려 있는 대회가 아닙니다.' });
+
+  const ev = rowToEvent(rows[0]);
+  const want = EV_FORMATS.includes(b.format) ? b.format : null;
+  if (!want) return res.status(400).json({ error: '없는 방식입니다.' });
+  if (want === ev.format) return res.status(400).json({ error: '이미 그 방식입니다.' });
+  const groups = ev.groups || [ev.slots.length];
+  if (want !== 'tree' && groups.length !== 4) {
+    return res.status(400).json({
+      error: `${EV_FORMAT_NAME[want]} 방식은 4조일 때만 됩니다 (지금 ${groups.length}조).`,
+    });
+  }
+
+  // 남길 것은 조별 칸(`시작-끝`)뿐이다. 외대진의 준결승·결승도 이 꼴이라 남지만,
+  // 다른 방식에서는 그런 칸이 없어 쓰이지 않는다 — 되돌리면 다시 살아난다.
+  const picks = {};
+  for (const [k, v] of Object.entries(ev.picks)) {
+    if (/^\d+-\d+$/.test(k)) picks[k] = v;
+  }
+  const entry = { ts: Date.now(), by: me, what: 'format', from: ev.format, to: want };
+
+  const out = await q(
+    `UPDATE event_brackets SET format = $1, draw = NULL, picks = $2, log = $3
+      WHERE id = $4 RETURNING *`,
+    [want, JSON.stringify(picks), JSON.stringify(evLogged(ev.log, entry)), ev.id]
+  );
+  await audit(me, 'event_format', { id: ev.id, from: ev.format, to: want });
   res.status(200).json({ ok: true, event: evView(out[0]) });
 }
 
