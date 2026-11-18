@@ -431,7 +431,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 174;
+const APP_VERSION = 175;
 let toldToRefresh = false;
 
 /**
@@ -7910,6 +7910,11 @@ const EV_BOXH = 58;    // 경기 상자의 높이
 // 둘째 조부터는 조와 조 사이 빈 자리에 들어가므로 괜찮았다.
 const EV_PAD  = 34;
 
+/** 대진표 안에 그린 본선 칸의 머리글. depth 가 음수인 칸들이다. */
+const EV_REP_COL = {
+  '-1': '패자부활', '-2': '패자부활 결승', '-3': '준결승', '-4': '결승',
+};
+
 /** 회전 이름. 왼쪽부터 1회전, 끝에서 둘은 준결승·결승. */
 function evRoundName(depth, maxDepth) {
   if (depth === 0) return '결승';
@@ -7964,8 +7969,10 @@ function evMatchHtml(m, label) {
   const can = evCanPick() && !!m.a && !!m.b;
   const side = (who, from) => {
     if (!who) {
+      // from 은 '1회전 3경기 승자' 처럼 **통째로** 받는다. 예전엔 여기서 ' 승자'를
+      // 붙였는데, 패자부활전에는 '패자' 로 내려오는 자리가 있어 그럴 수 없다.
       return `<span class="evt-s wait"><span class="evt-nm">${
-        from ? esc(from + ' 승자') : '미정'}</span></span>`;
+        from ? esc(from) : '미정'}</span></span>`;
     }
     const won = m.win === who;
     const lost = !!m.win && !won;
@@ -7987,8 +7994,8 @@ function evMatchHtml(m, label) {
  * 두 칸을 잇는 꺾은선. 가로 → 세로 → 가로.
  * `on` 이면 이기고 올라간 길이라 빨갛게 긋는다.
  */
-function evLink(x1, y1, x2, y2, midX, on) {
-  const c = on ? ' on' : '';
+function evLink(x1, y1, x2, y2, midX, on, lose) {
+  const c = (lose ? ' lose' : '') + (on ? ' on' : '');
   const h = (left, top, w) =>
     `<i class="evt-h${c}" style="left:${left}px;top:${top}px;width:${Math.max(1, w)}px"></i>`;
   const v = (left, top, hh) =>
@@ -8006,18 +8013,27 @@ function evTreeHtml(d) {
   const GUT = (d.groups || []).length > 1 ? 48 : 0;
   const x = (depth) => EV_X0 + GUT + (d.maxDepth - depth) * EV_COL;
   const y = (row) => EV_PAD + row * EV_LEAF + EV_LEAF / 2;
-  // 우승 칸은 결승에서 한 칸 더 오른쪽이다. 그 상자까지 들어갈 만큼만 넓힌다 —
-  // 어림잡아 잡았더니 우승 상자가 4px 잘려 나갔다.
-  const W = EV_X0 + GUT + (d.maxDepth + (d.finals ? 0 : 1)) * EV_COL + EV_BOX + 8;
-  const H = d.n * EV_LEAF + EV_PAD * 2;
+
+  // 패자부활전은 **대진표 안에** 그린다(서버가 depth·row 를 같이 보낸다).
+  // depth 가 음수라 조 결승 오른쪽 칸으로 저절로 간다.
+  const fin = (d.finals && d.finals.inTree) ? d.finals.stages : [];
+  const all = d.matches.concat(fin);
+  // 우승 칸은 마지막 경기에서 한 칸 더 오른쪽이다. 본선을 따로 두는 방식(ASL)
+  // 에서는 조 결승에서 끝나므로 우승 칸이 없다.
+  const champ = !d.finals || !!fin.length;
+  const minDepth = all.reduce((v, m) => Math.min(v, m.depth), 0);
+  const maxRow = all.reduce((v, m) => Math.max(v, m.row), 0);
+  // 그 상자까지 들어갈 만큼만 넓힌다 — 어림잡아 잡았더니 우승 상자가 4px 잘렸다.
+  const W = EV_X0 + GUT + (d.maxDepth - minDepth + (champ ? 1 : 0)) * EV_COL + EV_BOX + 8;
+  const H = Math.round(Math.max(d.n, maxRow + 1) * EV_LEAF + EV_PAD * 2);
   const label = evLabels(d);
 
   // 이긴 길은 나중에 그린다. 겹치는 자리에서 회색 선 밑에 깔리지 않도록.
   const lines = [];
   const won = [];
-  const byId = new Map(d.matches.map(m => [m.id, m]));
+  const byId = new Map(all.map(m => [m.id, m]));
   const boxes = [];
-  for (const m of d.matches) {
+  for (const m of all) {
     m.x = x(m.depth);
     m.top = Math.round(y(m.row) - EV_BOXH / 2);
     // 아직 안 정해진 쪽은 **어느 경기에서 올라오는지** 적는다.
@@ -8026,20 +8042,27 @@ function evTreeHtml(d) {
     // 회전마다 1부터 다시 매겨지기 때문이다 — '3경기 승자' 만으로는
     // 1회전 3경기인지 2회전 3경기인지 알 수 없다. 재어 보니 가장 긴
     // '1회전 12경기 승자'(101px)도 칸(132px)에 들어간다.
-    m.aSeat = m.aId ? label[m.aId] : null;
-    m.bSeat = m.bId ? label[m.bId] : null;
+    // 본선 칸은 서버가 자리 이름을 통째로 보내준다('A조 결승 패자' 같은 것).
+    m.aSeat = m.aFrom || (m.aId ? label[m.aId] + ' 승자' : null);
+    m.bSeat = m.bFrom || (m.bId ? label[m.bId] + ' 승자' : null);
     const thisX = m.x;
     const thisY = Math.round(y(m.row));
     // 아이가 '경기'인 쪽만 선을 긋는다. 선수(잎)는 상자 안에 이름으로 들어 있다.
-    for (const [childId, childRow] of [[m.aId, m.aRow], [m.bId, m.bRow]]) {
-      if (!childId) continue;
-      const cx = x(m.depth + 1) + EV_BOX;
-      const cy = Math.round(y(childRow));
-      // 그 아이 칸에 승자가 적혔으면 이 선을 타고 올라온 것이다
-      const child = byId.get(childId);
-      const hot = !!(child && child.win);
-      (hot ? won : lines).push(
-        evLink(cx, cy, thisX, thisY, cx + Math.round((thisX - cx) / 2), hot));
+    for (const [cid, lose, mid] of
+         [[m.aId, m.aLose, m.aMid], [m.bId, m.bLose, m.bMid]]) {
+      if (!cid) continue;
+      const c = byId.get(cid);
+      if (!c) continue;
+      // 올라오는 칸이 꼭 한 칸 왼쪽에 있지는 않다 — 조 결승에서 준결승으로
+      // 세 칸을 건너뛰기도 한다. 그 칸의 depth 를 보고 긋는다.
+      const cx = x(c.depth) + EV_BOX;
+      const cy = Math.round(y(c.row));
+      const hot = !!c.win;
+      const gap = thisX - cx;
+      const at = cx + Math.round(gap * (mid || 0.5));
+      // 진 사람이 내려오는 길은 **다른 색**이다. 이긴 길과 같은 빨강으로 그으면
+      // 조 결승에서 빨간 선이 둘 나가 어느 쪽이 이긴 길인지 안 보인다.
+      (hot ? won : lines).push(evLink(cx, cy, thisX, thisY, at, hot, lose));
     }
     boxes.push(evMatchHtml(m, label[m.id] || ''));
   }
@@ -8062,23 +8085,31 @@ function evTreeHtml(d) {
       bands.push(`<div class="evt-gband" style="top:${top}px;height:${h}px"
         ><span>${esc(evGroupName(i))}조</span></div>`);
     });
+    // 패자부활전은 조가 아니다 — D조 아래에 따로 띠를 두른다.
+    if (d.finals && d.finals.inTree && d.finals.repSpan) {
+      const top = Math.round(EV_PAD + d.finals.repRow * EV_LEAF);
+      const h = Math.round(d.finals.repSpan * EV_LEAF);
+      bands.push(`<div class="evt-gband rep" style="top:${top}px;height:${h}px"
+        ><span>부활</span></div>`);
+    }
   }
   const heads = [];
 
-  // 회전 머리글
-  for (let depth = d.maxDepth; depth >= 0; depth--) {
-    if (!d.matches.some(m => m.depth === depth)) continue;
-    const nm = d.finals ? evGroupRound(depth, d.maxDepth, true)
-                        : evRoundName(depth, d.maxDepth);
+  // 회전 머리글. 0 보다 아래(음수)는 대진표 안에 그린 본선 칸이다.
+  for (let depth = d.maxDepth; depth >= minDepth; depth--) {
+    if (!all.some(m => m.depth === depth)) continue;
+    const nm = depth < 0 ? (EV_REP_COL[depth] || '')
+      : d.finals ? evGroupRound(depth, d.maxDepth, true)
+      : evRoundName(depth, d.maxDepth);
     heads.push(`<div class="evt-head" style="left:${x(depth)}px">${esc(nm)}</div>`);
   }
-  // 우승 칸. 본선이 따로 있으면 조별 대진표는 조 결승에서 끝난다.
-  const champX = x(0) + EV_COL;
-  const root = d.finals ? null : d.matches.find(m => m.depth === 0);
+  // 우승 칸. 본선을 아래 칸에 따로 두는 방식(ASL)이면 조 결승에서 끝난다.
+  const champX = x(minDepth) + EV_COL;
+  const root = champ ? all.find(m => m.depth === minDepth) : null;
   if (root) {
     const ry = Math.round(y(root.row));
     (d.champion ? won : lines).push(
-      evLink(x(0) + EV_BOX, ry, champX, ry, x(0) + EV_BOX + 20, !!d.champion));
+      evLink(x(minDepth) + EV_BOX, ry, champX, ry, x(minDepth) + EV_BOX + 20, !!d.champion));
     boxes.push(`<div class="evt-m evt-champ-box ${d.champion ? 'done' : 'wait'}"
       style="left:${champX}px;top:${Math.round(ry - 26)}px">
       <span class="evt-s ${d.champion ? 'won' : 'wait'}">
@@ -8217,7 +8248,9 @@ const EV_FINALS_TEXT = {
 function renderEvAsl(d) {
   const panel = document.getElementById('evAslPanel');
   if (!panel) return;
-  const a = d && d.finals;
+  // 대진표 안에 그리는 방식(패자부활전)은 아래 칸을 접는다 —
+  // 같은 것을 두 군데 보이면 어느 쪽을 눌러야 하는지 헷갈린다.
+  const a = (d && d.finals && !d.finals.inTree) ? d.finals : null;
   panel.hidden = !a;
   if (!a) return;
 

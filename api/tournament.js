@@ -594,7 +594,7 @@ function evAsl(groupWins, picks, draw) {
  * **조추첨이 없다.** 어느 조 패자가 어느 조 패자와 붙는지(A-C, B-D)를 못박았기
  * 때문이다 — 사용자가 그렇게 정했고, 뽑을 것이 없으면 뽑는 단추도 두지 않는다.
  */
-function evRep(wins, finals, picks) {
+function evRep(wins, finals, picks, n) {
   const one = (id, a, b) => {
     let win = picks[id] || null;
     if (!a || !b || (win !== a && win !== b)) win = null;
@@ -608,6 +608,8 @@ function evRep(wins, finals, picks) {
     return m.win === m.a ? m.b : m.a;
   };
   const g = (i) => evGroupName(i);
+  const gid = (i) => (finals[i] ? finals[i].id : null);
+  const grow = (i) => (finals[i] ? finals[i].row : 0);
 
   const r1 = one('rep:1', lost(0), lost(2));
   const r2 = one('rep:2', lost(1), wins[3] || null);
@@ -616,28 +618,60 @@ function evRep(wins, finals, picks) {
   const s2 = one('rep:sf2', wins[2] || null, r3.win);
   const gf = one('rep:gf', s1.win, s2.win);
 
+  /* 대진표 안에 그릴 자리.
+   *
+   * depth 는 조 결승(0)에서 **오른쪽으로** 한 칸씩 음수로 간다. 화면은
+   * `x = (maxDepth - depth) * 칸폭` 으로 가로 자리를 잡으므로, 음수면 저절로
+   * 조 결승 오른쪽에 붙는다 — 그리는 쪽을 고칠 일이 없다.
+   *
+   * row 는 잎(선수 한 자리) 번호다. 부활전은 '조' 가 아니라서 잎이 없으므로
+   * **D조 아래, 잎 줄이 끝난 자리(n 다음)** 에 놓는다. 사용자가 'D조에
+   * 구성해 달라' 고 한 자리다.
+   *   n+1 부활 1경기 ┐
+   *   n+2            ├ 부활 결승
+   *   n+3 부활 2경기 ┘
+   * 준결승·결승은 올라오는 두 칸의 한가운데 — 종이 대진표와 같다.
+   */
+  const r1row = n + 1, r3row = n + 2, r2row = n + 3;
+  const s1row = (grow(0) + grow(1)) / 2;
+  const s2row = (grow(2) + r3row) / 2;
+  const gfrow = (s1row + s2row) / 2;
+
+  // mid 는 잇는 선의 세로 토막을 어디에 세울지(두 칸 사이의 몇 할쯤). 조 결승
+  // 넷에서 부활전으로 내려오는 선은 같은 틈을 지나므로, 그대로 두면 네 줄이
+  // 한 자리에 겹쳐 어느 조에서 내려온 선인지 못 읽는다. 조금씩 어긋나게 둔다.
   const stages = [
-    { ...r1, name: '패자부활 1경기',
+    { ...r1, name: '패자부활 1경기', depth: -1, row: r1row,
+      aId: gid(0), bId: gid(2), aLose: true, bLose: true, aMid: 0.26, bMid: 0.74,
       aFrom: `${g(0)}조 결승 패자`, bFrom: `${g(2)}조 결승 패자`,
       note: `${g(0)}조 결승 패자 vs ${g(2)}조 결승 패자 · 지면 탈락` },
-    { ...r2, name: '패자부활 2경기',
+    { ...r2, name: '패자부활 2경기', depth: -1, row: r2row,
+      aId: gid(1), bId: gid(3), aLose: true, bLose: false, aMid: 0.5, bMid: 0.9,
       aFrom: `${g(1)}조 결승 패자`, bFrom: `${g(3)}조 1위`,
       note: `${g(1)}조 결승 패자 vs ${g(3)}조 1위 · 지면 탈락` },
-    { ...r3, name: '패자부활 결승',
+    { ...r3, name: '패자부활 결승', depth: -2, row: r3row,
+      aId: 'rep:1', bId: 'rep:2',
       aFrom: '패자부활 1경기 승자', bFrom: '패자부활 2경기 승자',
       note: '이기면 준결승 2경기 진출, 지면 탈락' },
-    { ...s1, name: '준결승 1경기',
+    { ...s1, name: '준결승 1경기', depth: -3, row: s1row,
+      aId: gid(0), bId: gid(1),
       aFrom: `${g(0)}조 1위`, bFrom: `${g(1)}조 1위`,
       note: `${g(0)}조 1위 vs ${g(1)}조 1위 · 이기면 결승 진출` },
-    { ...s2, name: '준결승 2경기',
+    { ...s2, name: '준결승 2경기', depth: -3, row: s2row,
+      aId: gid(2), bId: 'rep:3',
       aFrom: `${g(2)}조 1위`, bFrom: '패자부활 결승 승자',
       note: `${g(2)}조 1위 vs 패자부활 승자 · 이기면 결승 진출` },
-    { ...gf, name: '결승',
+    { ...gf, name: '결승', depth: -4, row: gfrow,
+      aId: 'rep:sf1', bId: 'rep:sf2',
       aFrom: '준결승 1경기 승자', bFrom: '준결승 2경기 승자',
       note: '이기는 사람이 우승' },
   ];
-  // canDraw·drawn — 화면이 조추첨 단추를 둘지 판단하는 값. 부활전은 뽑을 것이 없다.
-  return { kind: 'rep', drawn: true, canDraw: false, order: null, stages, champion: gf.win };
+  // inTree — 대진표 안에 그린다. 아래 본선 칸은 접는다(같은 것을 두 번 보일 일이다).
+  // repRow·repSpan 은 부활전 자리에 띠를 두르려고 보낸다.
+  return {
+    kind: 'rep', drawn: true, canDraw: false, inTree: true, order: null,
+    stages, champion: gf.win, repRow: n, repSpan: 4,
+  };
 }
 
 /**
@@ -684,7 +718,7 @@ function evBoard(slots, groups, picks, format, draw) {
     });
     maxDepth = out.reduce((m, x) => Math.max(m, x.depth), 0);
     out.sort((x, y) => (y.depth - x.depth) || (x.row - y.row));
-    const a = asl ? evAsl(wins, picks, draw) : evRep(wins, gfin, picks);
+    const a = asl ? evAsl(wins, picks, draw) : evRep(wins, gfin, picks, slots.length);
     return {
       matches: evTagGroups(out, groups), maxDepth, finals: a, groupWins: wins,
       champion: a.champion, rootId: null,

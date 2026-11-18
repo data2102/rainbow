@@ -1299,6 +1299,11 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
 .evt-h.on, .evt-v.on{ background:var(--accent); }
 .evt-h.on{ height:3px; margin-top:-1.5px; }
 .evt-v.on{ width:3px; margin-left:-1.5px; }
+/* 진 사람이 패자부활전으로 내려오는 길. 이긴 길과 같은 빨강으로 그으면
+   조 결승 한 칸에서 빨간 선이 둘 나가 어느 쪽이 이긴 길인지 안 보인다.
+   올라가는 길은 빨강, 떨어지는 길은 노랑으로 갈라 둔다. */
+.evt-h.lose.on, .evt-v.lose.on{ background:var(--warning); }
+.evt-h.lose, .evt-v.lose{ opacity:.85; }
 .evt-m{
   position:absolute; width:154px; box-sizing:border-box;
   display:flex; flex-direction:column; gap:2px;
@@ -1459,6 +1464,8 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   border-bottom:2px solid var(--border-strong);
   border-radius:var(--radius-sm) 0 0 var(--radius-sm);
 }
+.evt-gband.rep{ border-color:var(--warning); }
+.evt-gband.rep span{ color:var(--warning); }
 .evt-gband span{
   font-size:var(--fs-footnote); font-weight:var(--fw-bold);
   letter-spacing:.06em; color:var(--accent); white-space:nowrap;
