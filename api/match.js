@@ -376,16 +376,47 @@ function pairKey(a, b) {
   return x < y ? x + '|' + y : y + '|' + x;
 }
 
+/* ---------- 호스트를 맡기지 않을 사람 ----------
+ *
+ * 회선이 약하거나 PC 가 버거워 호스트를 잡으면 판이 깨지는 사람이 있다.
+ * 그런 사람을 순번 맨 뒤로 민다 — 빼는 것이 아니라 미는 것이라, 팀이 그런
+ * 사람들뿐이어도 누군가는 호스트를 맡는다(룰렛이 멈추지 않는다).
+ *
+ * **같은 팀 금지 짝과 같은 이유로 이름을 환경변수에만 둔다.** '너는 호스트
+ * 맡기지 않는다' 는 당사자가 보면 기분 상할 일이고, 저장소는 공개다.
+ * 화면에도 기록에도 아무 표시가 남지 않는다.
+ *
+ *   HOST_SKIP="아이디1,아이디2"
+ *
+ * 바꾸려면 Vercel → Settings → Environment Variables → HOST_SKIP → Redeploy.
+ * 비워두면 아무 일도 하지 않는다.
+ */
+const HOST_SKIP_MAX = 30;
+
+function hostSkip() {
+  const raw = String(process.env.HOST_SKIP || '').trim();
+  if (!raw) return new Set();
+  return new Set(
+    raw.split(',').map(x => String(x || '').trim().toLowerCase())
+       .filter(Boolean).slice(0, HOST_SKIP_MAX)
+  );
+}
+
 /**
  * 팀 안의 차례를 정한다. 이 차례가 곧 호스트 순번이다.
  *
  * 먼저 섞은 뒤 이 밤에 호스트를 맡은 횟수가 적은 사람부터 앞에 세운다.
  * 같은 횟수끼리는 섞인 차례 그대로다(정렬이 안정적이라 그렇다) — 그래서
  * 아직 안 맡은 사람들 사이에서는 여전히 제비뽑기다.
+ *
+ * `skip` 에 든 사람은 **맡은 횟수보다 먼저** 따져 맨 뒤로 민다. 횟수로만
+ * 밀면 그 밤에 아무도 안 맡은 첫 판에서 맨 앞에 설 수 있다 — 하필 그때가
+ * 가장 흔한 경우다.
  */
-function hostOrder(handles, today) {
+function hostOrder(handles, today, skip = new Set()) {
   const n = (h) => today.get(String(h).toLowerCase()) || 0;
-  return shuffle([...handles]).sort((a, b) => n(a) - n(b));
+  const back = (h) => (skip.has(String(h).toLowerCase()) ? 1 : 0);
+  return shuffle([...handles]).sort((a, b) => back(a) - back(b) || n(a) - n(b));
 }
 
 /* ---------- 같은 팀 금지 짝 ----------
@@ -571,7 +602,8 @@ async function hostDraw(req, res, b) {
       const parts = splitTeams(rows, sizes, seen, apartPairs());
       const names = TEAM_NAMES.slice(0, teams);
       const today = await hostCountToday(c);
-      const teamRows = parts.map((handles, i) => ({ name: names[i], order: hostOrder(handles, today) }));
+      const skip = hostSkip();
+      const teamRows = parts.map((handles, i) => ({ name: names[i], order: hostOrder(handles, today, skip) }));
 
       // 앞에서부터 둘씩 붙여 대진을 만든다. 이름표를 이미 섞었으므로 어느 팀이
       // 어느 팀과 붙을지도 여기서 갈린다.
