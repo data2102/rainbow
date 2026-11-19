@@ -388,6 +388,36 @@ function hostOrder(handles, today) {
   return shuffle([...handles]).sort((a, b) => n(a) - n(b));
 }
 
+/* ---------- 같은 팀 금지 짝 ----------
+ *
+ * 어떤 둘은 같은 편에 서면 판이 한쪽으로 기운다. 갓 들어와 점수가 0인 회원이
+ * 그렇다 — 점수로 팀을 맞추는 장치(SPLIT_SLACK)는 **점수가 있어야** 돌아가므로,
+ * 기록이 없는 사람끼리 한 팀에 몰리는 것을 막지 못한다.
+ *
+ * **이름은 저장소에도 DB 에도 화면에도 두지 않는다.** '이 둘은 갈라놓는다' 는
+ * 당사자가 보면 기분 상할 일이고, 저장소는 공개다. 그래서 Vercel 환경변수
+ * 하나로만 받는다 — 사이트 어디에도 드러나지 않고, 뽑기 결과에도 적지 않는다.
+ *
+ *   SPLIT_APART="아이디1:아이디2"              한 짝
+ *   SPLIT_APART="a:b,c:d"                      여러 짝은 쉼표로
+ *
+ * 바꾸려면 Vercel → Settings → Environment Variables → SPLIT_APART → Redeploy.
+ * 비워두면 아무 일도 하지 않는다(예전과 똑같이 돌아간다).
+ */
+const APART_MAX = 20;
+
+function apartPairs() {
+  const raw = String(process.env.SPLIT_APART || '').trim();
+  if (!raw) return [];
+  const out = [];
+  for (const chunk of raw.split(',')) {
+    const [a, b] = chunk.split(':').map(x => String(x || '').trim());
+    if (a && b && a !== b) out.push([a, b]);
+    if (out.length >= APART_MAX) break;
+  }
+  return out;
+}
+
 /**
  * 팀을 나눈다 — 이번 달 포인트로 균형을 맞추되, 매번 같은 짝이 되지 않게.
  *
@@ -408,7 +438,7 @@ function hostOrder(handles, today) {
  * 쪽으로 제비를 몰아준다(`seen`). 여전히 제비뽑기지만, 방금 한 편이었던
  * 사람과 또 묶이는 조합은 뒤로 빠진다.
  */
-function splitTeams(rows, sizes, seen = new Map()) {
+function splitTeams(rows, sizes, seen = new Map(), apart = []) {
   const total = rows.reduce((n, p) => n + p.point, 0);
   // 점수가 전부 0인 달(새 시즌 첫날)에도 멈추지 않도록 바닥을 둔다
   const slack = Math.max(2, Math.round((total / sizes.length) * SPLIT_SLACK));
@@ -440,8 +470,25 @@ function splitTeams(rows, sizes, seen = new Map()) {
     tries.push({ parts, spread, repeat });
   }
 
-  const best = Math.min(...tries.map(t => t.spread));
-  const fair = tries.filter(t => t.spread <= best + slack);
+  /* 같은 팀 금지 짝은 **먼저** 걸러낸다.
+   *
+   * 점수·신선도보다 앞에 두는 까닭은, 이것이 '되도록' 이 아니라 '반드시' 이기
+   * 때문이다. 뒤에 두면 점수가 잘 맞는다는 이유로 둘이 한 팀이 될 수 있다.
+   * 300번 섞는 동안 조건에 맞는 것이 하나도 안 나오는 일은 두 팀만 되어도
+   * 거의 없지만(한 짝이 갈라질 확률이 절반쯤이다), 짝을 여럿 걸어 서로
+   * 부딪히면 생길 수 있다. 그때는 조용히 그냥 나눈다 — 룰렛이 멈추거나
+   * 화면에 '누구와 누구를 못 갈라놨다' 고 적히는 것보다는 낫다.
+   */
+  let kept = tries;
+  if (apart.length) {
+    const same = (parts, x, y) => parts.some(
+      part => part.some(p => p.handle === x) && part.some(p => p.handle === y));
+    const fit = tries.filter(t => apart.every(([x, y]) => !same(t.parts, x, y)));
+    if (fit.length) kept = fit;   // 하나도 없으면 못 지킨 채로 간다
+  }
+
+  const best = Math.min(...kept.map(t => t.spread));
+  const fair = kept.filter(t => t.spread <= best + slack);
 
   // 고른 것들 중에서 다시 신선한 쪽만 남긴다. 한계를 절대값이 아니라 이번에
   // 나온 폭(span)의 비율로 잡는 까닭은, 무게가 사람 수·판 수에 따라 몇 배씩
@@ -521,7 +568,7 @@ async function hostDraw(req, res, b) {
       // 그래도 안 되면 3순위가 맡는다. 이 밤에 이미 맡은 사람은 뒤로 민다.
       // 최근에 같은 편이었던 짝은 덜 묶이게 한다
       const seen = await recentTeammates(c);
-      const parts = splitTeams(rows, sizes, seen);
+      const parts = splitTeams(rows, sizes, seen, apartPairs());
       const names = TEAM_NAMES.slice(0, teams);
       const today = await hostCountToday(c);
       const teamRows = parts.map((handles, i) => ({ name: names[i], order: hostOrder(handles, today) }));
