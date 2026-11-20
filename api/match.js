@@ -273,29 +273,30 @@ function shuffle(a) {
  */
 const SPLIT_TRIES = 300;
 /**
- * 한 팀 평균 점수의 이만큼까지는 '고르게 나뉘었다'고 친다.
+ * '고르게 나뉘었다'고 쳐줄 허용폭 — **한 사람당 승률 몇 %p** 로 잡는다.
  *
- * 처음에는 15% 였다. 그런데 점수가 많이 벌어진 명단에서는 이 창이 너무 좁아,
- * 창 안에 드는 조합 자체가 **한쪽으로 치우쳐 있었다** — 꼴찌와 1등은 점수를
- * 맞추려면 거의 늘 한 편이어야 해서, 그 둘이 같은 편인 비율이 63%였다.
- * 아래 '신선도'를 아무리 세게 걸어도 창 밖은 고를 수 없으니 소용이 없었다.
+ * 가장 고른 조합 하나만 쓰면 안 된다. 점수든 승률이든 숫자가 벌어진 명단에서는
+ * 답이 거의 하나로 정해져, 같은 사람들로 돌리면 **늘 같은 팀**이 나온다.
+ * 그래서 '충분히 고른' 것들을 모아 그중에서 제비를 뽑는다(아래 '신선도'와 함께).
  *
- * 그래서 창을 30%로 넓혔다. 여덟 명(160·140·125·110·95·80·60·45점,
- * 한 팀 평균 408점)으로 300판씩 돌려 잰 값이다:
+ * 폭을 사람 수에 비례시키는 까닭은 합을 견주기 때문이다. 6명 팀의 합은
+ * 6명분이므로 같은 '1인당 2%p' 라도 합으로는 0.12 가 된다.
  *
- *             가장 붙어다닌 짝   쏠림    조합    두 팀 점수 차(평균/최대)
- *   15%            63%         22%p    18가지     38점 / 65점
- *   25%            51%         18%p    23가지     62점 / 105점
- *   30%            54%        4.8%p    26가지     70점 / 125점   ← 여기
- *   40%            44%        0.9%p    14가지    101점 / 155점
+ * 11명(9~10월 20판 이상)으로 6:6 을 4000번 짜고 **11월 실제 성적으로**
+ * 채점해 고른 값이다. 추정에 쓴 달과 채점에 쓴 달을 갈라 놓아야 공정하다 —
+ * 같은 데이터로 재면 좁을수록 좋다는 답만 나온다.
  *
- * 40% 면 짝은 완벽하게 고루 섞이지만 두 팀 점수 차가 한 팀 몫의 1/4까지
- * 벌어진다 — 경기가 기운다. 30% 는 "맨날 쟤랑 같은 편"이라는 말이 나오지
- * 않을 만큼(63% → 54%, 쏠림 22%p → 5%p) 섞으면서 점수 차는 한 팀의
- * 17%에 묶어둔 자리다. 점수가 비슷한 명단에서는 두 팀 차가 13%까지 줄고
- * 짝은 41~44%로 거의 완전히 고르다.
+ *   1인당    두 팀 실력 차(평균)   고를 수 있는 조합
+ *    1%p           3.9%p                49가지
+ *    2%p           4.0%p                96가지   ← 여기
+ *    3%p           4.2%p               139가지
+ *    5%p           4.5%p               208가지
+ *
+ * 1%p 는 더 고르지만 고를 조합이 절반으로 줄어 짝이 굳는다. 2%p 는 차이가
+ * 0.1%p 밖에 안 늘면서 조합은 두 배다. 참고로 아무 기준 없이 섞으면 5.7%p,
+ * 예전 POINT 방식도 5.7%p 였다(아래 careerRates 설명 참고).
  */
-const SPLIT_SLACK = 0.30;
+const SPLIT_SLACK = 0.02;   // 한 사람당 2%p
 /**
  * '충분히 고른' 조합들 가운데, 가장 신선한 것보다 이만큼까지는 같이 친다.
  *
@@ -347,6 +348,48 @@ const PAIR_WINDOW = 10;
  * 가까운 판일수록 무겁게 센다(가장 최근 판이 10, 열 판 전이 1). 어제 같은 편이었던
  * 것보다 **바로 앞 판에 같은 편이었던 것**이 훨씬 거슬리기 때문이다.
  */
+/* ---------- 누적 승률 ----------
+ *
+ * 팀을 맞추는 잣대다. 예전에는 **이번 달 POINT 합**으로 맞췄는데, 재어 보니
+ * 그게 공평하게 만드는 일을 거의 하지 못했다.
+ *
+ *   POINT 와 판수의 상관 +0.95   ← POINT 는 사실상 '얼마나 자주 나왔나'
+ *   POINT 와 승률의 상관 +0.62
+ *
+ * 많이 나온 사람이 많은 점수를 갖는다. 그래서 POINT 합을 맞추면 **출석을**
+ * 맞추는 셈이 되고, 실력은 그대로 기울어 있다. 9~10월 기록으로 팀을 짜고
+ * 11월 실제 성적으로 채점해 보니 POINT 방식(5.7%p)이 **아무 기준 없이 섞은
+ * 것(5.7%p)과 같았다.** 승률로 맞추면 4.0%p 로 줄었다.
+ *
+ * 그래서 **시즌을 가리지 않고 쌓인 전적**을 쓴다. 이번 달 것만 쓰면 매달
+ * 1일에 모두 0승 0패가 되어 한동안 아무 잣대가 없다.
+ */
+const RATE_PRIOR = 10;   // 보정. 2판 2승을 100% 로 보지 않으려고 둔다
+
+async function careerRates(c, handles) {
+  const { rows } = await c.query(
+    `SELECT h, count(*) FILTER (WHERE won) AS w, count(*) AS n FROM (
+         SELECT COALESCE(e->>'handle', e#>>'{}') AS h, true AS won
+           FROM matches m, jsonb_array_elements(m.winners) e
+          WHERE m.voided_at IS NULL
+         UNION ALL
+         SELECT COALESCE(e->>'handle', e#>>'{}'), false
+           FROM matches m, jsonb_array_elements(m.losers) e
+          WHERE m.voided_at IS NULL
+       ) t
+      WHERE h = ANY($1)
+      GROUP BY h`, [handles]
+  );
+  const rate = new Map();
+  for (const r of rows) {
+    const w = Number(r.w), n = Number(r.n);
+    // 판수가 적으면 5할 쪽으로 당겨 둔다. 2판 2승이 100% 로 서면 그 사람
+    // 하나 때문에 팀이 통째로 기운다.
+    rate.set(r.h, (w + RATE_PRIOR / 2) / (n + RATE_PRIOR));
+  }
+  return rate;
+}
+
 async function recentTeammates(c) {
   const { rows } = await c.query(
     `SELECT teams, team_a, team_b FROM host_draws ORDER BY ts DESC LIMIT $1`, [PAIR_WINDOW]
@@ -469,10 +512,13 @@ function apartPairs() {
  * 쪽으로 제비를 몰아준다(`seen`). 여전히 제비뽑기지만, 방금 한 편이었던
  * 사람과 또 묶이는 조합은 뒤로 빠진다.
  */
-function splitTeams(rows, sizes, seen = new Map(), apart = []) {
-  const total = rows.reduce((n, p) => n + p.point, 0);
-  // 점수가 전부 0인 달(새 시즌 첫날)에도 멈추지 않도록 바닥을 둔다
-  const slack = Math.max(2, Math.round((total / sizes.length) * SPLIT_SLACK));
+function splitTeams(rows, sizes, seen = new Map(), apart = [], rate = new Map()) {
+  // 기록이 없는 사람은 5할로 둔다 — 모른다는 뜻이지 못한다는 뜻이 아니다.
+  const of = (p) => (rate.has(p.handle) ? rate.get(p.handle) : 0.5);
+  // 허용폭은 **한 사람당 몇 %p** 로 잡는다. 팀이 커지면 합의 폭도 그만큼 커야
+  // 같은 뜻이 된다. 좁히면 더 고르게 나뉘지만 고를 조합이 줄어 늘 같은 팀이
+  // 나온다 — 재어 보고 고른 값이다(1인 2%p: 두 팀 차 4.0%p, 고를 조합 96개).
+  const slack = SPLIT_SLACK * (sizes[0] || 1);
 
   const tries = [];
   for (let t = 0; t < SPLIT_TRIES; t++) {
@@ -483,7 +529,7 @@ function splitTeams(rows, sizes, seen = new Map(), apart = []) {
 
     // 맞붙는 두 팀끼리만 견준다. 6명 팀과 5명 팀의 합을 맞대는 것은 뜻이 없고,
     // 어차피 한 경기 안의 두 팀은 인원이 같다.
-    const sum = (part) => part.reduce((n, p) => n + p.point, 0);
+    const sum = (part) => part.reduce((n, p) => n + of(p), 0);
     let spread = 0;
     for (let i = 0; i < parts.length; i += 2) {
       spread = Math.max(spread, Math.abs(sum(parts[i]) - sum(parts[i + 1])));
@@ -599,7 +645,8 @@ async function hostDraw(req, res, b) {
       // 그래도 안 되면 3순위가 맡는다. 이 밤에 이미 맡은 사람은 뒤로 민다.
       // 최근에 같은 편이었던 짝은 덜 묶이게 한다
       const seen = await recentTeammates(c);
-      const parts = splitTeams(rows, sizes, seen, apartPairs());
+      const rate = await careerRates(c, entries);
+      const parts = splitTeams(rows, sizes, seen, apartPairs(), rate);
       const names = TEAM_NAMES.slice(0, teams);
       const today = await hostCountToday(c);
       const skip = hostSkip();
