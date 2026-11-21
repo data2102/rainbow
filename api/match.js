@@ -1,6 +1,7 @@
 import { randomInt } from 'node:crypto';
 import {
-  q, tx, body, methodGuard, requireUser, currentStaff, requireStaff, requireAdmin, currentUser, audit,
+  q, tx, body, methodGuard, requireUser, currentStaff, requireStaff, requireAdmin,
+  currentAdmin, currentUser, audit,
   ensureLadder, rowToLadder,
   winGain, lossGain, cleanReason, ensureMatchVoid, noScoreFor,
   ensureHostDraws, rowToDraw, TEAM_NAMES, replay, nightStart,
@@ -860,11 +861,25 @@ async function hostLog(req, res) {
         [LOG_PER, (page - 1) * LOG_PER]),
     ]);
     const total = cnt[0].n;
+
+    /* 숨은 규칙이 **실제로 읽혔는지** 확인할 창구.
+     *
+     * SPLIT_APART·HOST_SKIP 은 화면에 아무 표시를 안 남기도록 만들었는데,
+     * 그 탓에 "넣었는데 왜 안 되지" 를 확인할 길이 없었다. Vercel 환경변수는
+     * 저장만 하고 Redeploy 를 안 하면 돌고 있는 배포에는 안 들어간다 —
+     * 실제로 그 일이 있었다(2026-11-21, 둘이 같은 팀에 호스트까지 걸렸다).
+     *
+     * **개수만** 보낸다. 이름은 여전히 어디에도 안 나간다. 리더·웹마스터만 본다.
+     */
+    const boss = await currentAdmin(req);   // 아이디를 돌려주거나 null
+    const cfg = boss ? { apart: apartPairs().length, skip: hostSkip().size } : null;
+
     res.setHeader('Cache-Control', 'no-store');
     res.status(200).json({
       page, per: LOG_PER, total,
       pages: Math.max(1, Math.ceil(total / LOG_PER)),
       draws: rows.map(rowToDraw),
+      ...(cfg ? { cfg } : {}),
     });
   } catch (e) {
     res.status(500).json({ error: '기록을 불러오지 못했습니다: ' + e.message });
