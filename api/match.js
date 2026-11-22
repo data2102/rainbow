@@ -35,6 +35,7 @@ export default async function handler(req, res) {
   if (b.action === 'hostClear') return hostClear(req, res, b);
   if (b.action === 'ladder') return ladderDraw(req, res, b);
   if (b.action === 'ladderLog') return ladderLog(req, res, b);
+  if (b.action === 'rules') return rulesSave(req, res, b);
   if (b.action === 'ladderVoid') return ladderVoid(req, res, b);
   return record(req, res, b);
 }
@@ -442,32 +443,6 @@ function pairKey(a, b) {
   return x < y ? x + '|' + y : y + '|' + x;
 }
 
-/* ---------- 호스트를 맡기지 않을 사람 ----------
- *
- * 회선이 약하거나 PC 가 버거워 호스트를 잡으면 판이 깨지는 사람이 있다.
- * 그런 사람을 순번 맨 뒤로 민다 — 빼는 것이 아니라 미는 것이라, 팀이 그런
- * 사람들뿐이어도 누군가는 호스트를 맡는다(룰렛이 멈추지 않는다).
- *
- * **같은 팀 금지 짝과 같은 이유로 이름을 환경변수에만 둔다.** '너는 호스트
- * 맡기지 않는다' 는 당사자가 보면 기분 상할 일이고, 저장소는 공개다.
- * 화면에도 기록에도 아무 표시가 남지 않는다.
- *
- *   HOST_SKIP="아이디1,아이디2"
- *
- * 바꾸려면 Vercel → Settings → Environment Variables → HOST_SKIP → Redeploy.
- * 비워두면 아무 일도 하지 않는다.
- */
-const HOST_SKIP_MAX = 30;
-
-function hostSkip() {
-  const raw = String(process.env.HOST_SKIP || '').trim();
-  if (!raw) return new Set();
-  return new Set(
-    raw.split(',').map(x => String(x || '').trim().toLowerCase())
-       .filter(Boolean).slice(0, HOST_SKIP_MAX)
-  );
-}
-
 /**
  * 팀 안의 차례를 정한다. 이 차례가 곧 호스트 순번이다.
  *
@@ -485,38 +460,80 @@ function hostOrder(handles, today, skip = new Set()) {
   return shuffle([...handles]).sort((a, b) => back(a) - back(b) || n(a) - n(b));
 }
 
-/* ---------- 같은 팀 금지 짝 ----------
+/* ---------- 룰렛 세부 규칙 (같은 팀 금지 · 호스트 제외) ----------
  *
- * 어떤 둘은 같은 편에 서면 판이 한쪽으로 기운다. 갓 들어와 점수가 0인 회원이
- * 그렇다 — 점수로 팀을 맞추는 장치(SPLIT_SLACK)는 **점수가 있어야** 돌아가므로,
- * 기록이 없는 사람끼리 한 팀에 몰리는 것을 막지 못한다.
+ * 어떤 둘은 같은 편에 서면 판이 한쪽으로 기운다. 또 어떤 사람은 회선이 약해
+ * 호스트를 잡으면 판이 깨진다. 둘 다 사람이 적어줘야 아는 일이다.
  *
- * **이름은 저장소에도 DB 에도 화면에도 두지 않는다.** '이 둘은 갈라놓는다' 는
- * 당사자가 보면 기분 상할 일이고, 저장소는 공개다. 그래서 Vercel 환경변수
- * 하나로만 받는다 — 사이트 어디에도 드러나지 않고, 뽑기 결과에도 적지 않는다.
+ * **이름은 저장소에 두지 않는다.** '이 둘은 갈라놓는다' 는 당사자가 보면 기분
+ * 상할 일이고 이 저장소는 공개다. 화면에도 뽑기 결과에도 아무 표시가 없다 —
+ * 리더·웹마스터가 세부 설정을 열었을 때만 보인다.
  *
- *   SPLIT_APART="아이디1:아이디2"              한 짝
- *   SPLIT_APART="a:b,c:d"                      여러 짝은 쉼표로
+ * 처음에는 Vercel 환경변수로만 받았다. 그런데 **환경변수는 저장만 하고
+ * Redeploy 를 안 하면 돌고 있는 배포에 안 들어간다.** 그걸 모르고 두 번
+ * 헛돌았다(2026-11-21~22, 둘이 같은 팀에 호스트까지 걸렸다). 그래서 DB 에
+ * 두고 사이트에서 바로 고치게 바꿨다(v184) — 누르면 그 순간부터 먹는다.
  *
- * 바꾸려면 Vercel → Settings → Environment Variables → SPLIT_APART → Redeploy.
- * 비워두면 아무 일도 하지 않는다(예전과 똑같이 돌아간다).
+ * 환경변수도 계속 읽는다. 둘 다 있으면 합친다.
  */
 const APART_MAX = 20;
+const HOST_SKIP_MAX = 30;
+const RULES_KEY = 'roulette_rules';
 
-function apartPairs() {
-  const raw = String(process.env.SPLIT_APART || '').trim();
-  if (!raw) return [];
-  const out = [];
-  for (const chunk of raw.split(',')) {
+async function ensureMeta(c) {
+  const run = c ? (q2, p2) => c.query(q2, p2) : (q2, p2) => q(q2, p2);
+  await run(`CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
+}
+
+/** DB 에 적어둔 세부 규칙. {apart:[[a,b]...], skip:[아이디...]} */
+async function loadRules(c) {
+  await ensureMeta(c);
+  const rows = c
+    ? (await c.query(`SELECT value FROM app_meta WHERE key = $1`, [RULES_KEY])).rows
+    : await q(`SELECT value FROM app_meta WHERE key = $1`, [RULES_KEY]);
+  let apart = [], skip = [];
+  if (rows.length) {
+    try {
+      const v = JSON.parse(rows[0].value) || {};
+      if (Array.isArray(v.apart)) apart = v.apart;
+      if (Array.isArray(v.skip)) skip = v.skip;
+    } catch { /* 깨져 있으면 없는 셈 친다 */ }
+  }
+  // 환경변수도 함께 — 예전 방식으로 넣어둔 것이 있으면 살려준다
+  for (const chunk of String(process.env.SPLIT_APART || '').split(',')) {
     const [a, b] = chunk.split(':').map(x => String(x || '').trim());
-    if (a && b && a !== b) out.push([a, b]);
+    if (a && b && a !== b) apart.push([a, b]);
+  }
+  for (const x of String(process.env.HOST_SKIP || '').split(',')) {
+    const h = String(x || '').trim();
+    if (h) skip.push(h);
+  }
+  // 맞춰볼 때는 소문자로, 화면에 보일 때는 적은 그대로.
+  const names = [...new Set(skip.map(h => String(h || '').trim()).filter(Boolean))]
+    .slice(0, HOST_SKIP_MAX);
+  return {
+    apart: cleanApart(apart),
+    skip: new Set(names.map(h => h.toLowerCase())),
+    skipNames: names,
+  };
+}
+
+function cleanApart(list) {
+  const out = []; const seen = new Set();
+  for (const p of list) {
+    if (!Array.isArray(p) || p.length !== 2) continue;
+    const a = String(p[0] || '').trim(), b = String(p[1] || '').trim();
+    if (!a || !b || a === b) continue;
+    const k = [a.toLowerCase(), b.toLowerCase()].sort().join('|');
+    if (seen.has(k)) continue;
+    seen.add(k); out.push([a, b]);
     if (out.length >= APART_MAX) break;
   }
   return out;
 }
 
 /**
- * 팀을 나눈다 — 이번 달 포인트로 균형을 맞추되, 매번 같은 짝이 되지 않게.
+ * 팀을 나눈다 — 누적 승률로 균형을 맞추되, 매번 같은 짝이 되지 않게.
  *
  * 처음에는 차이가 가장 적은 조합을 끝까지 찾아 들어갔다. 그랬더니 점수가
  * 저마다 다른 날에는 답이 하나로 정해져, 같은 사람들로 돌리면 **늘 같은 팀**이
@@ -669,11 +686,13 @@ async function hostDraw(req, res, b) {
       // 최근에 같은 편이었던 짝은 덜 묶이게 한다
       const seen = await recentTeammates(c);
       const rate = await careerRates(c, entries);
-      const parts = splitTeams(rows, sizes, seen, apartPairs(), rate);
+      const rules = await loadRules(c);
+      const parts = splitTeams(rows, sizes, seen, rules.apart, rate);
       const names = TEAM_NAMES.slice(0, teams);
       const today = await hostCountToday(c);
-      const skip = hostSkip();
-      const teamRows = parts.map((handles, i) => ({ name: names[i], order: hostOrder(handles, today, skip) }));
+      const teamRows = parts.map((handles, i) => ({
+        name: names[i], order: hostOrder(handles, today, rules.skip),
+      }));
 
       // 앞에서부터 둘씩 붙여 대진을 만든다. 이름표를 이미 섞었으므로 어느 팀이
       // 어느 팀과 붙을지도 여기서 갈린다.
@@ -871,8 +890,10 @@ async function hostLog(req, res) {
      *
      * **개수만** 보낸다. 이름은 여전히 어디에도 안 나간다. 리더·웹마스터만 본다.
      */
-    const boss = await currentAdmin(req);   // 아이디를 돌려주거나 null
-    const cfg = boss ? { apart: apartPairs().length, skip: hostSkip().size } : null;
+    // 리더·웹마스터에게는 세부 규칙을 그대로 돌려준다 — 거기서 고칠 수 있게.
+    const boss = await currentAdmin(req);
+    const rules = boss ? await loadRules(null) : null;
+    const cfg = rules ? { apart: rules.apart, skip: rules.skipNames } : null;
 
     res.setHeader('Cache-Control', 'no-store');
     res.status(200).json({
@@ -883,6 +904,44 @@ async function hostLog(req, res) {
     });
   } catch (e) {
     res.status(500).json({ error: '기록을 불러오지 못했습니다: ' + e.message });
+  }
+}
+
+/** 룰렛 세부 규칙 저장 — 리더·웹마스터만. 누른 그 순간부터 먹는다. */
+async function rulesSave(req, res, b) {
+  const me = await requireAdmin(req, res);
+  if (!me) return;
+  try {
+    await ensureMeta(null);
+    const apart = cleanApart(Array.isArray(b.apart) ? b.apart : []);
+    const skip = [...new Set(
+      (Array.isArray(b.skip) ? b.skip : [])
+        .map(x => String(x || '').trim()).filter(Boolean)
+    )].slice(0, HOST_SKIP_MAX);
+
+    // 명단에 없는 아이디는 돌려보낸다. 오타가 나면 아무 일도 안 일어나는데
+    // 화면에 표시를 안 남기는 규칙이라 **틀린 줄도 모른 채** 지나간다.
+    const names = [...new Set([...apart.flat(), ...skip])];
+    if (names.length) {
+      const found = new Set((await q(
+        `SELECT handle FROM players WHERE handle = ANY($1)`, [names])).map(r => r.handle));
+      const bad = names.filter(h => !found.has(h));
+      if (bad.length) {
+        return res.status(400).json({ error: '명단에 없는 아이디입니다: ' + bad.join(', ') });
+      }
+    }
+
+    await q(
+      `INSERT INTO app_meta (key, value) VALUES ($1, $2)
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [RULES_KEY, JSON.stringify({ apart, skip })]
+    );
+    // 기록에는 **개수만** 남긴다 — 감사 기록도 누가 찍히면 안 된다.
+    await audit(me, 'roulette_rules', { apart: apart.length, skip: skip.length });
+    const now = await loadRules(null);
+    res.status(200).json({ ok: true, cfg: { apart: now.apart, skip: now.skipNames } });
+  } catch (e) {
+    res.status(500).json({ error: '저장하지 못했습니다: ' + e.message });
   }
 }
 
