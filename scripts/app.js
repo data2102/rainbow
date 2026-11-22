@@ -431,7 +431,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 184;
+const APP_VERSION = 185;
 let toldToRefresh = false;
 
 /**
@@ -6956,14 +6956,10 @@ async function loadRlLog(page) {
   if (page) rlLogPage = page;
   try {
     rlLogData = await apiGet(`/api/match?host=1&page=${rlLogPage}`);
-    // cfg 는 리더·웹마스터에게만 온다. 없으면 세부 규칙 칸을 아예 안 보여준다.
-    rlRules = rlLogData && rlLogData.cfg ? rlLogData.cfg : null;
   } catch {
     rlLogData = null;
-    rlRules = null;
   }
   renderRlLog();
-  rlRulesRender();
 }
 
 /**
@@ -7007,110 +7003,6 @@ function rlVoidBtn(r) {
   if (!canStaff()) return '';
   if (r.pairs.some(p => p.result)) return '';
   return `<button type="button" class="rl-log-void" data-rlvoid="${r.id}">이 판 무효</button>`;
-}
-
-/* ---------- 룰렛 세부 규칙 (리더·웹마스터) ----------
- *
- * 같은 팀에 두지 않을 짝, 호스트를 맡기지 않을 사람. 서버가 뽑을 때 쓴다.
- *
- * **접힌 채로 둔다.** 펼치기 전에는 아이디가 화면에 한 글자도 안 뜬다 —
- * 당사자가 옆에서 보면 기분 상할 일이라 그렇게 만든 기능이다. 뽑기 결과에도
- * 기록에도 표시가 없고, 여기 말고는 어디서도 볼 수 없다.
- *
- * 예전에는 Vercel 환경변수로만 받았는데, **저장만 하고 Redeploy 를 안 하면
- * 돌고 있는 배포에 안 들어간다**는 것을 모르고 두 번 헛돌았다. 여기서 고치면
- * 그 순간부터 먹는다.
- */
-let rlRules = null;
-
-function rlRulesRender() {
-  const box = document.getElementById('rlRulesBox');
-  if (!box) return;
-  // 리더·웹마스터가 아니면 서버가 cfg 를 아예 안 보낸다 → 칸 자체를 숨긴다
-  box.hidden = !rlRules;
-  if (!rlRules) return;
-
-  const names = rlRanked().map(p => p.handle);
-  const opts = (sel) => `<option value="">— 고르기 —</option>`
-    + names.map(h => `<option value="${esc(h)}"${h === sel ? ' selected' : ''}>${esc(h)}</option>`).join('');
-  for (const id of ['rlApartA', 'rlApartB', 'rlSkipWho']) {
-    const el = document.getElementById(id);
-    if (el && el.options.length !== names.length + 1) el.innerHTML = opts(el.value);
-  }
-
-  const al = document.getElementById('rlApartList');
-  if (al) {
-    al.innerHTML = rlRules.apart.length
-      ? rlRules.apart.map((p, i) => `<div class="rl-rule-row">
-          <b>${esc(p[0])}</b> <span>↔</span> <b>${esc(p[1])}</b>
-          <button type="button" class="x" data-rlapartdel="${i}" title="지우기">✕</button>
-        </div>`).join('')
-      : '<div class="rl-rules-none">없음 — 아무도 갈라놓지 않습니다.</div>';
-  }
-  const sl = document.getElementById('rlSkipList');
-  if (sl) {
-    sl.innerHTML = rlRules.skip.length
-      ? rlRules.skip.map(h => `<div class="rl-rule-row"><b>${esc(h)}</b>
-          <button type="button" class="x" data-rlskipdel="${esc(h)}" title="지우기">✕</button>
-        </div>`).join('')
-      : '<div class="rl-rules-none">없음 — 누구나 호스트가 될 수 있습니다.</div>';
-  }
-}
-
-async function rlRulesSave(next, what) {
-  const note = document.getElementById('rlRulesNote');
-  try {
-    const r = await apiPost('/api/match', { action: 'rules', ...next });
-    rlRules = r.cfg;
-    rlRulesRender();
-    if (note) note.textContent = `${what} · 지금부터 적용됩니다.`;
-  } catch (e) {
-    if (note) note.textContent = e.message;
-  }
-}
-
-function initRlRules() {
-  const add = document.getElementById('rlApartAdd');
-  if (add) add.addEventListener('click', () => {
-    const a = (document.getElementById('rlApartA') || {}).value;
-    const b = (document.getElementById('rlApartB') || {}).value;
-    const note = document.getElementById('rlRulesNote');
-    if (!a || !b) { if (note) note.textContent = '두 사람을 다 골라주세요.'; return; }
-    if (a === b) { if (note) note.textContent = '같은 사람입니다.'; return; }
-    rlRulesSave({ apart: [...rlRules.apart, [a, b]], skip: rlRules.skip },
-                `${a} ↔ ${b} 를 갈라놓습니다`);
-  });
-
-  const sadd = document.getElementById('rlSkipAdd');
-  if (sadd) sadd.addEventListener('click', () => {
-    const h = (document.getElementById('rlSkipWho') || {}).value;
-    const note = document.getElementById('rlRulesNote');
-    if (!h) { if (note) note.textContent = '사람을 골라주세요.'; return; }
-    if (rlRules.skip.some(x => x.toLowerCase() === h.toLowerCase())) {
-      if (note) note.textContent = '이미 들어 있습니다.'; return;
-    }
-    rlRulesSave({ apart: rlRules.apart, skip: [...rlRules.skip, h] },
-                `${h} 는 호스트를 안 맡습니다`);
-  });
-
-  const box = document.getElementById('rlRulesBox');
-  if (box) box.addEventListener('click', (e) => {
-    const a = e.target.closest('[data-rlapartdel]');
-    if (a) {
-      const i = Number(a.dataset.rlapartdel);
-      const gone = rlRules.apart[i];
-      return rlRulesSave(
-        { apart: rlRules.apart.filter((_, k) => k !== i), skip: rlRules.skip },
-        `${gone[0]} ↔ ${gone[1]} 규칙을 지웠습니다`);
-    }
-    const sdel = e.target.closest('[data-rlskipdel]');
-    if (sdel) {
-      const h = sdel.dataset.rlskipdel;
-      return rlRulesSave(
-        { apart: rlRules.apart, skip: rlRules.skip.filter(x => x !== h) },
-        `${h} 를 호스트 제외에서 뺐습니다`);
-    }
-  });
 }
 
 function renderRlLog() {
@@ -7349,7 +7241,6 @@ async function rlWipeLog() {
 /* ---- 묶기 ---- */
 
 function initRouletteEvents() {
-  initRlRules();
   rlPicked = new Set(rlReadJson(RL_PICK_KEY));
   const savedTeams = Number(readKey(RL_TEAMS_KEY));
   if (RL_TEAM_OPTIONS.includes(savedTeams)) rlTeamCount = savedTeams;

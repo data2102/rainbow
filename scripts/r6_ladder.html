@@ -1936,37 +1936,6 @@ body.rule-v2 #standingTable .streak-txt{ display:none; }
 .rl-done b{ color:var(--success-strong); font-weight:var(--fw-bold); }
 
 /* ---- 기록 ---- */
-/* 세부 규칙 — 접혀 있는 것이 기본. 열기 전에는 아이디가 화면에 없다. */
-.rl-rules{ margin-top:var(--sp-4); border-top:1px solid var(--border); padding-top:var(--sp-3); }
-.rl-rules > summary{
-  cursor:pointer; font-size:var(--fs-footnote); color:var(--text-tertiary);
-  list-style:none; user-select:none; width:max-content;
-}
-.rl-rules > summary::-webkit-details-marker{ display:none; }
-.rl-rules > summary::before{ content:'▸ '; }
-.rl-rules[open] > summary::before{ content:'▾ '; }
-.rl-rules > summary:hover{ color:var(--text-secondary); }
-.rl-rules-in{ padding-top:var(--sp-2); }
-.rl-rules-list{ display:flex; flex-direction:column; gap:var(--sp-2); margin-top:var(--sp-2); }
-.rl-rule-row{
-  display:flex; align-items:center; gap:var(--sp-2); flex-wrap:wrap;
-  padding:var(--sp-2) var(--sp-3); border:1px solid var(--border);
-  border-radius:var(--radius-md); background:var(--surface-sunken);
-  font-size:var(--fs-caption);
-}
-.rl-rule-row b{ font-weight:var(--fw-medium); }
-.rl-rule-row .x{
-  margin-left:auto; border:1px solid var(--border-strong); background:var(--surface);
-  color:var(--text-secondary); border-radius:var(--radius-pill);
-  width:24px; height:24px; cursor:pointer; font-family:inherit; line-height:1;
-}
-.rl-rule-row .x:hover{ border-color:var(--danger); color:var(--danger); }
-.rl-rules-none{ font-size:var(--fs-footnote); color:var(--text-tertiary); padding:var(--sp-2) 0; }
-.rl-rules-add{
-  display:flex; align-items:center; gap:var(--sp-2); margin-top:var(--sp-2); flex-wrap:wrap;
-}
-.rl-rules-add select{ flex:1 1 150px; min-width:0; }
-.rl-rules-add span{ color:var(--text-tertiary); }
 .rl-log{ display:flex; flex-direction:column; gap:var(--sp-2); }
 .rl-log-row{
   padding:var(--sp-3); border-radius:var(--radius-sm);
@@ -4196,36 +4165,6 @@ if (/[?&]room=\d+/.test(location.search)) {
         리폿 탭에 손으로 쓴 판은 <b>수기작성</b> 으로 표시해두면 다른 사람이 또 올리지 않습니다.
       </div>
       <div class="rl-log" id="rlLog"></div>
-
-      <!-- 세부 규칙. 리더·웹마스터에게만 보이고, 접혀 있어 누르기 전에는
-           이름이 화면에 뜨지 않는다. 당사자가 지나가다 보면 기분 상할 일이라
-           화면 어디에도 안 적는 것이 이 기능의 요점이다. -->
-      <details class="rl-rules" id="rlRulesBox" hidden>
-        <summary>세부 규칙</summary>
-        <div class="rl-rules-in">
-          <div class="foot-note" style="margin-top:0;">
-            여기서 고치면 <b>바로 적용</b>됩니다 · 뽑기 결과·기록 어디에도 표시되지 않습니다.
-          </div>
-
-          <div class="side-label" style="margin-top:var(--sp-4);">같은 팀에 두지 않을 짝</div>
-          <div class="rl-rules-list" id="rlApartList"></div>
-          <div class="rl-rules-add">
-            <select id="rlApartA" aria-label="첫 번째 사람"></select>
-            <span>↔</span>
-            <select id="rlApartB" aria-label="두 번째 사람"></select>
-            <button type="button" class="btn-mini" id="rlApartAdd">추가</button>
-          </div>
-
-          <div class="side-label" style="margin-top:var(--sp-5);">호스트를 맡기지 않을 사람</div>
-          <div class="rl-rules-list" id="rlSkipList"></div>
-          <div class="rl-rules-add">
-            <select id="rlSkipWho" aria-label="호스트 제외할 사람"></select>
-            <button type="button" class="btn-mini" id="rlSkipAdd">추가</button>
-          </div>
-
-          <div class="pick-note" id="rlRulesNote" aria-live="polite"></div>
-        </div>
-      </details>
       <div id="rlLogEmpty" class="log-empty" hidden>아직 뽑은 기록이 없습니다.</div>
       <div class="pager" id="rlPager" style="display:none;"></div>
     </div>
