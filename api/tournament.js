@@ -1025,7 +1025,7 @@ async function eventFormat(req, res, b) {
 }
 
 /**
- * 선수 한 명을 다른 사람으로 바꾼다 — 리더·웹마스터만.
+ * 선수 한 명을 다른 사람으로 바꾼다 — 관리자 이상.
  *
  * 대진표를 다시 짜지 않는다. `slots` 의 그 한 자리만 갈아끼우므로 조 나누기·방식·
  * 적어둔 결과가 그대로 남는다. 다시 짜면 선 차례를 새로 섞어 치른 경기가 날아간다 —
@@ -1037,7 +1037,9 @@ async function eventFormat(req, res, b) {
  * 응답과 기록에 적어 보낸다 — 조용히 사라지면 리더가 모른다.
  */
 async function eventSwap(req, res, b) {
-  const me = await requireAdmin(req, res);
+  // 결과를 적고 되돌리는 것과 같은 자리다 — 대회를 돌리는 사람이 할 일이지
+  // 대진표를 짜는 일(리더·웹마스터)과는 다르다. 기록에 누가 바꿨는지 남는다.
+  const me = await requireStaff(req, res);
   if (!me) return;
   await ensureEvent();
 

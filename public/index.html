@@ -5600,7 +5600,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 186;
+const APP_VERSION = 187;
 let toldToRefresh = false;
 
 /**
@@ -13726,7 +13726,7 @@ async function evSetFormat(format) {
 }
 
 /**
- * 선수 교체 — 리더·웹마스터만.
+ * 선수 교체 — 관리자 이상(결과를 적는 사람과 같은 자리).
  *
  * 부상·불참으로 한 명이 빠질 때 쓴다. 참가자를 다시 고르면 선 차례를 새로 섞어
  * **이미 치른 경기가 날아간다** — 한 명 때문에 그럴 일은 아니다.
@@ -13739,7 +13739,7 @@ const evSwapSel = { out: '', in: '' };
 function renderEvSwap(d) {
   const box = document.getElementById('evSwapBox');
   if (!box) return;
-  box.hidden = !(d && evCanMake() && (d.entrants || []).length);
+  box.hidden = !(d && evCanPick() && (d.entrants || []).length);
   if (box.hidden) return;
 
   const inEv = new Set(d.entrants);
