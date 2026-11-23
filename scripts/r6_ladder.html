@@ -1435,6 +1435,18 @@ textarea{ resize:vertical; line-height:var(--lh-body); }
   color:var(--accent-strong); font-weight:var(--fw-bold);
 }
 .ev-fmt-btns{ display:flex; gap:var(--sp-2); flex-wrap:wrap; }
+/* 선수 교체 줄 — 방식 바꾸기 줄과 같은 띠 */
+.ev-swap{
+  display:flex; align-items:center; flex-wrap:wrap; gap:var(--sp-2);
+  margin-top:var(--sp-3); padding-top:var(--sp-3);
+  border-top:1px solid var(--border);
+  font-size:var(--fs-caption);
+}
+.ev-swap-sel{
+  flex:none; width:auto; min-width:150px; max-width:100%;
+  padding:var(--sp-2) var(--sp-3); font-size:var(--fs-caption); cursor:pointer;
+}
+.ev-swap-ar{ color:var(--text-secondary); font-weight:var(--fw-bold); }
 /* 조별 1위 넉 줄 */
 .ev-wins{ display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-bottom:var(--sp-4); }
 .ev-win{
@@ -4583,6 +4595,13 @@ if (/[?&]room=\d+/.test(location.search)) {
         <span class="side-label" style="margin:0;">본선 방식</span>
         <span class="ev-fmt-now" id="evFormatNow"></span>
         <span class="ev-fmt-btns" id="evFormatBtns"></span>
+      </div>
+      <div class="ev-swap" id="evSwapBox" hidden>
+        <span class="side-label" style="margin:0;">선수 교체</span>
+        <select class="ev-swap-sel" id="evSwapOut" aria-label="빠질 사람"></select>
+        <span class="ev-swap-ar" aria-hidden="true">&rarr;</span>
+        <select class="ev-swap-sel" id="evSwapIn" aria-label="들어올 사람"></select>
+        <button type="button" class="btn-mini" id="evSwapGo">바꾸기</button>
       </div>
       <div class="pick-actions" id="evAdminBtns" hidden>
         <button type="button" class="btn-mini btn-reject" id="evClose">이 대회 치우기</button>

@@ -205,6 +205,7 @@ export default async function handler(req, res) {
     if (action === 'eventUndo') return await eventPick(req, res, b, true);
     if (action === 'eventDraw') return await eventDraw(req, res, b);
     if (action === 'eventFormat') return await eventFormat(req, res, b);
+    if (action === 'eventSwap') return await eventSwap(req, res, b);
     if (action === 'eventClose') return await eventDelete(req, res, b);
     return res.status(400).json({ error: '알 수 없는 요청입니다.' });
   } catch (e) {
@@ -1021,6 +1022,63 @@ async function eventFormat(req, res, b) {
   );
   await audit(me, 'event_format', { id: ev.id, from: ev.format, to: want });
   res.status(200).json({ ok: true, event: evView(out[0]) });
+}
+
+/**
+ * 선수 한 명을 다른 사람으로 바꾼다 — 리더·웹마스터만.
+ *
+ * 대진표를 다시 짜지 않는다. `slots` 의 그 한 자리만 갈아끼우므로 조 나누기·방식·
+ * 적어둔 결과가 그대로 남는다. 다시 짜면 선 차례를 새로 섞어 치른 경기가 날아간다 —
+ * 부상·불참으로 한 명만 빠질 때 그럴 일은 아니다.
+ *
+ * 빠지는 사람이 **이미 이긴 경기가 있으면 그 칸의 결과는 지운다.** 남겨 두면 그 승리가
+ * 들어온 사람의 것으로 읽히는데, 치르지도 않은 경기다. 뒷 칸은 다시 셀 때 저절로
+ * 비므로(두 사람이 다 정해진 칸만 결과를 가진다) 손대지 않는다. 몇 칸이 비었는지는
+ * 응답과 기록에 적어 보낸다 — 조용히 사라지면 리더가 모른다.
+ */
+async function eventSwap(req, res, b) {
+  const me = await requireAdmin(req, res);
+  if (!me) return;
+  await ensureEvent();
+
+  const rows = await q(
+    `SELECT * FROM event_brackets WHERE id = $1 AND closed_at IS NULL`, [Number(b.id)]
+  );
+  if (!rows.length) return res.status(404).json({ error: '지금 열려 있는 대회가 아닙니다.' });
+
+  const ev = rowToEvent(rows[0]);
+  const out = String(b.out || '').trim();
+  const inn = String(b.in || '').trim();
+  if (!out || !inn) return res.status(400).json({ error: '빠질 사람과 들어올 사람을 골라주세요.' });
+  if (out === inn) return res.status(400).json({ error: '같은 사람입니다.' });
+
+  const at = ev.slots.indexOf(out);
+  if (at < 0) return res.status(400).json({ error: `${out} 은(는) 이 대회에 없습니다.` });
+  if (ev.slots.includes(inn)) {
+    return res.status(400).json({ error: `${inn} 은(는) 이미 이 대회에 있습니다.` });
+  }
+
+  const found = await q(`SELECT handle FROM players WHERE handle = $1`, [inn]);
+  if (!found.length) return res.status(400).json({ error: '명단에 없는 선수입니다: ' + inn });
+
+  // 빠지는 사람이 이긴 칸만 지운다.
+  const picks = {};
+  let cleared = 0;
+  for (const [k, v] of Object.entries(ev.picks)) {
+    if (v === out) { cleared += 1; continue; }
+    picks[k] = v;
+  }
+
+  const slots = [...ev.slots];
+  slots[at] = inn;
+  const entry = { ts: Date.now(), by: me, what: 'swap', out, in: inn, cleared };
+
+  const upd = await q(
+    `UPDATE event_brackets SET slots = $1, picks = $2, log = $3 WHERE id = $4 RETURNING *`,
+    [JSON.stringify(slots), JSON.stringify(picks), JSON.stringify(evLogged(ev.log, entry)), ev.id]
+  );
+  await audit(me, 'event_swap', { id: ev.id, out, in: inn, cleared });
+  res.status(200).json({ ok: true, cleared, event: evView(upd[0]) });
 }
 
 /** 대회 자체를 치운다 — 리더·웹마스터만 */

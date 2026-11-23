@@ -431,7 +431,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 185;
+const APP_VERSION = 186;
 let toldToRefresh = false;
 
 /**
@@ -8394,6 +8394,7 @@ function renderEvBoard() {
   const btns = document.getElementById('evAdminBtns');
   if (btns) btns.hidden = !evCanMake();
   renderEvFormatSwitch(d);
+  renderEvSwap(d);
 
   renderEvAsl(d);
   renderEvLog();
@@ -8427,6 +8428,12 @@ function renderEvLog() {
       return `<div class="ev-log-row"><b>본선 방식을 바꿨습니다</b>
         · ${esc(EV_FORMAT_NAME[e.from] || e.from || '')} → ${esc(EV_FORMAT_NAME[e.to] || e.to || '')}
         <span>(조별 경기 결과는 그대로)</span>
+        <span class="ev-log-w">${esc(formatDateTime(e.ts))} · ${esc(e.by)}</span></div>`;
+    }
+    if (e.what === 'swap') {
+      return `<div class="ev-log-row"><b>선수 교체</b>
+        · ${esc(e.out || '')} → ${esc(e['in'] || '')}
+        ${e.cleared ? `<span>(${e.cleared}칸 비움)</span>` : ''}
         <span class="ev-log-w">${esc(formatDateTime(e.ts))} · ${esc(e.by)}</span></div>`;
     }
     if (e.what === 'undo') {
@@ -8549,6 +8556,68 @@ async function evSetFormat(format) {
   evBusy = false;
 }
 
+/**
+ * 선수 교체 — 리더·웹마스터만.
+ *
+ * 부상·불참으로 한 명이 빠질 때 쓴다. 참가자를 다시 고르면 선 차례를 새로 섞어
+ * **이미 치른 경기가 날아간다** — 한 명 때문에 그럴 일은 아니다.
+ *
+ * 고른 것은 `evSwapSel` 에 들고 있는다. 이 탭도 자동 갱신으로 다시 그려지는데,
+ * 그때 목록을 새로 채우면 고르던 이름이 첫 줄로 되돌아간다.
+ */
+const evSwapSel = { out: '', in: '' };
+
+function renderEvSwap(d) {
+  const box = document.getElementById('evSwapBox');
+  if (!box) return;
+  box.hidden = !(d && evCanMake() && (d.entrants || []).length);
+  if (box.hidden) return;
+
+  const inEv = new Set(d.entrants);
+  const fill = (el, list, keep) => {
+    if (!el) return;
+    // 고르던 이름이 아직 목록에 있으면 그대로 둔다.
+    const want = list.includes(keep) ? keep : (list[0] || '');
+    const same = el.options.length === list.length
+      && list.every((h, i) => el.options[i].value === h);
+    if (!same) {
+      el.innerHTML = list.map(h => `<option value="${esc(h)}">${esc(h)}</option>`).join('');
+    }
+    el.value = want;
+    return want;
+  };
+  const outs = [...d.entrants].sort((x, y) => x.localeCompare(y));
+  const ins = rlRanked().map(p => p.handle).filter(h => !inEv.has(h))
+    .sort((x, y) => x.localeCompare(y));
+  evSwapSel.out = fill(document.getElementById('evSwapOut'), outs, evSwapSel.out) || '';
+  evSwapSel.in = fill(document.getElementById('evSwapIn'), ins, evSwapSel.in) || '';
+
+  const go = document.getElementById('evSwapGo');
+  if (go) go.disabled = !(evSwapSel.out && evSwapSel.in);
+}
+
+async function evSwap() {
+  if (evBusy || !evData) return;
+  const out = evSwapSel.out, inn = evSwapSel.in;
+  if (!out || !inn) return;
+  // 빠지는 사람이 이긴 경기가 있으면 그 칸이 빈다는 것을 먼저 알린다.
+  const won = Object.values(evData.picks || {}).filter(v => v === out).length;
+  if (!confirm(`${out} 자리에 ${inn} 을(를) 넣습니다.\n`
+    + '조 나누기와 적어둔 다른 결과는 그대로 남습니다.\n'
+    + (won ? `${out} 이(가) 이긴 경기 ${won}칸은 비웁니다 — 치르지 않은 경기입니다.\n` : '')
+    + '\n계속할까요?')) return;
+  evBusy = true;
+  try {
+    const r = await apiPost('/api/tournament',
+      { action: 'eventSwap', id: evData.id, out, in: inn });
+    evApply(r);
+    evSwapSel.out = '';
+    showToast(`${inn} 으로 바꿨습니다.`
+      + (r && r.cleared ? ` 결과 ${r.cleared}칸을 비웠습니다.` : ''));
+  } catch (e) { showToast(e.message); }
+  evBusy = false;
+}
+
 async function evClose() {
   if (!evData) return;
   if (!confirm('이 대회를 치웁니다.\n대진표가 화면에서 사라집니다(기록은 남습니다).\n계속할까요?')) return;
@@ -8606,6 +8675,13 @@ function initEventEvents() {
 
   const close = document.getElementById('evClose');
   if (close) close.addEventListener('click', evClose);
+
+  const swOut = document.getElementById('evSwapOut');
+  if (swOut) swOut.addEventListener('change', () => { evSwapSel.out = swOut.value; });
+  const swIn = document.getElementById('evSwapIn');
+  if (swIn) swIn.addEventListener('change', () => { evSwapSel.in = swIn.value; });
+  const swGo = document.getElementById('evSwapGo');
+  if (swGo) swGo.addEventListener('click', evSwap);
 
   const remake = document.getElementById('evRemake');
   if (remake) remake.addEventListener('click', () => {
