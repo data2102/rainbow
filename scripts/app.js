@@ -431,7 +431,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 188;
+const APP_VERSION = 189;
 let toldToRefresh = false;
 
 /**
@@ -8776,10 +8776,45 @@ function activateTab(name) {
   }
 }
 
+/**
+ * 주소로 탭을 연다 — `/#attendance`, 그리고 `/#novote`.
+ *
+ * 카카오톡 **공식** 오픈채팅봇은 미리 저장해둔 글만 보낸다. 정해둔 시각에
+ * 정해둔 문구를 뿌릴 뿐이라 매일 바뀌는 미투표 명단을 글에 넣을 수 없다.
+ * 대신 **바뀌지 않는 링크 한 줄**을 공지에 넣어두면, 누르는 그 순간의 명단이
+ * 나온다. 봇은 글만 보내고 명단은 사이트가 그린다.
+ *
+ * `#novote` 는 출석 탭을 열고 미투표자 칸까지 내려준다 — 휴대폰에서 공지를
+ * 누른 사람이 시간대 칸을 지나 한참 긁어내리지 않아도 되게.
+ * 로그인은 필요 없다(출석 화면은 로그아웃 상태에서도 보인다).
+ */
+const TAB_ALIAS = { novote: 'attendance' };
+
+function tabFromHash() {
+  const key = (location.hash || '').replace(/^#/, '').trim();
+  if (!key) return false;
+  const name = TAB_ALIAS[key] || key;
+  if (!document.getElementById('tab-' + name)) return false;
+  activateTab(name);
+  if (key === 'novote') scrollToNovote();
+  return true;
+}
+
+/** 미투표자 칸은 받아온 뒤에야 그려지므로 잠깐 기다렸다가 내린다. */
+function scrollToNovote(tries = 0) {
+  const el = document.querySelector('.slot-col.novote');
+  if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+  if (tries < 40) setTimeout(() => scrollToNovote(tries + 1), 150);
+}
+
 function initTabs() {
   document.querySelectorAll('[data-tab]').forEach(btn => {
     btn.addEventListener('click', () => activateTab(btn.dataset.tab));
   });
+
+  // 주소에 적혀 들어온 탭. 없으면 HTML 에 켜둔 순위 그대로 둔다.
+  tabFromHash();
+  window.addEventListener('hashchange', tabFromHash);
 
   const home = document.getElementById('homeLink');
   if (home) home.addEventListener('click', () => {
