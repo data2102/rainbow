@@ -331,8 +331,20 @@ const LOG_ACTIONS = [
  * 기본 출석은 그 둘만 걸고 풀 수 있는데, 걸었다는 기록이 로그에 남으면
  * 누가 자동 출석을 받고 있는지 관리자 모두가 알게 된다. 문을 좁혀 놓고
  * 기록으로 새어 나가면 좁힌 뜻이 없다.
+ *
+ * 계정 수정은 **이미 막아둔 것이 로그로 새던 자리다.** 회원 명단은 이메일을
+ * 리더·웹마스터에게만 보내는데(`list()` 의 `seeEmail`), 수정 기록에는 바뀐
+ * 주소가 그대로 적힌다(`PSN_BORY (CLAN PSN · 이메일 ...)`). 명단에서 가려 놓고
+ * 로그에서 보이면 가린 뜻이 없다.
+ *
+ * 고치는 일 자체는 관리자도 할 수 있다(`player.js` 의 `update` 는 requireStaff).
+ * 그래서 **관리자는 자기가 고친 줄도 못 본다** — 아는 것과 보이는 것이 어긋나는데,
+ * 어차피 남의 이메일은 처음부터 안 보이던 것이라 잃는 것이 없다.
+ *
+ * 지우고 되살린 기록(`remove_player`·`restore_player`)은 그대로 둔다 — 명단이
+ * 줄고 느는 일이라 관리자도 알아야 하고, 이메일이 적히지도 않는다.
  */
-const ADMIN_ONLY_ACTIONS = ['set_default_slot'];
+const ADMIN_ONLY_ACTIONS = ['set_default_slot', 'update_player'];
 
 async function logs(req, res) {
   const me = await requireStaff(req, res);
