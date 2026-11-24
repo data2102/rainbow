@@ -5600,7 +5600,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 190;
+const APP_VERSION = 191;
 let toldToRefresh = false;
 
 /**
@@ -13984,12 +13984,22 @@ function scrollToNovote(tries = 0) {
   const mark = () => { touched = true; };
   addEventListener('wheel', mark, { once: true, passive: true });
   addEventListener('touchstart', mark, { once: true, passive: true });
+  // **그때 다시 찾아야 한다.** renderAttendance 가 칸을 통째로 다시 그리므로
+  // 여기서 들고 있던 노드는 떨어져 나간 것이 되고, 떨어진 노드에 대고
+  // scrollIntoView 를 불러봐야 아무 일도 안 일어난다(실측: 475px 에서 안 움직임).
+  const again = (left) => {
+    if (touched) return;
+    const now = document.querySelector('.slot-col.novote');
+    if (!now) return;
+    if (Math.abs(now.getBoundingClientRect().top) > 24) {
+      now.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    if (left > 0) setTimeout(() => again(left - 1), 700);
+  };
   setTimeout(() => {
     removeEventListener('wheel', mark);
     removeEventListener('touchstart', mark);
-    if (touched) return;
-    const box = el.getBoundingClientRect();
-    if (Math.abs(box.top) > 24) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    again(2);
   }, 900);
 }
 
