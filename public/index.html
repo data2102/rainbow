@@ -5600,7 +5600,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 189;
+const APP_VERSION = 190;
 let toldToRefresh = false;
 
 /**
@@ -13969,11 +13969,28 @@ function tabFromHash() {
   return true;
 }
 
-/** 미투표자 칸은 받아온 뒤에야 그려지므로 잠깐 기다렸다가 내린다. */
+/**
+ * 미투표자 칸은 받아온 뒤에야 그려지므로 잠깐 기다렸다가 내린다.
+ *
+ * **한 번 내리고 끝내면 안 된다** — 아래쪽 '투표 현황 · 월별'이 늦게 들어오며
+ * 높이를 바꿔, 맞춰둔 자리가 화면 한가운데로 밀린다. 그래서 잠시 뒤 한 번 더
+ * 맞춘다. 그 사이 사람이 손으로 긁었으면 그만둔다 — 보던 자리를 뺏지 않는다.
+ */
 function scrollToNovote(tries = 0) {
   const el = document.querySelector('.slot-col.novote');
-  if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
-  if (tries < 40) setTimeout(() => scrollToNovote(tries + 1), 150);
+  if (!el) { if (tries < 40) setTimeout(() => scrollToNovote(tries + 1), 150); return; }
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  let touched = false;
+  const mark = () => { touched = true; };
+  addEventListener('wheel', mark, { once: true, passive: true });
+  addEventListener('touchstart', mark, { once: true, passive: true });
+  setTimeout(() => {
+    removeEventListener('wheel', mark);
+    removeEventListener('touchstart', mark);
+    if (touched) return;
+    const box = el.getBoundingClientRect();
+    if (Math.abs(box.top) > 24) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 900);
 }
 
 function initTabs() {
