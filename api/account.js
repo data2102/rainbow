@@ -323,6 +323,11 @@ const LOG_ACTIONS = [
   'create_player', 'update_player', 'remove_player', 'restore_player', 'set_role',
   'void_match', 'restore_match',
   'set_default_slot',
+  // 뽑기 기록을 지운 것. **지운 뒤에는 화면 어디에도 흔적이 없다** — 번호가
+  // 비는 것으로 짐작할 수 있을 뿐인데, 그 빈칸은 돌리다 실패해 번호만 날아간
+  // 경우에도 생겨서 가릴 수가 없다. 기록은 처음부터 `audit()` 가 남기고
+  // 있었는데 이 목록에 없어 안 보였을 뿐이다(2026-11-25).
+  'host_void', 'host_clear',
 ];
 
 /**

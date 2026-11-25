@@ -431,7 +431,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 191;
+const APP_VERSION = 192;
 let toldToRefresh = false;
 
 /**
@@ -4404,6 +4404,8 @@ const ACCT_ACTION_LABEL = {
   set_default_slot: '기본 출석',
   void_match: '기록 취소',
   restore_match: '취소 되돌림',
+  host_void: '뽑기 무효',
+  host_clear: '뽑기 기록 전체 삭제',
 };
 
 /* ---------- 관리자 표 쪽 넘김 ---------- */
@@ -4797,6 +4799,15 @@ function renderAcctLogs() {
       const w = (d.winners || []).join(', ');
       const lo = (d.losers || []).join(', ');
       extra = ` (승 ${w || '-'} / 패 ${lo || '-'})` + (d.reason ? ` · ${d.reason}` : '');
+    } else if (l.action === 'host_void') {
+      // 지운 판은 없어졌으므로 '언제 뽑은 판' 인지로 가리킨다. 번호(#id)는
+      // 그 판이 사라진 뒤에는 아무것도 가리키지 못한다.
+      target = d.ts ? formatDateTime(Number(d.ts)) + ' 뽑기' : '뽑기';
+      const hs = (d.hosts || []).join(', ');
+      extra = hs ? ` (호스트였던 사람 ${hs})` : '';
+    } else if (l.action === 'host_clear') {
+      target = `${d.removed != null ? d.removed + '건' : '전체'}`;
+      extra = d.withResult ? ` (결과를 올린 판 ${d.withResult}건 포함)` : '';
     } else if (l.action === 'set_default_slot') {
       extra = d.slot === null || d.slot === undefined
         ? ' (해제)'
