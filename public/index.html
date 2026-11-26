@@ -2995,7 +2995,11 @@ button.room-n:hover{ color:var(--accent); text-decoration:underline; }
 @keyframes awayPulse{ 50%{ opacity:.25; } }
 .away-t{ flex:1 1 auto; min-width:0; font-size:var(--fs-footnote); color:var(--text-primary); }
 
-/* 방만 띄운 창 — 머리글과 다른 메뉴는 접는다 */
+/* 방만 띄운 창 — 머리글과 다른 메뉴는 접는다.
+   카카오톡 띠도 여기서는 뺀다. 그 띠는 **아직 회원이 아닌 사람**을 부르는
+   것인데, 방에 들어와 있다는 것은 이미 들어온 사람이라는 뜻이다.
+   게임을 기다리는 창에서 밖으로 나가는 길을 맨 위에 둘 까닭이 없다. */
+.room-only .kakao-bar,
 .room-only #app > header,
 .room-only .sstrip,
 .room-only .tabs,
@@ -5601,7 +5605,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 192;
+const APP_VERSION = 193;
 let toldToRefresh = false;
 
 /**
