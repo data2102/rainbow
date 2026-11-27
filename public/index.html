@@ -3821,7 +3821,7 @@ if (/[?&]room=\d+/.test(location.search)) {
         </table>
       </div>
       <div class="foot-note">
-        경기를 한 번이라도 치른 선수만 표시합니다 · 승률이 같으면 승수가 많은 선수가 위로 갑니다.
+        <b>이번 달 20경기 이상</b> 치른 선수만 표시합니다 · 승률이 같으면 승수가 많은 선수가 위로 갑니다.
       </div>
     </div>
 
@@ -5371,6 +5371,21 @@ function tourDeletable() { return isAdmin() && tourLive(); }
 const ADVANCING = 4;        // 예선 통과 팀 수
 const CLAN_TOP = 5;         // 클랜 순위에 보여줄 등수
 const TOP_N = 5;            // 개인 순위 표에 보여줄 인원
+/**
+ * Best Ratio 에 오르려면 **이번 달** 치러야 하는 경기 수.
+ *
+ * 한 판만 뛰어도 오르던 때는 2승 1패(66.7%)가 2·3위에 나란히 섰다. 실력이 딱
+ * 5할인 사람도 3판을 치면 **절반의 확률로** 66.7% 이상이 나오므로, 그 자리는
+ * 잘한 사람의 자리가 아니라 동전던지기의 자리였다.
+ *
+ * 20으로 둔 까닭은 판수 분포에 **틈**이 있기 때문이다 — 적게 뛴 사람과 제대로
+ * 뛴 사람 사이가 비어 있어(9월 4→13, 10월 7→17, 11월 4→10), 선 근처에서
+ * 오락가락할 사람이 거의 없다. 이번 달 기준 29명 중 21명이 남는다.
+ *
+ * 달이 바뀌면 모두 0판에서 시작하므로 **처음 엿새쯤은 자격자가 없다.**
+ * 그동안은 빈 표 대신 '아직 아무도 채우지 못했다'고 적는다.
+ */
+const RATIO_MIN_GAMES = 20;
 const STANDING_HIGHLIGHT = 5; // STANDING 표에서 색을 달리 줄 상위 등수
 
 function teamLabel(id) {
@@ -5605,7 +5620,7 @@ async function refreshVisibleTab() {
  * 그 사람 자리는 "아직 못 쟀음"으로 비워둔다.
  */
 const PING_VERSION = 3;
-const APP_VERSION = 193;
+const APP_VERSION = 194;
 let toldToRefresh = false;
 
 /**
@@ -6136,12 +6151,12 @@ function renderTop5() {
       || '<tr><td colspan="5" class="log-empty">아직 연승 기록이 없습니다.</td></tr>';
   }
 
-  // 승률은 경기를 치른 선수만 대상으로 한다. 0전 0승이 100%로 잡히거나
-  // 0%로 목록을 채우는 것을 막기 위해서다.
+  // 승률은 **이번 달 RATIO_MIN_GAMES 경기 이상** 치른 선수만 대상으로 한다.
+  // 판수가 적으면 승률이 실력이 아니라 운을 재기 때문이다(위 상수의 설명).
   // 승률이 같으면 승수가 많은 쪽을 위로 둔다. 1승 0패와 9승 0패는 같은 100%지만
   // 무게가 다르기 때문이다.
   const byRatio = list
-    .filter(p => p.wins + p.losses > 0)
+    .filter(p => p.wins + p.losses >= RATIO_MIN_GAMES)
     .sort((a, b) => ratio(b) - ratio(a) || b.wins - a.wins || a.handle.localeCompare(b.handle))
     .slice(0, TOP_N);
 
@@ -6152,7 +6167,7 @@ function renderTop5() {
       <td class="clan-tag">${esc(p.clan)}</td>
       <td>${ratio(p)}%</td>
       <td class="win-txt">${p.wins}</td></tr>`).join('')
-      || '<tr><td colspan="5" class="log-empty">아직 경기 기록이 없습니다.</td></tr>';
+      || `<tr><td colspan="5" class="log-empty">아직 이번 달 ${RATIO_MIN_GAMES}경기를 채운 선수가 없습니다.</td></tr>`;
   }
 }
 
